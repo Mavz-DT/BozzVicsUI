@@ -16,10 +16,22 @@ const authStore =
 |--------------------------------------------------------------------------
 | API
 |--------------------------------------------------------------------------
+|
+| Local:
+| VITE_API_URL=http://localhost:5000
+|
+| Production:
+| VITE_API_URL=https://your-backend.onrender.com
+|
 */
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
 const API =
-  'http://localhost:5000/api'
+  `${API_BASE_URL}/api`
 
 const getAuthHeaders = () => {
   const token =
@@ -433,88 +445,88 @@ const formatDateTime =
     )
   }
 
-  const getTransactionReference =
-    transaction => {
-      const referenceType =
-        transaction?.referenceType
+const getTransactionReference =
+  transaction => {
+    const referenceType =
+      transaction?.referenceType
 
-      if (!referenceType) {
-        return '-'
-      }
-
-      if (
-        referenceType === 'Order'
-      ) {
-        const referenceId =
-          String(
-            transaction.referenceId || ''
-          )
-
-        if (!referenceId) {
-          return 'Order'
-        }
-
-        return `Order • ${referenceId.slice(-6).toUpperCase()}`
-      }
-
-      if (
-        referenceType === 'Expense'
-      ) {
-        return 'Expense'
-      }
-
-      if (
-        referenceType === 'System'
-      ) {
-        return 'System'
-      }
-
-      return 'Manual'
+    if (!referenceType) {
+      return '-'
     }
 
-  const getTransactionTypeClass =
-    transaction => {
-      const type =
-        transaction?.transactionType
+    if (
+      referenceType === 'Order'
+    ) {
+      const referenceId =
+        String(
+          transaction.referenceId || ''
+        )
 
-      if (
-        type === 'Sale'
-      ) {
-        return 'bg-blue-100 text-blue-700'
+      if (!referenceId) {
+        return 'Order'
       }
 
-      if (
-        type === 'Void'
-      ) {
-        return 'bg-emerald-100 text-emerald-700'
-      }
-
-      if (
-        type === 'Stock In'
-      ) {
-        return 'bg-green-100 text-green-700'
-      }
-
-      if (
-        type === 'Stock Out'
-      ) {
-        return 'bg-orange-100 text-orange-700'
-      }
-
-      if (
-        type === 'Adjustment'
-      ) {
-        return 'bg-purple-100 text-purple-700'
-      }
-
-      if (
-        type === 'Wastage'
-      ) {
-        return 'bg-red-100 text-red-700'
-      }
-
-      return 'bg-gray-100 text-gray-700'
+      return `Order • ${referenceId.slice(-6).toUpperCase()}`
     }
+
+    if (
+      referenceType === 'Expense'
+    ) {
+      return 'Expense'
+    }
+
+    if (
+      referenceType === 'System'
+    ) {
+      return 'System'
+    }
+
+    return 'Manual'
+  }
+
+const getTransactionTypeClass =
+  transaction => {
+    const type =
+      transaction?.transactionType
+
+    if (
+      type === 'Sale'
+    ) {
+      return 'bg-blue-100 text-blue-700'
+    }
+
+    if (
+      type === 'Void'
+    ) {
+      return 'bg-emerald-100 text-emerald-700'
+    }
+
+    if (
+      type === 'Stock In'
+    ) {
+      return 'bg-green-100 text-green-700'
+    }
+
+    if (
+      type === 'Stock Out'
+    ) {
+      return 'bg-orange-100 text-orange-700'
+    }
+
+    if (
+      type === 'Adjustment'
+    ) {
+      return 'bg-purple-100 text-purple-700'
+    }
+
+    if (
+      type === 'Wastage'
+    ) {
+      return 'bg-red-100 text-red-700'
+    }
+
+    return 'bg-gray-100 text-gray-700'
+  }
 
 /*
 |--------------------------------------------------------------------------
