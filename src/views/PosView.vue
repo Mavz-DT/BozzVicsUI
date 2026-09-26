@@ -35,6 +35,19 @@ const categories = ref([])
 const menus = ref([])
 const selectedCategory = ref('')
 
+/*
+|--------------------------------------------------------------------------
+| API
+|--------------------------------------------------------------------------
+*/
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
 // =========================
 // ADMIN
 // =========================
@@ -223,12 +236,19 @@ const fetchAddOns =
     try {
       const res =
         await axios.get(
-          '/api/add-ons',
+          `${API}/add-ons`,
           getAuthConfig()
         )
 
+      const data =
+        Array.isArray(
+          res.data
+        )
+          ? res.data
+          : []
+
       availableAddOns.value =
-        res.data.filter(
+        data.filter(
           addOn =>
             addOn.isAvailable
         )
@@ -248,16 +268,6 @@ const openAddOnModal =
       return
     }
 
-    /*
-     * A menu can only be ordered when:
-     *
-     * 1. It is available.
-     * 2. If stock monitoring is ON,
-     *    it must have stock.
-     *
-     * If stock monitoring is OFF,
-     * stock quantity is ignored.
-     */
     if (
       !isMenuOrderable(item)
     ) {
@@ -376,17 +386,6 @@ const confirmAddToCart =
       return
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * When monitoring is OFF, the actual menu stock
-     * should NOT limit the cart.
-     *
-     * We still keep the real stock in actualStock
-     * so the UI can display it when needed.
-     *
-     * The backend remains the final authority.
-     */
     const effectiveCartStock =
       menuItem.stockMonitoring === true
         ? Number(
@@ -435,12 +434,16 @@ const fetchOrderNumbers =
     try {
       const res =
         await axios.get(
-          '/api/order-numbers',
+          `${API}/order-numbers`,
           getAuthConfig()
         )
 
       orderNumbers.value =
-        res.data
+        Array.isArray(
+          res.data
+        )
+          ? res.data
+          : []
     } catch (error) {
       console.error(
         'Error fetching order numbers:',
@@ -528,7 +531,7 @@ const releaseOrderNumber =
 
     try {
       await axios.put(
-        `/api/order-numbers/${number}/release`,
+        `${API}/order-numbers/${number}/release`,
         {},
         getAuthConfig()
       )
@@ -1815,7 +1818,7 @@ const handlePayment =
 
       const orderResponse =
         await axios.post(
-          '/api/orders',
+          `${API}/orders`,
           orderData,
           getAuthConfig()
         )
@@ -1938,7 +1941,7 @@ const handlePayment =
 
         const paymentResponse =
           await axios.post(
-            '/api/payments',
+            `${API}/payments`,
             {
               orderId:
                 createdOrder._id,
@@ -2065,21 +2068,35 @@ const fetchData =
     try {
       const catRes =
         await axios.get(
-          '/api/categories',
+          `${API}/categories`,
           getAuthConfig()
         )
 
       const menuRes =
         await axios.get(
-          '/api/menus',
+          `${API}/menus`,
           getAuthConfig()
         )
 
+      const categoryData =
+        Array.isArray(
+          catRes.data
+        )
+          ? catRes.data
+          : []
+
+      const menuData =
+        Array.isArray(
+          menuRes.data
+        )
+          ? menuRes.data
+          : []
+
       categories.value =
-        catRes.data
+        categoryData
 
       menus.value =
-        menuRes.data
+        menuData
 
       if (
         categories.value
@@ -2172,7 +2189,7 @@ const saveCategoryOrder =
 
       const response =
         await axios.put(
-          '/api/categories/reorder',
+          `${API}/categories/reorder`,
           {
             categoryIds
           },
@@ -2260,7 +2277,7 @@ const saveMenuOrder =
     try {
       const response =
         await axios.put(
-          '/api/menus/reorder',
+          `${API}/menus/reorder`,
           {
             categoryId,
             menuIds
@@ -2385,7 +2402,6 @@ const isMenuOrderable =
     }
 
     /*
-     * IMPORTANT:
      * Stock only matters when monitoring is ON.
      */
     if (
