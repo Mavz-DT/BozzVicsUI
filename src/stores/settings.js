@@ -2,64 +2,104 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
 
-export const useSettingsStore = defineStore('settings', () => {
-  const businessName = ref("BOZZ VIC'S LOMI HOUSE")
-  const businessSubtitle = ref('Point of Sale System')
-  const themeColor = ref('#7f1d1d')
-  const isLoaded = ref(false)
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
 
-  const applyTheme = () => {
-    document.documentElement.style.setProperty(
-      '--theme-color',
-      themeColor.value
+const API = `${API_BASE_URL}/api`
+
+export const useSettingsStore = defineStore(
+  'settings',
+  () => {
+    const businessName = ref(
+      "BOZZ VIC'S LOMI HOUSE"
     )
-  }
 
-  const fetchSettings = async () => {
-    try {
-      const res = await axios.get('/api/settings')
+    const businessSubtitle = ref(
+      'Point of Sale System'
+    )
 
-      businessName.value =
-        res.data.businessName || "BOZZ VIC'S LOMI HOUSE"
+    const themeColor = ref(
+      '#7f1d1d'
+    )
 
-      businessSubtitle.value =
-        res.data.businessSubtitle || 'Point of Sale System'
+    const isLoaded = ref(false)
 
-      themeColor.value =
-        res.data.themeColor || '#7f1d1d'
+    const applyTheme = () => {
+      document.documentElement.style.setProperty(
+        '--theme-color',
+        themeColor.value
+      )
+    }
 
-      applyTheme()
-      isLoaded.value = true
-    } catch (error) {
-      console.error('Error fetching settings:', error)
+    const fetchSettings = async () => {
+      try {
+        const res =
+          await axios.get(
+            `${API}/settings`
+          )
+
+        businessName.value =
+          res.data.businessName ||
+          "BOZZ VIC'S LOMI HOUSE"
+
+        businessSubtitle.value =
+          res.data.businessSubtitle ||
+          'Point of Sale System'
+
+        themeColor.value =
+          res.data.themeColor ||
+          '#7f1d1d'
+
+        applyTheme()
+
+        isLoaded.value =
+          true
+      } catch (error) {
+        console.error(
+          'Error fetching settings:',
+          error
+        )
+      }
+    }
+
+    const updateSettings =
+      async data => {
+        const res =
+          await axios.put(
+            `${API}/settings`,
+            data
+          )
+
+        businessName.value =
+          res.data.businessName ||
+          businessName.value
+
+        businessSubtitle.value =
+          res.data.businessSubtitle ||
+          businessSubtitle.value
+
+        themeColor.value =
+          res.data.themeColor ||
+          themeColor.value
+
+        applyTheme()
+
+        isLoaded.value =
+          true
+
+        return res.data
+      }
+
+    return {
+      businessName,
+      businessSubtitle,
+      themeColor,
+      isLoaded,
+      fetchSettings,
+      updateSettings,
+      applyTheme
     }
   }
-
-  const updateSettings = async (data) => {
-    const res = await axios.put('/api/settings', data)
-
-    businessName.value =
-      res.data.businessName || businessName.value
-
-    businessSubtitle.value =
-      res.data.businessSubtitle || businessSubtitle.value
-
-    themeColor.value =
-      res.data.themeColor || themeColor.value
-
-    applyTheme()
-    isLoaded.value = true
-
-    return res.data
-  }
-
-  return {
-    businessName,
-    businessSubtitle,
-    themeColor,
-    isLoaded,
-    fetchSettings,
-    updateSettings,
-    applyTheme
-  }
-})
+)
