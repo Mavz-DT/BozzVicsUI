@@ -8,6 +8,71 @@ const settingsStore = useSettingsStore()
 const authStore = useAuthStore()
 
 // =========================
+// API
+// =========================
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+// =========================
+// RESPONSE HELPERS
+// =========================
+
+const extractArray = data => {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (Array.isArray(data?.orders)) {
+    return data.orders
+  }
+
+  if (Array.isArray(data?.settledOrders)) {
+    return data.settledOrders
+  }
+
+  if (Array.isArray(data?.salesRecords)) {
+    return data.salesRecords
+  }
+
+  if (Array.isArray(data?.records)) {
+    return data.records
+  }
+
+  if (Array.isArray(data?.payments)) {
+    return data.payments
+  }
+
+  if (Array.isArray(data?.menus)) {
+    return data.menus
+  }
+
+  if (Array.isArray(data?.addOns)) {
+    return data.addOns
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data
+  }
+
+  if (Array.isArray(data?.results)) {
+    return data.results
+  }
+
+  return []
+}
+
+const getPaymentsArray = sale => {
+  return Array.isArray(sale?.payments)
+    ? sale.payments
+    : []
+}
+
+// =========================
 // UNSETTLED ORDERS
 // =========================
 
@@ -87,15 +152,15 @@ const isAdmin = computed(() => {
 const fetchUnsettledOrders = async () => {
   try {
     isLoading.value = true
-
     error.value = ''
 
-    const res =
-      await axios.get(
-        '/api/orders/unsettled'
-      )
+    const res = await axios.get(
+      `${API}/orders/unsettled`
+    )
 
-    orders.value = res.data
+    orders.value = extractArray(
+      res.data
+    )
   } catch (err) {
     console.error(
       'Error fetching unsettled orders:',
@@ -135,19 +200,22 @@ const fetchSettledOrders = async () => {
 
     if (isAdmin.value) {
       res = await axios.get(
-        `/api/payments/sales-records?date=${selectedDate.value}`,
+        `${API}/payments/sales-records?date=${selectedDate.value}`,
         config
       )
     } else {
       res = await axios.get(
-        '/api/payments/sales-records',
+        `${API}/payments/sales-records`,
         config
       )
     }
 
+    const records =
+      extractArray(res.data)
+
     // Only show Delivery orders
     settledOrders.value =
-      (res.data || []).filter(
+      records.filter(
         sale =>
           sale.order?.orderType ===
           'Delivery'
@@ -191,30 +259,36 @@ const filteredOrders = computed(() => {
       .toLowerCase()
 
   if (!query) {
-    return orders.value
+    return Array.isArray(
+      orders.value
+    )
+      ? orders.value
+      : []
   }
 
-  return orders.value.filter(
-    order => {
-      const customerName =
-        order.customer?.name?.toLowerCase() ||
-        ''
+  return (
+    Array.isArray(orders.value)
+      ? orders.value
+      : []
+  ).filter(order => {
+    const customerName =
+      order.customer?.name?.toLowerCase() ||
+      ''
 
-      const contact =
-        order.customer?.contactNumber?.toLowerCase() ||
-        ''
+    const contact =
+      order.customer?.contactNumber?.toLowerCase() ||
+      ''
 
-      const address =
-        order.customer?.address?.toLowerCase() ||
-        ''
+    const address =
+      order.customer?.address?.toLowerCase() ||
+      ''
 
-      return (
-        customerName.includes(query) ||
-        contact.includes(query) ||
-        address.includes(query)
-      )
-    }
-  )
+    return (
+      customerName.includes(query) ||
+      contact.includes(query) ||
+      address.includes(query)
+    )
+  })
 })
 
 // =========================
@@ -228,11 +302,18 @@ const filteredSettledOrders =
         .trim()
         .toLowerCase()
 
+    const records =
+      Array.isArray(
+        settledOrders.value
+      )
+        ? settledOrders.value
+        : []
+
     if (!query) {
-      return settledOrders.value
+      return records
     }
 
-    return settledOrders.value.filter(
+    return records.filter(
       sale => {
         const customerName =
           sale.order?.customer?.name?.toLowerCase() ||
@@ -250,11 +331,23 @@ const filteredSettledOrders =
           sale.paymentMethod?.toLowerCase() ||
           ''
 
+        const payments =
+          getPaymentsArray(sale)
+
+        const hasPaymentMethod =
+          payments.some(
+            payment =>
+              payment.paymentMethod
+                ?.toLowerCase()
+                .includes(query)
+          )
+
         return (
           customerName.includes(query) ||
           contact.includes(query) ||
           address.includes(query) ||
-          paymentMethod.includes(query)
+          paymentMethod.includes(query) ||
+          hasPaymentMethod
         )
       }
     )
@@ -265,7 +358,14 @@ const filteredSettledOrders =
 // =========================
 
 const totalUnsettled = computed(() => {
-  return filteredOrders.value.reduce(
+  const records =
+    Array.isArray(
+      filteredOrders.value
+    )
+      ? filteredOrders.value
+      : []
+
+  return records.reduce(
     (sum, order) =>
       sum +
       Number(
@@ -276,7 +376,14 @@ const totalUnsettled = computed(() => {
 })
 
 const totalSettled = computed(() => {
-  return filteredSettledOrders.value.reduce(
+  const records =
+    Array.isArray(
+      filteredSettledOrders.value
+    )
+      ? filteredSettledOrders.value
+      : []
+
+  return records.reduce(
     (sum, sale) =>
       sum +
       Number(
@@ -337,8 +444,6 @@ const splitCashTenderedValue =
         splitCashTendered.value || 0
       )
 
-    // If no separate tendered amount,
-    // use Cash Amount itself.
     return tendered > 0
       ? tendered
       : splitCash.value
@@ -687,7 +792,12 @@ const getSettlementDate =
 
 const viewOrder = order => {
   const items =
-    order.items
+    Array.isArray(order?.items)
+      ? order.items
+      : []
+
+  const itemText =
+    items
       .map(
         item =>
           `${item.name} x${item.quantity}`
@@ -698,7 +808,7 @@ const viewOrder = order => {
     `Customer: ${order.customer?.name || '—'}\n` +
     `Contact: ${order.customer?.contactNumber || '—'}\n` +
     `Address: ${order.customer?.address || '—'}\n\n` +
-    `Items:\n${items}\n\n` +
+    `Items:\n${itemText}\n\n` +
     `Amount Due: ${formatAmount(
       order.netAmount
     )}`
@@ -714,7 +824,12 @@ const viewSettledOrder = sale => {
     sale.order || {}
 
   const items =
-    (order.items || [])
+    Array.isArray(order.items)
+      ? order.items
+      : []
+
+  const itemText =
+    items
       .map(
         item =>
           `${item.name} x${item.quantity}`
@@ -729,7 +844,7 @@ const viewSettledOrder = sale => {
     `Customer: ${order.customer?.name || '—'}\n` +
     `Contact: ${order.customer?.contactNumber || '—'}\n` +
     `Address: ${order.customer?.address || '—'}\n\n` +
-    `Items:\n${items}\n\n` +
+    `Items:\n${itemText}\n\n` +
     `Amount: ${formatAmount(
       sale.amount
     )}\n` +
@@ -739,6 +854,10 @@ const viewSettledOrder = sale => {
     )}`
   )
 }
+
+// =========================
+// PRINT SETTLED RECEIPT
+// =========================
 
 const printSettledReceipt = sale => {
   const order = sale?.order
@@ -768,11 +887,21 @@ const printSettledReceipt = sale => {
   const receiptDate =
     getSettlementDate(sale)
 
+  const items =
+    Array.isArray(order.items)
+      ? order.items
+      : []
+
   const itemsHtml =
-    (order.items || [])
+    items
       .map(item => {
+        const addOns =
+          Array.isArray(item.addOns)
+            ? item.addOns
+            : []
+
         const addOnTotal =
-          (item.addOns || []).reduce(
+          addOns.reduce(
             (total, addOn) =>
               total +
               Number(
@@ -786,10 +915,10 @@ const printSettledReceipt = sale => {
           addOnTotal
 
         const addOnsHtml =
-          item.addOns?.length
+          addOns.length
             ? `
               <div class="sub-item">
-                + ${item.addOns
+                + ${addOns
                   .map(
                     addOn =>
                       `${addOn.name} (${Number(
@@ -846,7 +975,7 @@ const printSettledReceipt = sale => {
   // =========================
 
   const payments =
-    sale.payments || []
+    getPaymentsArray(sale)
 
   let paymentHtml = ''
 
@@ -1205,11 +1334,6 @@ const printSettledReceipt = sale => {
             border-top: 1px dotted #000;
           }
 
-          .payment-block:first-of-type {
-            border-top: none;
-            padding-top: 0;
-          }
-
           .reference {
             text-align: right;
             word-break: break-all;
@@ -1303,13 +1427,15 @@ const printSettledReceipt = sale => {
             </span>
 
             <span>
-              ${receiptDate
-                ? new Date(
-                    receiptDate
-                  ).toLocaleString(
-                    'en-PH'
-                  )
-                : '-'}
+              ${
+                receiptDate
+                  ? new Date(
+                      receiptDate
+                    ).toLocaleString(
+                      'en-PH'
+                    )
+                  : '-'
+              }
             </span>
 
           </div>
@@ -1663,13 +1789,13 @@ const settleOrder = async () => {
 
     const res =
       await axios.post(
-        '/api/payments',
+        `${API}/payments`,
         {
           orderId:
             selectedOrder.value._id,
 
           receivedBy:
-            authStore.user._id,
+            authStore.user?._id,
 
           payments
         }
@@ -2384,7 +2510,7 @@ onMounted(() => {
                     <span
                       v-for="method in [
                         ...new Set(
-                          (sale.payments || [])
+                          getPaymentsArray(sale)
                             .filter(
                               payment =>
                                 payment.type !== 'Refund'
@@ -2410,7 +2536,7 @@ onMounted(() => {
 
                     <span
                       v-if="
-                        !sale.payments?.length
+                        getPaymentsArray(sale).length === 0
                       "
                       class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold"
                       :class="
@@ -2433,7 +2559,7 @@ onMounted(() => {
 
                   <div
                     v-if="
-                      sale.payments?.some(
+                      getPaymentsArray(sale).some(
                         payment =>
                           payment.paymentMethod ===
                             'GCash' &&
@@ -2450,7 +2576,7 @@ onMounted(() => {
                     </p>
 
                     <p
-                      v-for="payment in sale.payments.filter(
+                      v-for="payment in getPaymentsArray(sale).filter(
                         payment =>
                           payment.paymentMethod ===
                             'GCash' &&
