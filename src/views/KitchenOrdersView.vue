@@ -10,37 +10,138 @@ const isLoading = ref(true)
 const error = ref('')
 const search = ref('')
 
+// =========================
+// API
+// =========================
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+// =========================
+// RESPONSE HELPER
+// =========================
+
+const extractOrdersArray = data => {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (Array.isArray(data?.orders)) {
+    return data.orders
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data
+  }
+
+  if (Array.isArray(data?.results)) {
+    return data.results
+  }
+
+  if (Array.isArray(data?.records)) {
+    return data.records
+  }
+
+  return []
+}
+
+const getOrderItems = order => {
+  return Array.isArray(order?.items)
+    ? order.items
+    : []
+}
+
+// =========================
+// FETCH ORDERS
+// =========================
+
 const fetchOrders = async () => {
   try {
     isLoading.value = true
     error.value = ''
 
-    const res = await axios.get('/api/orders')
-    orders.value = res.data
+    const res = await axios.get(
+      `${API}/orders`
+    )
+
+    orders.value =
+      extractOrdersArray(res.data)
+
+    if (
+      !Array.isArray(res.data) &&
+      !Array.isArray(res.data?.orders) &&
+      !Array.isArray(res.data?.data) &&
+      !Array.isArray(res.data?.results) &&
+      !Array.isArray(res.data?.records)
+    ) {
+      console.warn(
+        'Unexpected kitchen orders API response:',
+        res.data
+      )
+    }
+
   } catch (err) {
-    console.error('Error fetching kitchen orders:', err)
+    console.error(
+      'Error fetching kitchen orders:',
+      err
+    )
 
     error.value =
       err.response?.data?.message ||
       'Hindi makuha ang kitchen orders.'
+
+    orders.value = []
   } finally {
     isLoading.value = false
   }
 }
 
-const kitchenOrders = computed(() => {
-  const query = search.value.trim().toLowerCase()
+// =========================
+// KITCHEN ORDERS
+// =========================
 
-  return orders.value
+const kitchenOrders = computed(() => {
+  const query =
+    search.value
+      .trim()
+      .toLowerCase()
+
+  const records =
+    Array.isArray(orders.value)
+      ? orders.value
+      : []
+
+  return records
     .filter(order =>
-      ['Active', 'Preparing', 'Ready'].includes(order.status)
+      [
+        'Active',
+        'Preparing',
+        'Ready'
+      ].includes(
+        order?.status
+      )
     )
     .filter(order => {
-      if (!query) return true
+      if (!query) {
+        return true
+      }
 
-      const orderNumber = String(order.orderNumber || '')
-      const orderType = order.orderType?.toLowerCase() || ''
-      const customerName = order.customer?.name?.toLowerCase() || ''
+      const orderNumber =
+        String(
+          order?.orderNumber || ''
+        ).toLowerCase()
+
+      const orderType =
+        order?.orderType
+          ?.toLowerCase() || ''
+
+      const customerName =
+        order?.customer?.name
+          ?.toLowerCase() || ''
 
       return (
         orderNumber.includes(query) ||
@@ -50,14 +151,29 @@ const kitchenOrders = computed(() => {
     })
 })
 
-const formatDate = date => {
-  if (!date) return ''
+// =========================
+// FORMAT DATE
+// =========================
 
-  return new Date(date).toLocaleString('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  })
+const formatDate = date => {
+  if (!date) {
+    return ''
+  }
+
+  return new Date(
+    date
+  ).toLocaleString(
+    'en-PH',
+    {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }
+  )
 }
+
+// =========================
+// STATUS CLASS
+// =========================
 
 const getStatusClass = status => {
   switch (status) {
@@ -73,45 +189,80 @@ const getStatusClass = status => {
   }
 }
 
+// =========================
+// PRINT ORDER
+// =========================
+
 const printOrder = order => {
-  const printWindow = window.open('', '_blank', 'width=400,height=700')
+  const printWindow = window.open(
+    '',
+    '_blank',
+    'width=400,height=700'
+  )
 
   if (!printWindow) {
-    alert('Hindi mabuksan ang print window. I-check ang browser popup blocker.')
+    alert(
+      'Hindi mabuksan ang print window. I-check ang browser popup blocker.'
+    )
     return
   }
 
-  const orderNumber = order.orderNumber
-    ? `#${order.orderNumber}`
-    : 'DELIVERY'
+  const orderNumber =
+    order.orderNumber
+      ? `#${order.orderNumber}`
+      : 'DELIVERY'
 
-  const customerName = order.customer?.name || ''
-  const orderType = order.orderType || ''
+  const customerName =
+    order.customer?.name || ''
 
-  const itemsHtml = order.items
-    .map(item => `
-      <div class="item">
-        <div class="qty">${item.quantity}x</div>
-        <div class="name">
-          ${item.name}
+  const orderType =
+    order.orderType || ''
 
-          ${
-            item.specialInstructions
-              ? `<div class="instruction">${item.specialInstructions}</div>`
-              : ''
-          }
+  const items =
+    getOrderItems(order)
+
+  const itemsHtml =
+    items
+      .map(item => `
+        <div class="item">
+
+          <div class="qty">
+            ${item.quantity}x
+          </div>
+
+          <div class="name">
+
+            ${item.name}
+
+            ${
+              item.specialInstructions
+                ? `
+                  <div class="instruction">
+                    ${item.specialInstructions}
+                  </div>
+                `
+                : ''
+            }
+
+          </div>
+
         </div>
-      </div>
-    `)
-    .join('')
+      `)
+      .join('')
 
   printWindow.document.write(`
     <!DOCTYPE html>
+
     <html>
+
       <head>
-        <title>Kitchen Order Ticket</title>
+
+        <title>
+          Kitchen Order Ticket
+        </title>
 
         <style>
+
           * {
             box-sizing: border-box;
           }
@@ -120,7 +271,10 @@ const printOrder = order => {
             margin: 0;
             padding: 12px;
             width: 80mm;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family:
+              Arial,
+              Helvetica,
+              sans-serif;
             color: #000;
             background: #fff;
           }
@@ -204,16 +358,21 @@ const printOrder = order => {
           }
 
           @media print {
+
             body {
               width: 80mm;
             }
+
           }
+
         </style>
+
       </head>
 
       <body>
 
         <div class="header">
+
           <div class="business">
             ${settingsStore.businessName}
           </div>
@@ -221,48 +380,97 @@ const printOrder = order => {
           <div class="title">
             KITCHEN ORDER TICKET
           </div>
+
         </div>
 
         <div class="meta">
 
           <div class="meta-row">
-            <span class="meta-label">Order</span>
-            <span>${orderNumber}</span>
+
+            <span class="meta-label">
+              Order
+            </span>
+
+            <span>
+              ${orderNumber}
+            </span>
+
           </div>
 
           <div class="meta-row">
-            <span class="meta-label">Date</span>
-            <span>
-              ${new Date(order.createdAt).toLocaleDateString('en-PH')}
+
+            <span class="meta-label">
+              Type
             </span>
+
+            <span>
+              ${orderType}
+            </span>
+
           </div>
 
           <div class="meta-row">
-            <span class="meta-label">Time</span>
-            <span>
-              ${new Date(order.createdAt).toLocaleTimeString('en-PH', {
-                hour: 'numeric',
-                minute: '2-digit',
-                second: '2-digit'
-              })}
+
+            <span class="meta-label">
+              Date
             </span>
+
+            <span>
+              ${
+                order.createdAt
+                  ? new Date(
+                      order.createdAt
+                    ).toLocaleDateString(
+                      'en-PH'
+                    )
+                  : '-'
+              }
+            </span>
+
+          </div>
+
+          <div class="meta-row">
+
+            <span class="meta-label">
+              Time
+            </span>
+
+            <span>
+              ${
+                order.createdAt
+                  ? new Date(
+                      order.createdAt
+                    ).toLocaleTimeString(
+                      'en-PH',
+                      {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      }
+                    )
+                  : '-'
+              }
+            </span>
+
           </div>
 
           ${
             customerName
               ? `
                 <div class="meta-row">
-                  <span class="meta-label">Customer</span>
-                  <span>${customerName}</span>
+
+                  <span class="meta-label">
+                    Customer
+                  </span>
+
+                  <span>
+                    ${customerName}
+                  </span>
+
                 </div>
               `
               : ''
           }
-
-          <div class="meta-row">
-            <span class="meta-label">Time</span>
-            <span>${formatDate(order.createdAt)}</span>
-          </div>
 
         </div>
 
@@ -275,6 +483,7 @@ const printOrder = order => {
         </div>
 
         <script>
+
           window.onload = function () {
             window.print()
           }
@@ -282,18 +491,28 @@ const printOrder = order => {
           window.onafterprint = function () {
             window.close()
           }
+
         <\/script>
 
       </body>
+
     </html>
   `)
 
   printWindow.document.close()
 }
 
+// =========================
+// REFRESH
+// =========================
+
 const refreshOrders = async () => {
   await fetchOrders()
 }
+
+// =========================
+// INITIAL LOAD
+// =========================
 
 onMounted(() => {
   fetchOrders()
@@ -301,26 +520,40 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+  <div
+    class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6"
+  >
 
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+
+    <div
+      class="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+    >
 
       <div>
-        <h1 class="text-2xl md:text-3xl font-black text-gray-800">
+
+        <h1
+          class="text-2xl md:text-3xl font-black text-gray-800"
+        >
           Kitchen Orders
         </h1>
 
-        <p class="text-sm text-gray-500 mt-1">
+        <p
+          class="text-sm text-gray-500 mt-1"
+        >
           Mga order na kailangang ihanda sa kitchen.
         </p>
+
       </div>
 
       <button
         @click="refreshOrders"
         type="button"
         class="px-4 py-3 rounded-xl text-white font-bold shadow-sm"
-        :style="{ backgroundColor: settingsStore.themeColor }"
+        :style="{
+          backgroundColor:
+            settingsStore.themeColor
+        }"
       >
         Refresh
       </button>
@@ -328,6 +561,7 @@ onMounted(() => {
     </div>
 
     <!-- Error -->
+
     <div
       v-if="error"
       class="bg-red-100 text-red-700 p-4 rounded-xl text-sm font-medium"
@@ -336,16 +570,22 @@ onMounted(() => {
     </div>
 
     <!-- Search -->
-    <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+
+    <div
+      class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm"
+    >
+
       <input
         v-model="search"
         type="text"
         placeholder="Search order number, customer, or order type..."
         class="w-full border border-gray-300 rounded-xl p-3 outline-none focus:ring-2 focus:ring-red-200"
       />
+
     </div>
 
     <!-- Loading -->
+
     <div
       v-if="isLoading"
       class="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-500"
@@ -354,10 +594,12 @@ onMounted(() => {
     </div>
 
     <!-- Empty -->
+
     <div
       v-else-if="kitchenOrders.length === 0"
       class="bg-white border border-gray-200 rounded-2xl p-12 text-center"
     >
+
       <div class="text-4xl mb-3">
         🍽️
       </div>
@@ -369,9 +611,11 @@ onMounted(() => {
       <p class="text-sm text-gray-400 mt-1">
         Walang kasalukuyang order na kailangang ihanda.
       </p>
+
     </div>
 
     <!-- Orders -->
+
     <div
       v-else
       class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
@@ -384,24 +628,42 @@ onMounted(() => {
       >
 
         <!-- Ticket Header -->
+
         <div
           class="px-4 py-4 flex items-center justify-between"
-          :style="{ borderTop: `5px solid ${settingsStore.themeColor}` }"
+          :style="{
+            borderTop:
+              `5px solid ${settingsStore.themeColor}`
+          }"
         >
 
           <div>
-            <p class="text-xs text-gray-400 font-semibold uppercase">
+
+            <p
+              class="text-xs text-gray-400 font-semibold uppercase"
+            >
               {{ order.orderType }}
             </p>
 
-            <h2 class="text-2xl font-black text-gray-800">
-              {{ order.orderNumber ? `#${order.orderNumber}` : 'DELIVERY' }}
+            <h2
+              class="text-2xl font-black text-gray-800"
+            >
+              {{
+                order.orderNumber
+                  ? `#${order.orderNumber}`
+                  : 'DELIVERY'
+              }}
             </h2>
+
           </div>
 
           <span
             class="px-3 py-1.5 rounded-full text-xs font-bold"
-            :class="getStatusClass(order.status)"
+            :class="
+              getStatusClass(
+                order.status
+              )
+            "
           >
             {{ order.status }}
           </span>
@@ -409,35 +671,54 @@ onMounted(() => {
         </div>
 
         <!-- Customer -->
+
         <div
-          v-if="order.orderType === 'Delivery' && order.customer?.name"
+          v-if="
+            order.orderType === 'Delivery' &&
+            order.customer?.name
+          "
           class="px-4 pb-3"
         >
-          <p class="text-xs text-gray-400">
+
+          <p
+            class="text-xs text-gray-400"
+          >
             Customer
           </p>
 
-          <p class="font-bold text-gray-800">
+          <p
+            class="font-bold text-gray-800"
+          >
             {{ order.customer.name }}
           </p>
+
         </div>
 
         <!-- Items -->
-        <div class="px-4 py-3 border-t border-gray-100">
+
+        <div
+          class="px-4 py-3 border-t border-gray-100"
+        >
 
           <div
-            v-for="item in order.items"
+            v-for="item in getOrderItems(order)"
             :key="item._id"
             class="flex gap-3 py-3 border-b border-gray-100 last:border-b-0"
           >
 
-            <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center font-black text-gray-700 shrink-0">
+            <div
+              class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center font-black text-gray-700 shrink-0"
+            >
               {{ item.quantity }}x
             </div>
 
-            <div class="flex-1 min-w-0">
+            <div
+              class="flex-1 min-w-0"
+            >
 
-              <p class="font-bold text-gray-800">
+              <p
+                class="font-bold text-gray-800"
+              >
                 {{ item.name }}
               </p>
 
@@ -445,7 +726,8 @@ onMounted(() => {
                 v-if="item.specialInstructions"
                 class="text-xs text-red-600 mt-1 font-semibold"
               >
-                Note: {{ item.specialInstructions }}
+                Note:
+                {{ item.specialInstructions }}
               </p>
 
             </div>
@@ -455,26 +737,46 @@ onMounted(() => {
         </div>
 
         <!-- Footer -->
-        <div class="px-4 py-4 bg-gray-50 border-t border-gray-100">
 
-          <div class="flex items-center justify-between gap-3">
+        <div
+          class="px-4 py-4 bg-gray-50 border-t border-gray-100"
+        >
+
+          <div
+            class="flex items-center justify-between gap-3"
+          >
 
             <div>
-              <p class="text-xs text-gray-400">
+
+              <p
+                class="text-xs text-gray-400"
+              >
                 Order Time
               </p>
 
-              <p class="text-sm font-semibold text-gray-700">
-                {{ formatDate(order.createdAt) }}
+              <p
+                class="text-sm font-semibold text-gray-700"
+              >
+                {{
+                  formatDate(
+                    order.createdAt
+                  )
+                }}
               </p>
+
             </div>
 
             <button
-              @click="printOrder(order)"
+              @click="
+                printOrder(order)
+              "
               type="button"
               title="Print kitchen ticket"
               class="px-4 py-2.5 rounded-xl text-white font-bold shadow-sm"
-              :style="{ backgroundColor: settingsStore.themeColor }"
+              :style="{
+                backgroundColor:
+                  settingsStore.themeColor
+              }"
             >
               Print KOT
             </button>
