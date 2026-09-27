@@ -445,8 +445,8 @@ const appendKey = key => {
     return
   }
 
-  keypadValue.value += key
-})
+    keypadValue.value += key
+  }
 
 /*
 |--------------------------------------------------------------------------
