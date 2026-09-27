@@ -137,6 +137,11 @@ const adminMenuItems = [
     icon: '🧾'
   },
   {
+    label: 'Manage Users',
+    to: '/manage-users',
+    icon: '🔐'
+  },
+  {
     label: 'Settings',
     to: '/settings',
     icon: '⚙️'

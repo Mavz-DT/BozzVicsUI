@@ -1,21 +1,22 @@
-import { createRouter, createWebHistory } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
-import LoginView from '../views/LoginView.vue';
-import PosView from '../views/PosView.vue';
-import InventoryView from '../views/InventoryView.vue';
-import SettingsView from '../views/SettingsView.vue';
-import ActiveOrdersView from '../views/ActiveOrdersView.vue';
-import UnsettledOrdersView from '../views/UnsettledOrdersView.vue';
-import KitchenOrdersView from '../views/KitchenOrdersView.vue';
-import AddOnsView from '../views/AddOnsView.vue';
-import SalesRecordsView from '../views/SalesRecordsView.vue';
-import OrderAuditView from '../views/OrderAuditView.vue';
-import ReportsView from '../views/ReportsView.vue';
-import AttendanceView from '../views/AttendanceView.vue';
-import EmployeesView from '../views/EmployeesView.vue';
-import ExpenseItemsView from '../views/ExpenseItemsView.vue';
-import MenuManagementView from '../views/MenuManagementView.vue';
+import LoginView from '../views/LoginView.vue'
+import PosView from '../views/PosView.vue'
+import InventoryView from '../views/InventoryView.vue'
+import SettingsView from '../views/SettingsView.vue'
+import ActiveOrdersView from '../views/ActiveOrdersView.vue'
+import UnsettledOrdersView from '../views/UnsettledOrdersView.vue'
+import KitchenOrdersView from '../views/KitchenOrdersView.vue'
+import AddOnsView from '../views/AddOnsView.vue'
+import SalesRecordsView from '../views/SalesRecordsView.vue'
+import OrderAuditView from '../views/OrderAuditView.vue'
+import ReportsView from '../views/ReportsView.vue'
+import AttendanceView from '../views/AttendanceView.vue'
+import EmployeesView from '../views/EmployeesView.vue'
+import ExpenseItemsView from '../views/ExpenseItemsView.vue'
+import MenuManagementView from '../views/MenuManagementView.vue'
+import ManageUsersView from '../views/ManageUsersView.vue'
 
 const routes = [
   {
@@ -92,6 +93,15 @@ const routes = [
     }
   },
   {
+    path: '/manage-users',
+    name: 'manage-users',
+    component: ManageUsersView,
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true
+    }
+  },
+  {
     path: '/active-orders',
     name: 'active-orders',
     component: ActiveOrdersView,
@@ -147,34 +157,34 @@ const routes = [
       requiresAdmin: true
     }
   }
-];
+]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
-});
+})
 
 router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore();
-  const user = authStore.user;
+  const authStore = useAuthStore()
+  const user = authStore.user
 
   // 1. Page requires login pero walang naka-login
   if (to.meta.requiresAuth && !user) {
-    return next('/login');
+    return next('/login')
   }
 
   // 2. Naka-login na at pumunta sa login
   if (to.path === '/login' && user) {
-    return next('/pos');
+    return next('/pos')
   }
 
   // 3. Page requires Admin pero hindi Admin ang user
   if (to.meta.requiresAdmin && user?.role !== 'Admin') {
-    return next('/pos');
+    return next('/pos')
   }
 
   // 4. Otherwise, tuloy
-  next();
-});
+  next()
+})
 
-export default router;
+export default router
