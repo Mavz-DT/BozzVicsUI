@@ -404,24 +404,23 @@ const filteredSettledOrders =
 // TOTALS
 // =========================
 
-const totalUnsettled =
-  computed(() => {
-    const records =
-      Array.isArray(
-        filteredOrders.value
+  const totalUnsettled =
+    computed(() => {
+      return orders.value.reduce(
+        (
+          total,
+          order
+        ) => {
+          return (
+            total +
+            calculateStoreAmountDue(
+              order
+            )
+          )
+        },
+        0
       )
-        ? filteredOrders.value
-        : []
-
-    return records.reduce(
-      (sum, order) =>
-        sum +
-        Number(
-          order.netAmount || 0
-        ),
-      0
-    )
-  })
+    })
 
 const totalSettled =
   computed(() => {
@@ -446,13 +445,12 @@ const totalSettled =
 // SETTLE AMOUNT
 // =========================
 
-const settleAmount =
-  computed(() => {
-    return Number(
-      selectedOrder.value?.netAmount ||
-        0
-    )
-  })
+  const settleAmount =
+    computed(() => {
+      return calculateStoreAmountDue(
+        selectedOrder.value
+      )
+    })
 
 // =========================
 // NORMAL CASH CHANGE
@@ -965,6 +963,53 @@ const keypadValue =
       }
     }
   })
+
+// =========================
+// SORE AMOUNT DUE
+// =========================
+
+  const calculateStoreAmountDue = order => {
+    const grossAmount =
+      Number(
+        order?.grossAmount || 0
+      )
+
+    const discountAmount =
+      Number(
+        order?.discountAmount || 0
+      )
+
+    const deliveryFee =
+      Number(
+        order?.deliveryFee || 0
+      )
+
+    const foodNetAmount =
+      Math.max(
+        0,
+        Number(
+          (
+            grossAmount -
+            discountAmount
+          ).toFixed(2)
+        )
+      )
+
+    const deliveryCollectedByStore =
+      order?.deliveryFeePaidBy ===
+      'Store'
+
+    return Number(
+      (
+        foodNetAmount +
+        (
+          deliveryCollectedByStore
+            ? deliveryFee
+            : 0
+        )
+      ).toFixed(2)
+    )
+  }
 
 // =========================
 // KEYPAD TARGET

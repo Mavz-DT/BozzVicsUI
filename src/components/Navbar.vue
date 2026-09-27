@@ -87,6 +87,11 @@ const moreMenuItems = [
     icon: '🧾'
   },
   {
+    label: 'Cash Ledger',
+    to: '/cash-ledger',
+    icon: '💰'
+  },
+  {
     label: 'Attendance',
     to: '/attendance',
     icon: '👥'

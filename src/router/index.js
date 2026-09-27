@@ -17,6 +17,7 @@ import EmployeesView from '../views/EmployeesView.vue'
 import ExpenseItemsView from '../views/ExpenseItemsView.vue'
 import MenuManagementView from '../views/MenuManagementView.vue'
 import ManageUsersView from '../views/ManageUsersView.vue'
+import CashLedgerView from '../views/CashLedgerView.vue'
 
 const routes = [
   {
@@ -30,6 +31,14 @@ const routes = [
   {
     path: '/pos',
     component: PosView,
+    meta: {
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/cash-ledger',
+    name: 'CashLedger',
+    component: CashLedgerView,
     meta: {
       requiresAuth: true
     }

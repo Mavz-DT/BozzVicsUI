@@ -1381,7 +1381,7 @@ const printCustomerReceipt =
                   ₱${Number(
                     payment.amount ??
                       order.storeAmountDue ??
-                      order.netAmount ||
+                      order.netAmount ??
                       0
                   ).toFixed(2)}
                 </span>

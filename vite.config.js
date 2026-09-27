@@ -5,6 +5,7 @@ import {
 
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig(
@@ -23,7 +24,42 @@ export default defineConfig(
     return {
       plugins: [
         vue(),
-        tailwindcss()
+        tailwindcss(),
+
+        VitePWA({
+          registerType: 'autoUpdate',
+
+          manifest: {
+            name: "Bozz Vic's POS",
+            short_name: "Bozz Vic's POS",
+
+            description:
+              'Restaurant Point-of-Sale System',
+
+            start_url: '/',
+            scope: '/',
+
+            display: 'standalone',
+
+            background_color: '#ffffff',
+            theme_color: '#1d4ed8',
+
+            lang: 'en',
+
+            icons: [
+              {
+                src: '/pwa-192x192.png',
+                sizes: '192x192',
+                type: 'image/png'
+              },
+              {
+                src: '/pwa-512x512.png',
+                sizes: '512x512',
+                type: 'image/png'
+              }
+            ]
+          }
+        })
       ],
 
       server: {
