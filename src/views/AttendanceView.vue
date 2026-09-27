@@ -164,6 +164,93 @@ const clearMessages = () => {
   success.value = ''
 }
 
+// =====================================================
+// API
+// =====================================================
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+// =====================================================
+// RESPONSE HELPERS
+// =====================================================
+
+const extractArray = data => {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (Array.isArray(data?.employees)) {
+    return data.employees
+  }
+
+  if (Array.isArray(data?.attendance)) {
+    return data.attendance
+  }
+
+  if (Array.isArray(data?.records)) {
+    return data.records
+  }
+
+  if (Array.isArray(data?.results)) {
+    return data.results
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data
+  }
+
+  return []
+}
+
+const parseResponse = async res => {
+  const text = await res.text()
+
+  if (!text) {
+    if (!res.ok) {
+      throw new Error(
+        `Request failed with status ${res.status}.`
+      )
+    }
+
+    return null
+  }
+
+  let result = null
+
+  try {
+    result = JSON.parse(text)
+  } catch {
+    throw new Error(
+      'Hindi valid JSON ang response ng server. I-check ang API URL at backend.'
+    )
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      result?.message ||
+      `Request failed with status ${res.status}.`
+    )
+  }
+
+  return result
+}
+
+const fetchJson = async (
+  url,
+  options = {}
+) => {
+  const res = await fetch(
+    url,
+    options
+  )
+
+  return parseResponse(res)
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -173,8 +260,8 @@ const clearMessages = () => {
 
 const fetchEmployees = async () => {
   try {
-    const res = await fetch(
-      '/api/attendance/employees',
+    const result = await fetchJson(
+      `${API}/attendance/employees`,
       {
         headers: {
           ...getAuthHeaders()
@@ -182,30 +269,20 @@ const fetchEmployees = async () => {
       }
     )
 
-    const result = await res
-      .json()
-      .catch(() => null)
-
-    if (!res.ok) {
-      throw new Error(
-        result?.message ||
-        'Failed to fetch employees.'
-      )
-    }
-
-    employees.value = result
+    employees.value = extractArray(result)
   } catch (err) {
     console.error(
       'fetchEmployees error:',
       err
     )
 
+    employees.value = []
+
     error.value =
       err.message ||
       'Failed to fetch employees.'
   }
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -229,8 +306,8 @@ const fetchRecordingAttendance = async () => {
       selectedRecordingDate.value
     )
 
-    const res = await fetch(
-      `/api/attendance?${params.toString()}`,
+    const result = await fetchJson(
+      `${API}/attendance?${params.toString()}`,
       {
         headers: {
           ...getAuthHeaders()
@@ -238,18 +315,8 @@ const fetchRecordingAttendance = async () => {
       }
     )
 
-    const result = await res
-      .json()
-      .catch(() => null)
-
-    if (!res.ok) {
-      throw new Error(
-        result?.message ||
-        'Failed to fetch attendance.'
-      )
-    }
-
-    recordingAttendance.value = result
+    recordingAttendance.value =
+      extractArray(result)
   } catch (err) {
     console.error(
       'fetchRecordingAttendance error:',
@@ -266,7 +333,6 @@ const fetchRecordingAttendance = async () => {
   }
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Attendance Rows for Recording
@@ -274,9 +340,19 @@ const fetchRecordingAttendance = async () => {
 */
 
 const recordingRows = computed(() => {
-  return employees.value.map(employee => {
+  const employeeList =
+    Array.isArray(employees.value)
+      ? employees.value
+      : []
+
+  const attendanceList =
+    Array.isArray(recordingAttendance.value)
+      ? recordingAttendance.value
+      : []
+
+  return employeeList.map(employee => {
     const record =
-      recordingAttendance.value.find(
+      attendanceList.find(
         item =>
           item.employee?._id ===
           employee._id
@@ -290,7 +366,6 @@ const recordingRows = computed(() => {
     }
   })
 })
-
 
 /*
 |--------------------------------------------------------------------------
@@ -326,7 +401,6 @@ const updateRecordingRemarks = (
   row.remarks = remarks
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Save One Attendance
@@ -346,15 +420,18 @@ const saveAttendance = async row => {
   savingId.value = row.employee._id
 
   try {
-    const res = await fetch(
-      '/api/attendance',
+    const result = await fetchJson(
+      `${API}/attendance`,
       {
         method: 'POST',
+
         headers: {
           'Content-Type':
             'application/json',
+
           ...getAuthHeaders()
         },
+
         body: JSON.stringify({
           employeeId:
             row.employee._id,
@@ -371,16 +448,10 @@ const saveAttendance = async row => {
       }
     )
 
-    const result = await res
-      .json()
-      .catch(() => null)
-
-    if (!res.ok) {
-      throw new Error(
-        result?.message ||
-        'Failed to save attendance.'
-      )
-    }
+    console.log(
+      'Attendance saved:',
+      result
+    )
 
     success.value =
       `Attendance ni ${row.employee.name} ay na-save.`
@@ -400,7 +471,6 @@ const saveAttendance = async row => {
   }
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Mark All Present
@@ -418,7 +488,6 @@ const markAllPresent = () => {
     'Lahat ng employees ay na-mark na Present.'
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Save All Attendance
@@ -428,7 +497,12 @@ const markAllPresent = () => {
 const saveAllAttendance = async () => {
   clearMessages()
 
-  if (recordingRows.value.length === 0) {
+  const rows =
+    Array.isArray(recordingRows.value)
+      ? recordingRows.value
+      : []
+
+  if (rows.length === 0) {
     error.value =
       'Walang employees na ise-save.'
 
@@ -436,7 +510,7 @@ const saveAllAttendance = async () => {
   }
 
   const incomplete =
-    recordingRows.value.find(
+    rows.find(
       row => !row.status
     )
 
@@ -450,34 +524,38 @@ const saveAllAttendance = async () => {
   savingAll.value = true
 
   try {
-    const responses = await Promise.all(
-      recordingRows.value.map(row => {
-        return fetch(
-          '/api/attendance',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              ...getAuthHeaders()
-            },
-            body: JSON.stringify({
-              employeeId:
-                row.employee._id,
+    const responses =
+      await Promise.all(
+        rows.map(row => {
+          return fetch(
+            `${API}/attendance`,
+            {
+              method: 'POST',
 
-              date:
-                selectedRecordingDate.value,
+              headers: {
+                'Content-Type':
+                  'application/json',
 
-              status:
-                row.status,
+                ...getAuthHeaders()
+              },
 
-              remarks:
-                row.remarks || ''
-            })
-          }
-        )
-      })
-    )
+              body: JSON.stringify({
+                employeeId:
+                  row.employee._id,
+
+                date:
+                  selectedRecordingDate.value,
+
+                status:
+                  row.status,
+
+                remarks:
+                  row.remarks || ''
+              })
+            }
+          )
+        })
+      )
 
     const failed =
       responses.find(
@@ -485,10 +563,18 @@ const saveAllAttendance = async () => {
       )
 
     if (failed) {
-      const result =
-        await failed
-          .json()
-          .catch(() => null)
+      const text =
+        await failed.text()
+
+      let result = null
+
+      try {
+        result = text
+          ? JSON.parse(text)
+          : null
+      } catch {
+        result = null
+      }
 
       throw new Error(
         result?.message ||
@@ -514,7 +600,6 @@ const saveAllAttendance = async () => {
   }
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Admin Recording Date
@@ -531,7 +616,6 @@ const changeRecordingDate = async () => {
     await fetchRecordingAttendance()
   }
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -562,8 +646,8 @@ const fetchHistoryAttendance = async () => {
       )
     }
 
-    const res = await fetch(
-      `/api/attendance?${params.toString()}`,
+    const result = await fetchJson(
+      `${API}/attendance?${params.toString()}`,
       {
         headers: {
           ...getAuthHeaders()
@@ -571,18 +655,8 @@ const fetchHistoryAttendance = async () => {
       }
     )
 
-    const result = await res
-      .json()
-      .catch(() => null)
-
-    if (!res.ok) {
-      throw new Error(
-        result?.message ||
-        'Failed to fetch attendance history.'
-      )
-    }
-
-    historyAttendance.value = result
+    historyAttendance.value =
+      extractArray(result)
   } catch (err) {
     console.error(
       'fetchHistoryAttendance error:',
@@ -602,7 +676,10 @@ const fetchHistoryAttendance = async () => {
 const handleAdminFilter = async () => {
   clearMessages()
 
-  if (fromDate.value > toDate.value) {
+  if (
+    fromDate.value >
+    toDate.value
+  ) {
     error.value =
       'From date cannot be later than To date.'
 
@@ -620,7 +697,6 @@ const clearAdminFilter = async () => {
   await fetchHistoryAttendance()
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | History Summary
@@ -636,7 +712,12 @@ const historySummary = computed(() => {
     'Sick Leave': 0
   }
 
-  historyAttendance.value.forEach(
+  const records =
+    Array.isArray(historyAttendance.value)
+      ? historyAttendance.value
+      : []
+
+  records.forEach(
     record => {
       if (
         counts[record.status] !==
@@ -664,7 +745,6 @@ const getRecordedBy = record => {
   )
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Initial Load
@@ -686,7 +766,6 @@ onMounted(async () => {
   }
 })
 </script>
-
 
 <template>
   <div
@@ -717,7 +796,6 @@ onMounted(async () => {
           Record at tingnan ang employee attendance.
         </p>
       </div>
-
 
       <!-- Admin Recording Date -->
 
@@ -761,7 +839,6 @@ onMounted(async () => {
 
       </div>
 
-
       <!-- Cashier Date -->
 
       <div
@@ -787,15 +864,16 @@ onMounted(async () => {
           class="font-black
             text-gray-800 mt-1"
         >
-          {{ formatDateLong(
-            selectedRecordingDate
-          ) }}
+          {{
+            formatDateLong(
+              selectedRecordingDate
+            )
+          }}
         </div>
 
       </div>
 
     </div>
-
 
     <!-- Messages -->
 
@@ -823,10 +901,7 @@ onMounted(async () => {
       {{ error }}
     </div>
 
-
-    <!-- ===================================================== -->
     <!-- RECORD ATTENDANCE -->
-    <!-- ===================================================== -->
 
     <div
       class="bg-white
@@ -860,12 +935,13 @@ onMounted(async () => {
             class="text-sm
               text-gray-500 mt-1"
           >
-            {{ formatDateLong(
-              selectedRecordingDate
-            ) }}
+            {{
+              formatDateLong(
+                selectedRecordingDate
+              )
+            }}
           </p>
         </div>
-
 
         <!-- Actions -->
 
@@ -897,7 +973,6 @@ onMounted(async () => {
           >
             ✓ Mark All Present
           </button>
-
 
           <button
             type="button"
@@ -932,7 +1007,6 @@ onMounted(async () => {
 
       </div>
 
-
       <!-- Loading -->
 
       <div
@@ -940,6 +1014,7 @@ onMounted(async () => {
         class="py-12 flex
           justify-center"
       >
+
         <div
           class="w-10 h-10
             rounded-full
@@ -951,8 +1026,8 @@ onMounted(async () => {
               settingsStore.themeColor
           }"
         ></div>
-      </div>
 
+      </div>
 
       <!-- No employees -->
 
@@ -983,7 +1058,6 @@ onMounted(async () => {
         </p>
 
       </div>
-
 
       <!-- Employee Rows -->
 
@@ -1019,7 +1093,9 @@ onMounted(async () => {
               </div>
 
               <div
-                v-if="row.employee.employeeCode"
+                v-if="
+                  row.employee.employeeCode
+                "
                 class="text-xs
                   text-gray-500 mt-1"
               >
@@ -1028,7 +1104,6 @@ onMounted(async () => {
               </div>
 
             </div>
-
 
             <div
               v-if="row.saved"
@@ -1048,7 +1123,6 @@ onMounted(async () => {
             </div>
 
           </div>
-
 
           <!-- Status Buttons -->
 
@@ -1088,7 +1162,6 @@ onMounted(async () => {
             </button>
 
           </div>
-
 
           <!-- Remarks + Save -->
 
@@ -1155,10 +1228,7 @@ onMounted(async () => {
 
     </div>
 
-
-    <!-- ===================================================== -->
     <!-- ADMIN HISTORY -->
-    <!-- ===================================================== -->
 
     <template v-if="isAdmin">
 
@@ -1189,7 +1259,6 @@ onMounted(async () => {
           </p>
 
         </div>
-
 
         <div
           class="grid grid-cols-1
@@ -1225,7 +1294,6 @@ onMounted(async () => {
 
           </div>
 
-
           <!-- To -->
 
           <div>
@@ -1252,7 +1320,6 @@ onMounted(async () => {
             />
 
           </div>
-
 
           <!-- Employee -->
 
@@ -1294,7 +1361,6 @@ onMounted(async () => {
             </select>
 
           </div>
-
 
           <!-- Filter Buttons -->
 
@@ -1339,7 +1405,6 @@ onMounted(async () => {
 
       </div>
 
-
       <!-- Summary -->
 
       <div
@@ -1381,7 +1446,6 @@ onMounted(async () => {
         </div>
 
       </div>
-
 
       <!-- History Table -->
 
@@ -1434,7 +1498,6 @@ onMounted(async () => {
 
         </div>
 
-
         <!-- Loading -->
 
         <div
@@ -1456,7 +1519,6 @@ onMounted(async () => {
           ></div>
 
         </div>
-
 
         <!-- Empty -->
 
@@ -1490,7 +1552,6 @@ onMounted(async () => {
           </p>
 
         </div>
-
 
         <!-- Table -->
 
@@ -1559,7 +1620,6 @@ onMounted(async () => {
               </tr>
 
             </thead>
-
 
             <tbody
               class="divide-y
