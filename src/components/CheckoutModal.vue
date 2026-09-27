@@ -39,6 +39,9 @@ const { totalAmount: cartTotal } =
 const paymentMethod = ref('Cash')
 const paymentStatus = ref('Paid')
 
+// Prevent accidental double submission
+const isSubmitting = ref(false)
+
 // Normal Cash
 const amountTendered = ref('')
 
@@ -445,8 +448,8 @@ const appendKey = key => {
     return
   }
 
-    keypadValue.value += key
-  }
+  keypadValue.value += key
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -496,9 +499,16 @@ const selectPaymentMethod =
 */
 
 const handleConfirm = () => {
+  // Prevent accidental double tap / duplicate submit
+  if (isSubmitting.value) {
+    return
+  }
+
   if (!isFormValid.value) {
     return
   }
+
+  isSubmitting.value = true
 
   /*
   |--------------------------------------------------------------------------
@@ -705,6 +715,8 @@ const handleConfirm = () => {
 */
 
 const closeModal = () => {
+  isSubmitting.value = false
+
   amountTendered.value = ''
   referenceNumber.value = ''
 
@@ -852,11 +864,15 @@ const closeModal = () => {
                 @click="
                   paymentStatus = 'Paid'
                 "
+                :disabled="isSubmitting"
                 :class="[
                   'flex-1 min-h-[48px] rounded-lg font-bold transition-all',
                   paymentStatus === 'Paid'
                     ? 'bg-white shadow-sm text-gray-800'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-gray-500 hover:text-gray-700',
+                  isSubmitting
+                    ? 'cursor-not-allowed opacity-60'
+                    : ''
                 ]"
               >
                 Pay Now
@@ -867,11 +883,15 @@ const closeModal = () => {
                 @click="
                   paymentStatus = 'Unsettled'
                 "
+                :disabled="isSubmitting"
                 :class="[
                   'flex-1 min-h-[48px] rounded-lg font-bold transition-all',
                   paymentStatus === 'Unsettled'
                     ? 'bg-white shadow-sm text-gray-800'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-gray-500 hover:text-gray-700',
+                  isSubmitting
+                    ? 'cursor-not-allowed opacity-60'
+                    : ''
                 ]"
               >
                 Unsettled
@@ -911,11 +931,15 @@ const closeModal = () => {
                 @click="
                   selectPaymentMethod('Cash')
                 "
+                :disabled="isSubmitting"
                 :class="[
                   'min-h-[54px] rounded-xl border font-bold transition-all',
                   paymentMethod === 'Cash'
                     ? 'bg-green-600 text-white border-green-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                  isSubmitting
+                    ? 'cursor-not-allowed opacity-60'
+                    : ''
                 ]"
               >
                 💵 Cash
@@ -929,11 +953,15 @@ const closeModal = () => {
                 @click="
                   selectPaymentMethod('GCash')
                 "
+                :disabled="isSubmitting"
                 :class="[
                   'min-h-[54px] rounded-xl border font-bold transition-all',
                   paymentMethod === 'GCash'
                     ? 'bg-purple-600 text-white border-purple-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                  isSubmitting
+                    ? 'cursor-not-allowed opacity-60'
+                    : ''
                 ]"
               >
                 📱 GCash
@@ -947,11 +975,15 @@ const closeModal = () => {
                 @click="
                   selectPaymentMethod('Split')
                 "
+                :disabled="isSubmitting"
                 :class="[
                   'min-h-[54px] rounded-xl border font-bold transition-all',
                   paymentMethod === 'Split'
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                  isSubmitting
+                    ? 'cursor-not-allowed opacity-60'
+                    : ''
                 ]"
               >
                 Split
@@ -987,7 +1019,8 @@ const closeModal = () => {
                 @click="
                   setKeypadTarget('amountTendered')
                 "
-                class="w-full p-4 border rounded-xl text-3xl font-black text-right transition-colors"
+                :disabled="isSubmitting"
+                class="w-full p-4 border rounded-xl text-3xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 :class="
                   keypadTarget ===
                   'amountTendered'
@@ -1054,7 +1087,8 @@ const closeModal = () => {
                 @click="
                   setKeypadTarget('referenceNumber')
                 "
-                class="w-full p-4 border rounded-xl text-2xl font-black text-right transition-colors"
+                :disabled="isSubmitting"
+                class="w-full p-4 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 :class="
                   keypadTarget ===
                   'referenceNumber'
@@ -1171,7 +1205,8 @@ const closeModal = () => {
                 @click="
                   setKeypadTarget('splitCashAmount')
                 "
-                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors"
+                :disabled="isSubmitting"
+                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 :class="
                   keypadTarget ===
                   'splitCashAmount'
@@ -1200,7 +1235,8 @@ const closeModal = () => {
                 @click="
                   setKeypadTarget('splitGCashAmount')
                 "
-                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors"
+                :disabled="isSubmitting"
+                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 :class="
                   keypadTarget ===
                   'splitGCashAmount'
@@ -1231,7 +1267,8 @@ const closeModal = () => {
                 @click="
                   setKeypadTarget('splitCashTendered')
                 "
-                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors"
+                :disabled="isSubmitting"
+                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 :class="
                   keypadTarget ===
                   'splitCashTendered'
@@ -1280,7 +1317,8 @@ const closeModal = () => {
                 @click="
                   setKeypadTarget('splitGCashReference')
                 "
-                class="w-full p-3.5 border rounded-xl text-xl font-black text-right transition-colors"
+                :disabled="isSubmitting"
+                class="w-full p-3.5 border rounded-xl text-xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 :class="
                   keypadTarget ===
                   'splitGCashReference'
@@ -1424,7 +1462,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('1')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 1
               </button>
@@ -1432,7 +1471,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('2')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 2
               </button>
@@ -1440,7 +1480,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('3')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 3
               </button>
@@ -1448,7 +1489,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('4')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 4
               </button>
@@ -1456,7 +1498,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('5')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 5
               </button>
@@ -1464,7 +1507,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('6')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 6
               </button>
@@ -1472,7 +1516,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('7')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 7
               </button>
@@ -1480,7 +1525,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('8')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 8
               </button>
@@ -1488,7 +1534,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('9')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 9
               </button>
@@ -1496,7 +1543,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('clear')"
-                class="h-16 sm:h-[68px] rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 text-lg font-black text-red-600 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 text-lg font-black text-red-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 C
               </button>
@@ -1504,7 +1552,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('0')"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 0
               </button>
@@ -1512,7 +1561,8 @@ const closeModal = () => {
               <button
                 type="button"
                 @click="appendKey('backspace')"
-                class="h-16 sm:h-[68px] rounded-xl bg-gray-200 hover:bg-gray-300 active:bg-gray-400 border border-gray-300 text-2xl font-black text-gray-700 shadow-sm"
+                :disabled="isSubmitting"
+                class="h-16 sm:h-[68px] rounded-xl bg-gray-200 hover:bg-gray-300 active:bg-gray-400 border border-gray-300 text-2xl font-black text-gray-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 ←
               </button>
@@ -1525,7 +1575,8 @@ const closeModal = () => {
               v-if="showDecimalKey"
               type="button"
               @click="appendKey('.')"
-              class="w-full h-14 mt-2 rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-700 shadow-sm"
+              :disabled="isSubmitting"
+              class="w-full h-14 mt-2 rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               .
             </button>
@@ -1676,7 +1727,8 @@ const closeModal = () => {
             <button
               @click="closeModal"
               type="button"
-              class="min-h-[54px] rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-black"
+              :disabled="isSubmitting"
+              class="min-h-[54px] rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-black disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancel
             </button>
@@ -1684,10 +1736,14 @@ const closeModal = () => {
             <button
               @click="handleConfirm"
               type="button"
-              :disabled="!isFormValid"
+              :disabled="
+                !isFormValid ||
+                isSubmitting
+              "
               class="min-h-[54px] rounded-xl text-white font-black shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
               :style="
-                isFormValid
+                isFormValid &&
+                !isSubmitting
                   ? {
                       backgroundColor:
                         settingsStore.themeColor
@@ -1696,11 +1752,13 @@ const closeModal = () => {
               "
             >
               {{
-                isUnsettled
-                  ? 'Save Unsettled'
-                  : paymentMethod === 'Split'
-                    ? 'Confirm Split'
-                    : 'Confirm Payment'
+                isSubmitting
+                  ? 'Processing...'
+                  : isUnsettled
+                    ? 'Save Unsettled'
+                    : paymentMethod === 'Split'
+                      ? 'Confirm Split'
+                      : 'Confirm Payment'
               }}
             </button>
 

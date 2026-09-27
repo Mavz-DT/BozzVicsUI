@@ -21,24 +21,54 @@ const cartStore = useCartStore()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 
-const { cart, totalAmount } = storeToRefs(cartStore)
+const { cart, totalAmount } =
+  storeToRefs(cartStore)
 
-const isCheckoutOpen = ref(false)
+const isCheckoutOpen =
+  ref(false)
 
-const orderType = ref('')
-const selectedOrderNumber = ref(null)
-const deliverySetupConfirmed = ref(false)
-const discountAmount = ref(0)
-const orderNumbers = ref([])
+// =========================
+// PAYMENT SUBMISSION GUARD
+// =========================
+//
+// Prevents accidental double-click
+// or duplicate confirm events from
+// creating more than one payment
+// request at the frontend level.
+//
+// =========================
 
-const categories = ref([])
-const menus = ref([])
-const selectedCategory = ref('')
+const isProcessingPayment =
+  ref(false)
+
+const orderType =
+  ref('')
+
+const selectedOrderNumber =
+  ref(null)
+
+const deliverySetupConfirmed =
+  ref(false)
+
+const discountAmount =
+  ref(0)
+
+const orderNumbers =
+  ref([])
+
+const categories =
+  ref([])
+
+const menus =
+  ref([])
+
+const selectedCategory =
+  ref('')
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 | API
-|--------------------------------------------------------------------------
+|---------------------------------------------------------------------------
 */
 
 const API_BASE_URL = (
@@ -46,24 +76,36 @@ const API_BASE_URL = (
   'http://localhost:5000'
 ).replace(/\/$/, '')
 
-const API = `${API_BASE_URL}/api`
+const API =
+  `${API_BASE_URL}/api`
 
 // =========================
 // ADMIN
 // =========================
 
-const isAdmin = computed(() => {
-  return authStore.user?.role === 'Admin'
-})
+const isAdmin =
+  computed(() => {
+    return (
+      authStore.user?.role ===
+      'Admin'
+    )
+  })
 
 // =========================
 // LAYOUT EDITOR
 // =========================
 
-const editLayoutMode = ref(false)
-const layoutSaving = ref(false)
-const layoutMessage = ref('')
-const layoutMessageType = ref('success')
+const editLayoutMode =
+  ref(false)
+
+const layoutSaving =
+  ref(false)
+
+const layoutMessage =
+  ref('')
+
+const layoutMessageType =
+  ref('success')
 
 let dragOriginalItems = {
   categories: [],
@@ -74,143 +116,180 @@ const showLayoutMessage = (
   message,
   type = 'success'
 ) => {
-  layoutMessage.value = message
-  layoutMessageType.value = type
+  layoutMessage.value =
+    message
+
+  layoutMessageType.value =
+    type
 }
 
-const clearLayoutMessage = () => {
-  layoutMessage.value = ''
-}
-
-const startLayoutEditor = () => {
-  if (!isAdmin.value) {
-    return
+const clearLayoutMessage =
+  () => {
+    layoutMessage.value =
+      ''
   }
 
-  editLayoutMode.value = true
-  clearLayoutMessage()
+const startLayoutEditor =
+  () => {
+    if (!isAdmin.value) {
+      return
+    }
 
-  showLayoutMessage(
-    'Layout Editor active. Use the ☰ handle to drag categories or menu items.'
-  )
-}
+    editLayoutMode.value =
+      true
 
-const stopLayoutEditor = () => {
-  editLayoutMode.value = false
-  clearLayoutMessage()
-}
+    clearLayoutMessage()
 
-const toggleEditLayoutMode = () => {
-  if (!isAdmin.value) {
-    return
+    showLayoutMessage(
+      'Layout Editor active. Use the ☰ handle to drag categories or menu items.'
+    )
   }
 
-  if (editLayoutMode.value) {
-    stopLayoutEditor()
-  } else {
-    startLayoutEditor()
+const stopLayoutEditor =
+  () => {
+    editLayoutMode.value =
+      false
+
+    clearLayoutMessage()
   }
-}
+
+const toggleEditLayoutMode =
+  () => {
+    if (!isAdmin.value) {
+      return
+    }
+
+    if (
+      editLayoutMode.value
+    ) {
+      stopLayoutEditor()
+    } else {
+      startLayoutEditor()
+    }
+  }
 
 // =========================
 // DRAG START / END
 // =========================
 
-const beginLayoutDrag = kind => {
-  if (
-    !editLayoutMode.value ||
-    !isAdmin.value
-  ) {
-    return
-  }
+const beginLayoutDrag =
+  kind => {
+    if (
+      !editLayoutMode.value ||
+      !isAdmin.value
+    ) {
+      return
+    }
 
-  dragOriginalItems = {
-    categories: categories.value.map(
-      category => ({
-        ...category
-      })
-    ),
+    dragOriginalItems = {
+      categories:
+        categories.value.map(
+          category => ({
+            ...category
+          })
+        ),
 
-    menus: menus.value.map(
-      menu => ({
-        ...menu
-      })
+      menus:
+        menus.value.map(
+          menu => ({
+            ...menu
+          })
+        )
+    }
+
+    clearLayoutMessage()
+
+    showLayoutMessage(
+      kind === 'category'
+        ? 'Drag the category to its new position.'
+        : 'Drag the menu item to its new position.'
     )
   }
 
-  clearLayoutMessage()
+const finishLayoutDrag =
+  async (
+    kind,
+    event
+  ) => {
+    if (
+      !editLayoutMode.value ||
+      !isAdmin.value
+    ) {
+      return
+    }
 
-  showLayoutMessage(
-    kind === 'category'
-      ? 'Drag the category to its new position.'
-      : 'Drag the menu item to its new position.'
-  )
-}
+    const oldIndex =
+      Number(
+        event?.oldIndex ?? -1
+      )
 
-const finishLayoutDrag = async (
-  kind,
-  event
-) => {
-  if (
-    !editLayoutMode.value ||
-    !isAdmin.value
-  ) {
-    return
+    const newIndex =
+      Number(
+        event?.newIndex ?? -1
+      )
+
+    if (
+      oldIndex < 0 ||
+      newIndex < 0 ||
+      oldIndex === newIndex
+    ) {
+      return
+    }
+
+    if (
+      kind ===
+      'category'
+    ) {
+      await saveCategoryOrder()
+      return
+    }
+
+    if (
+      kind ===
+      'menu'
+    ) {
+      await saveMenuOrder()
+    }
   }
-
-  const oldIndex =
-    Number(event?.oldIndex ?? -1)
-
-  const newIndex =
-    Number(event?.newIndex ?? -1)
-
-  if (
-    oldIndex < 0 ||
-    newIndex < 0 ||
-    oldIndex === newIndex
-  ) {
-    return
-  }
-
-  if (kind === 'category') {
-    await saveCategoryOrder()
-    return
-  }
-
-  if (kind === 'menu') {
-    await saveMenuOrder()
-  }
-}
 
 // =========================
 // AUTH CONFIG
 // =========================
 
-const getAuthConfig = () => {
-  const token =
-    authStore.getToken()
+const getAuthConfig =
+  () => {
+    const token =
+      authStore.getToken()
 
-  if (!token) {
-    return {}
-  }
+    if (!token) {
+      return {}
+    }
 
-  return {
-    headers: {
-      Authorization:
-        `Bearer ${token}`
+    return {
+      headers: {
+        Authorization:
+          `Bearer ${token}`
+      }
     }
   }
-}
 
 // =========================
 // DELIVERY INFORMATION
 // =========================
+//
+// Customer = customer pays rider directly
+// Store    = customer pays store,
+//            then store pays rider
+// =========================
 
-const delivery = ref({
-  customerName: '',
-  deliveryFee: 0,
-  notes: ''
-})
+const delivery =
+  ref({
+    customerName: '',
+    deliveryFee: 0,
+    deliveryFeePaidBy:
+      'Customer',
+    notes: ''
+  })
 
 // =========================
 // ADD-ONS
@@ -387,7 +466,8 @@ const confirmAddToCart =
     }
 
     const effectiveCartStock =
-      menuItem.stockMonitoring === true
+      menuItem.stockMonitoring ===
+      true
         ? Number(
             menuItem.stock || 0
           )
@@ -413,7 +493,8 @@ const confirmAddToCart =
           ),
 
         stockMonitoring:
-          menuItem.stockMonitoring === true
+          menuItem.stockMonitoring ===
+          true
       },
 
       selectedAddOns.value,
@@ -452,17 +533,21 @@ const fetchOrderNumbers =
     }
   }
 
-const resetDelivery = () => {
-  delivery.value = {
-    customerName: '',
-    deliveryFee: 0,
-    notes: ''
+const resetDelivery =
+  () => {
+    delivery.value = {
+      customerName: '',
+      deliveryFee: 0,
+      deliveryFeePaidBy:
+        'Customer',
+      notes: ''
+    }
   }
-}
 
 const handleOrderTypeChange =
   type => {
-    orderType.value = type
+    orderType.value =
+      type
 
     selectedOrderNumber.value =
       null
@@ -505,6 +590,21 @@ const confirmDeliverySetup =
     ) {
       alert(
         'Hindi puwedeng negative ang Delivery Fee.'
+      )
+
+      return
+    }
+
+    if (
+      ![
+        'Customer',
+        'Store'
+      ].includes(
+        delivery.value.deliveryFeePaidBy
+      )
+    ) {
+      alert(
+        'Piliin kung Customer o Store ang magbabayad ng delivery fee.'
       )
 
       return
@@ -613,6 +713,17 @@ const canProceedToCheckout =
         Number(
           delivery.value.deliveryFee
         ) < 0
+      ) {
+        return false
+      }
+
+      if (
+        ![
+          'Customer',
+          'Store'
+        ].includes(
+          delivery.value.deliveryFeePaidBy
+        )
       ) {
         return false
       }
@@ -1326,6 +1437,83 @@ const printCustomerReceipt =
                 : ''
             }
 
+            ${
+              order.customer?.contactNumber
+                ? `
+                  <div class="info-row">
+
+                    <span>
+                      Contact
+                    </span>
+
+                    <span>
+                      ${order.customer.contactNumber}
+                    </span>
+
+                  </div>
+                `
+                : ''
+            }
+
+            ${
+              order.customer?.address
+                ? `
+                  <div class="info-row">
+
+                    <span>
+                      Address
+                    </span>
+
+                    <span>
+                      ${order.customer.address}
+                    </span>
+
+                  </div>
+                `
+                : ''
+            }
+
+            ${
+              Number(
+                order.deliveryFee ||
+                  0
+              ) > 0
+                ? `
+                  <div class="info-row">
+
+                    <span>
+                      Delivery Fee
+                    </span>
+
+                    <span>
+                      ₱${Number(
+                        order.deliveryFee ||
+                          0
+                      ).toFixed(2)}
+                    </span>
+
+                  </div>
+
+                  <div class="info-row">
+
+                    <span>
+                      Fee Paid By
+                    </span>
+
+                    <span>
+                      ${
+                        order.deliveryFeePaidBy ===
+                        'Store'
+                          ? 'Store'
+                          : 'Customer'
+                      }
+                    </span>
+
+                  </div>
+                `
+                : ''
+            }
+
           </div>
         `
         : ''
@@ -1394,6 +1582,12 @@ const printCustomerReceipt =
               justify-content: space-between;
               gap: 10px;
               margin-bottom: 4px;
+            }
+
+            .summary-row span:last-child,
+            .info-row span:last-child {
+              text-align: right;
+              word-break: break-word;
             }
 
             .label {
@@ -1670,6 +1864,27 @@ const printCustomerReceipt =
 
 const handlePayment =
   async paymentDetails => {
+
+    // =========================
+    // FRONTEND DUPLICATE GUARD
+    // =========================
+    //
+    // Kapag may ongoing payment
+    // request, huwag nang mag-submit
+    // ulit kahit ma-trigger ulit ang
+    // confirm event.
+    //
+    // =========================
+
+    if (
+      isProcessingPayment.value
+    ) {
+      return
+    }
+
+    isProcessingPayment.value =
+      true
+
     try {
       if (
         !canProceedToCheckout.value
@@ -1798,6 +2013,13 @@ const handlePayment =
                   0
               )
             : 0,
+
+        deliveryFeePaidBy:
+          orderType.value ===
+          'Delivery'
+            ? delivery.value
+                .deliveryFeePaidBy
+            : 'Customer',
 
         discountAmount:
           discount,
@@ -1935,6 +2157,36 @@ const handlePayment =
         }
 
         // =========================
+        // CREATE PAYMENT REQUEST ID
+        // =========================
+        //
+        // One ID represents one
+        // complete payment submission.
+        //
+        // Split Cash + GCash will use
+        // the same request ID because
+        // they belong to one checkout.
+        //
+        // =========================
+
+        let paymentRequestId = ''
+
+        if (
+          typeof crypto !==
+            'undefined' &&
+          typeof crypto.randomUUID ===
+            'function'
+        ) {
+          paymentRequestId =
+            crypto.randomUUID()
+        } else {
+          paymentRequestId =
+            `${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 11)}`
+        }
+
+        // =========================
         // CREATE ALL PAYMENTS
         // ONE REQUEST
         // =========================
@@ -1948,6 +2200,8 @@ const handlePayment =
 
               receivedBy:
                 authStore.user._id,
+
+              paymentRequestId,
 
               payments:
                 paymentList.map(
@@ -2056,6 +2310,12 @@ const handlePayment =
           error.message ||
           'May naging problema sa pag-process ng order.'
       )
+
+    } finally {
+      // Always release the frontend
+      // payment submission lock.
+      isProcessingPayment.value =
+        false
     }
   }
 
@@ -2177,7 +2437,9 @@ const saveCategoryOrder =
       return
     }
 
-    layoutSaving.value = true
+    layoutSaving.value =
+      true
+
     clearLayoutMessage()
 
     try {
@@ -2227,7 +2489,8 @@ const saveCategoryOrder =
         'error'
       )
     } finally {
-      layoutSaving.value = false
+      layoutSaving.value =
+        false
     }
   }
 
@@ -2235,16 +2498,18 @@ const saveCategoryOrder =
 // SAVE MENU ORDER
 // =========================
 
-const getCurrentCategoryId = () => {
-  const category =
-    categories.value.find(
-      item =>
-        item.name ===
-        selectedCategory.value
-    )
+const getCurrentCategoryId =
+  () => {
+    const category =
+      categories.value.find(
+        item =>
+          item.name ===
+          selectedCategory.value
+      )
 
-  return category?._id || null
-}
+    return category?._id ||
+      null
+  }
 
 const saveMenuOrder =
   async () => {
@@ -2271,7 +2536,9 @@ const saveMenuOrder =
       return
     }
 
-    layoutSaving.value = true
+    layoutSaving.value =
+      true
+
     clearLayoutMessage()
 
     try {
@@ -2316,7 +2583,8 @@ const saveMenuOrder =
         'error'
       )
     } finally {
-      layoutSaving.value = false
+      layoutSaving.value =
+        false
     }
   }
 
@@ -2353,7 +2621,9 @@ const filteredMenus =
         )
     },
 
-    set(reorderedList) {
+    set(
+      reorderedList
+    ) {
       const reorderedMenus =
         reorderedList.map(
           (
@@ -2361,7 +2631,8 @@ const filteredMenus =
             index
           ) => ({
             ...menu,
-            sortOrder: index
+            sortOrder:
+              index
           })
         )
 
@@ -2396,17 +2667,17 @@ const isMenuOrderable =
     }
 
     if (
-      item.isAvailable === false
+      item.isAvailable ===
+      false
     ) {
       return false
     }
 
-    /*
-     * Stock only matters when monitoring is ON.
-     */
     if (
       item.stockMonitoring === true &&
-      Number(item.stock || 0) <= 0
+      Number(
+        item.stock || 0
+      ) <= 0
     ) {
       return false
     }
@@ -2416,25 +2687,33 @@ const isMenuOrderable =
 
 const isMenuStockMonitored =
   item => {
-    return item?.stockMonitoring === true
+    return (
+      item?.stockMonitoring ===
+      true
+    )
   }
 
 const menuStockLabel =
   item => {
     if (
-      item?.isAvailable === false
+      item?.isAvailable ===
+      false
     ) {
       return 'Unavailable'
     }
 
     if (
-      !isMenuStockMonitored(item)
+      !isMenuStockMonitored(
+        item
+      )
     ) {
       return 'Not Monitored'
     }
 
     if (
-      Number(item.stock || 0) <= 0
+      Number(
+        item.stock || 0
+      ) <= 0
     ) {
       return 'Out of Stock'
     }
@@ -2870,12 +3149,14 @@ onMounted(() => {
                   <p
                     class="text-xs text-gray-500 mt-1"
                   >
-                    Customer name is required. Other notes are optional.
+                    Customer name and delivery fee are captured here. Choose who receives the delivery fee.
                   </p>
 
                 </div>
 
                 <div class="space-y-4">
+
+                  <!-- CUSTOMER NAME -->
 
                   <div>
 
@@ -2895,6 +3176,8 @@ onMounted(() => {
                     />
 
                   </div>
+
+                  <!-- DELIVERY FEE -->
 
                   <div>
 
@@ -2927,6 +3210,188 @@ onMounted(() => {
 
                   </div>
 
+                  <!-- DELIVERY FEE PAID BY -->
+
+                  <div>
+
+                    <label
+                      class="block text-sm font-semibold text-gray-700 mb-2"
+                    >
+                      Delivery Fee Paid By
+                    </label>
+
+                    <div
+                      class="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                    >
+
+                      <!-- CUSTOMER -->
+
+                      <button
+                        type="button"
+                        @click="
+                          delivery.deliveryFeePaidBy =
+                            'Customer'
+                        "
+                        class="rounded-xl border p-4 text-left transition-all"
+                        :class="
+                          delivery.deliveryFeePaidBy ===
+                          'Customer'
+                            ? 'border-gray-400 bg-gray-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:bg-gray-50'
+                        "
+                        :style="
+                          delivery.deliveryFeePaidBy ===
+                          'Customer'
+                            ? {
+                                borderColor:
+                                  settingsStore.themeColor
+                              }
+                            : {}
+                        "
+                      >
+
+                        <div
+                          class="flex items-start gap-3"
+                        >
+
+                          <div
+                            class="mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0"
+                            :style="
+                              delivery.deliveryFeePaidBy ===
+                              'Customer'
+                                ? {
+                                    borderColor:
+                                      settingsStore.themeColor
+                                  }
+                                : {
+                                    borderColor:
+                                      '#d1d5db'
+                                  }
+                            "
+                          >
+
+                            <div
+                              v-if="
+                                delivery.deliveryFeePaidBy ===
+                                'Customer'
+                              "
+                              class="w-2.5 h-2.5 rounded-full"
+                              :style="{
+                                backgroundColor:
+                                  settingsStore.themeColor
+                              }"
+                            >
+                            </div>
+
+                          </div>
+
+                          <div>
+
+                            <p
+                              class="font-black text-gray-800"
+                            >
+                              Customer pays rider
+                            </p>
+
+                            <p
+                              class="text-xs text-gray-500 mt-1"
+                            >
+                              Customer gives the delivery fee directly to the rider.
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </button>
+
+                      <!-- STORE -->
+
+                      <button
+                        type="button"
+                        @click="
+                          delivery.deliveryFeePaidBy =
+                            'Store'
+                        "
+                        class="rounded-xl border p-4 text-left transition-all"
+                        :class="
+                          delivery.deliveryFeePaidBy ===
+                          'Store'
+                            ? 'border-gray-400 bg-gray-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:bg-gray-50'
+                        "
+                        :style="
+                          delivery.deliveryFeePaidBy ===
+                          'Store'
+                            ? {
+                                borderColor:
+                                  settingsStore.themeColor
+                              }
+                            : {}
+                        "
+                      >
+
+                        <div
+                          class="flex items-start gap-3"
+                        >
+
+                          <div
+                            class="mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0"
+                            :style="
+                              delivery.deliveryFeePaidBy ===
+                              'Store'
+                                ? {
+                                    borderColor:
+                                      settingsStore.themeColor
+                                  }
+                                : {
+                                    borderColor:
+                                      '#d1d5db'
+                                  }
+                            "
+                          >
+
+                            <div
+                              v-if="
+                                delivery.deliveryFeePaidBy ===
+                                'Store'
+                              "
+                              class="w-2.5 h-2.5 rounded-full"
+                              :style="{
+                                backgroundColor:
+                                  settingsStore.themeColor
+                              }"
+                            >
+                            </div>
+
+                          </div>
+
+                          <div>
+
+                            <p
+                              class="font-black text-gray-800"
+                            >
+                              Customer pays store
+                            </p>
+
+                            <p
+                              class="text-xs text-gray-500 mt-1"
+                            >
+                              Store collects the fee, then pays the rider.
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </button>
+
+                    </div>
+
+                  </div>
+
+                  <!-- NOTES -->
+
                   <div>
 
                     <label
@@ -2945,6 +3410,70 @@ onMounted(() => {
                     />
 
                   </div>
+
+                </div>
+
+                <!-- DELIVERY PREVIEW -->
+
+                <div
+                  class="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4"
+                >
+
+                  <div
+                    class="flex items-center justify-between gap-3"
+                  >
+
+                    <div>
+
+                      <p
+                        class="text-xs font-bold text-gray-500"
+                      >
+                        Delivery Fee Handling
+                      </p>
+
+                      <p
+                        class="font-black text-gray-800 mt-1"
+                      >
+                        {{
+                          delivery.deliveryFeePaidBy ===
+                          'Store'
+                            ? 'Store will collect the delivery fee.'
+                            : 'Customer will pay the rider directly.'
+                        }}
+                      </p>
+
+                    </div>
+
+                    <span
+                      class="text-lg font-black"
+                      :style="{
+                        color:
+                          settingsStore.themeColor
+                      }"
+                    >
+                      ₱{{
+                        Number(
+                          delivery.deliveryFee ||
+                            0
+                        ).toFixed(2)
+                      }}
+                    </span>
+
+                  </div>
+
+                  <p
+                    v-if="
+                      delivery.deliveryFeePaidBy ===
+                      'Store' &&
+                      Number(
+                        delivery.deliveryFee ||
+                          0
+                      ) > 0
+                    "
+                    class="text-xs text-orange-600 font-semibold mt-2"
+                  >
+                    After settlement, this fee will appear as Pending until the rider is paid.
+                  </p>
 
                 </div>
 
@@ -3072,7 +3601,7 @@ onMounted(() => {
           >
 
             <div
-              class="flex items-center gap-3"
+              class="flex items-center gap-3 flex-wrap"
             >
 
               <span
@@ -3100,6 +3629,31 @@ onMounted(() => {
                 class="text-sm font-bold text-gray-700"
               >
                 {{ delivery.customerName }}
+              </span>
+
+              <span
+                v-if="
+                  orderType ===
+                  'Delivery' &&
+                  Number(
+                    delivery.deliveryFee ||
+                      0
+                  ) > 0
+                "
+                class="text-xs font-bold px-3 py-1.5 rounded-full"
+                :class="
+                  delivery.deliveryFeePaidBy ===
+                  'Store'
+                    ? 'bg-orange-100 text-orange-700'
+                    : 'bg-gray-100 text-gray-700'
+                "
+              >
+                {{
+                  delivery.deliveryFeePaidBy ===
+                  'Store'
+                    ? 'Store pays rider'
+                    : 'Customer pays rider'
+                }}
               </span>
 
             </div>
@@ -3234,8 +3788,6 @@ onMounted(() => {
           >
 
             <template #item="{ element: item }">
-
-              <!-- MENU CARD -->
 
               <div
                 @click="
@@ -3544,7 +4096,10 @@ onMounted(() => {
                 "
               >
                 Stock:
-                {{ item.actualStock ?? item.stock }}
+                {{
+                  item.actualStock ??
+                  item.stock
+                }}
               </template>
 
               <template
@@ -3694,23 +4249,68 @@ onMounted(() => {
             orderType ===
             'Delivery'
           "
-          class="flex justify-between items-center text-sm mb-3"
+          class="space-y-2 mb-3"
         >
 
-          <span class="text-gray-500">
-            Delivery Fee
-          </span>
+          <!-- DELIVERY FEE -->
 
-          <span
-            class="font-semibold text-gray-700"
+          <div
+            class="flex justify-between items-center text-sm"
           >
-            ₱{{
+
+            <span class="text-gray-500">
+              Delivery Fee
+            </span>
+
+            <span
+              class="font-semibold text-gray-700"
+            >
+              ₱{{
+                Number(
+                  delivery.deliveryFee ||
+                  0
+                ).toFixed(2)
+              }}
+            </span>
+
+          </div>
+
+          <!-- DELIVERY FEE HANDLING -->
+
+          <div
+            v-if="
               Number(
                 delivery.deliveryFee ||
-                0
-              ).toFixed(2)
-            }}
-          </span>
+                  0
+              ) > 0
+            "
+            class="flex justify-between items-center gap-3"
+          >
+
+            <span
+              class="text-xs text-gray-500"
+            >
+              Fee Paid By
+            </span>
+
+            <span
+              class="text-xs font-black px-2.5 py-1 rounded-full"
+              :class="
+                delivery.deliveryFeePaidBy ===
+                'Store'
+                  ? 'bg-orange-100 text-orange-700'
+                  : 'bg-gray-100 text-gray-700'
+              "
+            >
+              {{
+                delivery.deliveryFeePaidBy ===
+                'Store'
+                  ? 'Store'
+                  : 'Customer'
+              }}
+            </span>
+
+          </div>
 
         </div>
 
