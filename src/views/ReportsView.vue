@@ -33,6 +33,19 @@ const error = ref('')
 
 /*
 |--------------------------------------------------------------------------
+| API
+|--------------------------------------------------------------------------
+*/
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+/*
+|--------------------------------------------------------------------------
 | Helpers
 |--------------------------------------------------------------------------
 */
@@ -50,7 +63,9 @@ const getTodayPhilippineDate = () => {
 }
 
 const formatAmount = amount => {
-  return `₱${Number(amount || 0).toLocaleString(
+  return `₱${Number(
+    amount || 0
+  ).toLocaleString(
     'en-PH',
     {
       minimumFractionDigits: 2,
@@ -64,7 +79,17 @@ const formatDateOnly = value => {
     return '—'
   }
 
-  return new Date(value).toLocaleDateString(
+  const date = new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '—'
+  }
+
+  return date.toLocaleDateString(
     'en-PH',
     {
       year: 'numeric',
@@ -77,12 +102,8 @@ const formatDateOnly = value => {
 
 /*
 |--------------------------------------------------------------------------
-| IMPORTANT
-|--------------------------------------------------------------------------
-|
 | Backend end date is exclusive.
-| So for display only, subtract 1 millisecond.
-|
+|--------------------------------------------------------------------------
 */
 
 const formatReportEndDate = value => {
@@ -93,6 +114,14 @@ const formatReportEndDate = value => {
   const date =
     new Date(value)
 
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '—'
+  }
+
   date.setTime(
     date.getTime() - 1
   )
@@ -100,17 +129,71 @@ const formatReportEndDate = value => {
   return formatDateOnly(date)
 }
 
+const getToken = () => {
+  let token = ''
+
+  try {
+    if (
+      typeof auth.getToken === 'function'
+    ) {
+      token =
+        auth.getToken() || ''
+    }
+  } catch (err) {
+    console.warn(
+      'Unable to get token from auth store:',
+      err
+    )
+  }
+
+  if (!token) {
+    token =
+      localStorage.getItem(
+        'token'
+      ) || ''
+  }
+
+  return token
+}
+
 const getAuthHeaders = () => {
   const token =
-    typeof auth.getToken === 'function'
-      ? auth.getToken()
-      : localStorage.getItem('token') || ''
+    getToken()
 
   return token
     ? {
-        Authorization: `Bearer ${token}`
+        Authorization:
+          `Bearer ${token}`
       }
     : {}
+}
+
+/*
+|--------------------------------------------------------------------------
+| Normalize Report Response
+|--------------------------------------------------------------------------
+*/
+
+const normalizeReportResponse = data => {
+  const source =
+    data?.reports ||
+    data?.data ||
+    data ||
+    {}
+
+  return {
+    daily:
+      source?.daily ||
+      null,
+
+    mtd:
+      source?.mtd ||
+      null,
+
+    ytd:
+      source?.ytd ||
+      null
+  }
 }
 
 /*
@@ -130,11 +213,17 @@ const isAdmin = computed(() => {
 */
 
 const activeReport = computed(() => {
-  if (activePeriod.value === 'Daily') {
+  if (
+    activePeriod.value ===
+    'Daily'
+  ) {
     return reports.value.daily
   }
 
-  if (activePeriod.value === 'MTD') {
+  if (
+    activePeriod.value ===
+    'MTD'
+  ) {
     return reports.value.mtd
   }
 
@@ -148,78 +237,93 @@ const activeReport = computed(() => {
 */
 
 const sales = computed(() => {
-  return activeReport.value?.sales || {}
+  return (
+    activeReport.value?.sales ||
+    {}
+  )
 })
 
 const totalSales = computed(() => {
   return Number(
-    sales.value.netSales || 0
+    sales.value.netSales ||
+    0
   )
 })
 
 const grossSales = computed(() => {
   return Number(
-    sales.value.grossSales || 0
+    sales.value.grossSales ||
+    0
   )
 })
 
 const discounts = computed(() => {
   return Number(
-    sales.value.discounts || 0
+    sales.value.discounts ||
+    0
   )
 })
 
 const deliveryFees = computed(() => {
   return Number(
-    sales.value.deliveryFees || 0
+    sales.value.deliveryFees ||
+    0
   )
 })
 
 const orderCount = computed(() => {
   return Number(
-    sales.value.orderCount || 0
+    sales.value.orderCount ||
+    0
   )
 })
 
 const cashSales = computed(() => {
   return Number(
-    sales.value.cash || 0
+    sales.value.cash ||
+    0
   )
 })
 
 const gcashSales = computed(() => {
   return Number(
-    sales.value.gcash || 0
+    sales.value.gcash ||
+    0
   )
 })
 
 const dineInSales = computed(() => {
   return Number(
-    sales.value.dineIn || 0
+    sales.value.dineIn ||
+    0
   )
 })
 
 const takeOutSales = computed(() => {
   return Number(
-    sales.value.takeOut || 0
+    sales.value.takeOut ||
+    0
   )
 })
 
 const deliverySales = computed(() => {
   return Number(
-    sales.value.delivery || 0
+    sales.value.delivery ||
+    0
   )
 })
 
 const refunds = computed(() => {
   return Number(
-    sales.value.refunds || 0
+    sales.value.refunds ||
+    0
   )
 })
 
 const adjustments = computed(() => {
   return Number(
-    sales.value.adjustments || 0
+    sales.value.adjustments ||
+    0
   )
 })
 
@@ -230,48 +334,58 @@ const adjustments = computed(() => {
 */
 
 const expenses = computed(() => {
-  return activeReport.value?.expenses || {}
+  return (
+    activeReport.value?.expenses ||
+    {}
+  )
 })
 
 const ingredientsExpense = computed(() => {
   return Number(
-    expenses.value.ingredients || 0
+    expenses.value.ingredients ||
+    0
   )
 })
 
 const materialsExpense = computed(() => {
   return Number(
-    expenses.value.materials || 0
+    expenses.value.materials ||
+    0
   )
 })
 
 const maintenanceExpense = computed(() => {
   return Number(
-    expenses.value.maintenance || 0
+    expenses.value.maintenance ||
+    0
   )
 })
 
 const billsExpense = computed(() => {
   return Number(
-    expenses.value.bills || 0
+    expenses.value.bills ||
+    0
   )
 })
 
 const miscellaneousExpense = computed(() => {
   return Number(
-    expenses.value.miscellaneous || 0
+    expenses.value.miscellaneous ||
+    0
   )
 })
 
 const laborExpense = computed(() => {
   return Number(
-    expenses.value.labor || 0
+    expenses.value.labor ||
+    0
   )
 })
 
 const totalExpenses = computed(() => {
   return Number(
-    expenses.value.total || 0
+    expenses.value.total ||
+    0
   )
 })
 
@@ -290,13 +404,15 @@ const billBreakdown = computed(() => {
 
 const directBillExpense = computed(() => {
   return Number(
-    billBreakdown.value.direct || 0
+    billBreakdown.value.direct ||
+    0
   )
 })
 
 const recurringBillExpense = computed(() => {
   return Number(
-    billBreakdown.value.recurring || 0
+    billBreakdown.value.recurring ||
+    0
   )
 })
 
@@ -330,84 +446,100 @@ const laborBreakdown = computed(() => {
 
 const regularLaborExpense = computed(() => {
   return Number(
-    laborBreakdown.value.regular || 0
+    laborBreakdown.value.regular ||
+    0
   )
 })
 
-const thirteenthMonthExpense = computed(() => {
-  return Number(
-    laborBreakdown.value.thirteenthMonth ||
-      0
-  )
-})
+const thirteenthMonthExpense =
+  computed(() => {
+    return Number(
+      laborBreakdown.value
+        .thirteenthMonth ||
+        0
+    )
+  })
 
-const laborBenefitsExpense = computed(() => {
-  return Number(
-    laborBreakdown.value.laborBenefits ||
-      0
-  )
-})
+const laborBenefitsExpense =
+  computed(() => {
+    return Number(
+      laborBreakdown.value
+        .laborBenefits ||
+        0
+    )
+  })
 
-const estimatedDailyRegularLabor = computed(() => {
-  return Number(
-    laborBreakdown.value
-      .regularEstimatedDaily || 0
-  )
-})
+const estimatedDailyRegularLabor =
+  computed(() => {
+    return Number(
+      laborBreakdown.value
+        .regularEstimatedDaily ||
+        0
+    )
+  })
 
-const regularEstimateSource = computed(() => {
-  return (
-    laborBreakdown.value
-      .regularEstimateSource ||
-    '—'
-  )
-})
+const regularEstimateSource =
+  computed(() => {
+    return (
+      laborBreakdown.value
+        .regularEstimateSource ||
+      '—'
+    )
+  })
 
-const dailyRegularLabor = computed(() => {
-  return (
-    laborBreakdown.value.dailyRegular ||
-    {}
-  )
-})
+const dailyRegularLabor =
+  computed(() => {
+    return (
+      laborBreakdown.value
+        .dailyRegular ||
+      {}
+    )
+  })
 
-const daily13thMonthLabor = computed(() => {
-  return (
-    laborBreakdown.value.daily13thMonth ||
-    {}
-  )
-})
+const daily13thMonthLabor =
+  computed(() => {
+    return (
+      laborBreakdown.value
+        .daily13thMonth ||
+      {}
+    )
+  })
 
-const dailyLaborBenefits = computed(() => {
-  return (
-    laborBreakdown.value
-      .dailyLaborBenefits ||
-    {}
-  )
-})
+const dailyLaborBenefits =
+  computed(() => {
+    return (
+      laborBreakdown.value
+        .dailyLaborBenefits ||
+      {}
+    )
+  })
 
-const selectedDateRegularLabor = computed(() => {
-  return Number(
-    dailyRegularLabor.value[
-      selectedDate.value
-    ] || 0
-  )
-})
+const selectedDateRegularLabor =
+  computed(() => {
+    return Number(
+      dailyRegularLabor.value[
+        selectedDate.value
+      ] || 0
+    )
+  })
 
-const selectedDate13thMonth = computed(() => {
-  return Number(
-    daily13thMonthLabor.value[
-      selectedDate.value
-    ] || 0
-  )
-})
+const selectedDate13thMonth =
+  computed(() => {
+    return Number(
+      daily13thMonthLabor.value[
+        selectedDate.value
+      ] || 0
+    )
+  })
 
-const selectedDateLaborBenefits = computed(() => {
-  return Number(
-    dailyLaborBenefits.value[
-      selectedDate.value
-    ] || 0
-  )
-})
+const selectedDateLaborBenefits =
+  computed(() => {
+    return Number(
+      dailyLaborBenefits.value[
+        selectedDate.value
+      ] || 0
+    )
+  })
 
 /*
 |--------------------------------------------------------------------------
@@ -415,11 +547,14 @@ const selectedDateLaborBenefits = computed(() => {
 |--------------------------------------------------------------------------
 */
 
-const estimatedProfit = computed(() => {
-  return Number(
-    activeReport.value?.profit?.estimated || 0
-  )
-})
+const estimatedProfit =
+  computed(() => {
+    return Number(
+      activeReport.value?.profit
+        ?.estimated ||
+      0
+    )
+  })
 
 /*
 |--------------------------------------------------------------------------
@@ -429,21 +564,29 @@ const estimatedProfit = computed(() => {
 
 const averageSales = computed(() => {
   return Number(
-    activeReport.value?.averages?.dailySales || 0
+    activeReport.value
+      ?.averages?.dailySales ||
+    0
   )
 })
 
-const averageExpenses = computed(() => {
-  return Number(
-    activeReport.value?.averages?.dailyExpenses || 0
-  )
-})
+const averageExpenses =
+  computed(() => {
+    return Number(
+      activeReport.value
+        ?.averages?.dailyExpenses ||
+      0
+    )
+  })
 
-const averageProfit = computed(() => {
-  return Number(
-    activeReport.value?.averages?.dailyProfit || 0
-  )
-})
+const averageProfit =
+  computed(() => {
+    return Number(
+      activeReport.value
+        ?.averages?.dailyProfit ||
+      0
+    )
+  })
 
 /*
 |--------------------------------------------------------------------------
@@ -464,25 +607,54 @@ const fetchReports = async () => {
   error.value = ''
 
   try {
-    const response = await axios.get(
-      '/api/reports',
-      {
-        params: {
-          date: selectedDate.value
-        },
-        headers: getAuthHeaders()
-      }
+    const token =
+      getToken()
+
+    if (!token) {
+      throw new Error(
+        'Walang authentication token. Mag-login ulit sa POS.'
+      )
+    }
+
+    const response =
+      await axios.get(
+        `${API}/reports`,
+        {
+          params: {
+            date:
+              selectedDate.value
+          },
+
+          headers:
+            getAuthHeaders()
+        }
+      )
+
+    console.log(
+      'Reports API response:',
+      response.data
     )
 
-    reports.value = {
-      daily:
-        response.data?.daily || null,
+    const normalized =
+      normalizeReportResponse(
+        response.data
+      )
 
-      mtd:
-        response.data?.mtd || null,
+    reports.value =
+      normalized
 
-      ytd:
-        response.data?.ytd || null
+    const hasAnyReport =
+      Boolean(
+        normalized.daily ||
+        normalized.mtd ||
+        normalized.ytd
+      )
+
+    if (!hasAnyReport) {
+      console.warn(
+        'No daily/MTD/YTD report objects found in API response.',
+        response.data
+      )
     }
   } catch (err) {
     console.error(
@@ -496,9 +668,22 @@ const fetchReports = async () => {
       ytd: null
     }
 
-    error.value =
-      err?.response?.data?.message ||
-      'Failed to load reports.'
+    if (
+      err?.response?.status ===
+      401
+    ) {
+      error.value =
+        'Session expired o invalid ang login token. Mag-login ulit sa POS.'
+    } else if (
+      err?.response?.data?.message
+    ) {
+      error.value =
+        err.response.data.message
+    } else {
+      error.value =
+        err?.message ||
+        'Failed to load reports.'
+    }
   } finally {
     isLoading.value = false
   }
@@ -521,7 +706,8 @@ const handleDateChange = () => {
 */
 
 const selectPeriod = period => {
-  activePeriod.value = period
+  activePeriod.value =
+    period
 }
 
 /*
@@ -531,7 +717,9 @@ const selectPeriod = period => {
 */
 
 const expensePercentage = amount => {
-  if (totalExpenses.value <= 0) {
+  if (
+    totalExpenses.value <= 0
+  ) {
     return 0
   }
 
@@ -563,9 +751,7 @@ onMounted(() => {
     class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6"
   >
 
-    <!-- ====================================================== -->
     <!-- ADMIN CHECK -->
-    <!-- ====================================================== -->
 
     <div
       v-if="!isAdmin"
@@ -576,9 +762,7 @@ onMounted(() => {
 
     <template v-else>
 
-      <!-- ================================================== -->
       <!-- HEADER -->
-      <!-- ================================================== -->
 
       <div
         class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
@@ -621,9 +805,7 @@ onMounted(() => {
 
       </div>
 
-      <!-- ================================================== -->
       <!-- ERROR -->
-      <!-- ================================================== -->
 
       <div
         v-if="error"
@@ -632,9 +814,7 @@ onMounted(() => {
         {{ error }}
       </div>
 
-      <!-- ================================================== -->
       <!-- PERIOD SELECTOR -->
-      <!-- ================================================== -->
 
       <div
         class="bg-white border border-gray-200 rounded-2xl p-2 shadow-sm"
@@ -646,7 +826,9 @@ onMounted(() => {
 
           <button
             type="button"
-            @click="selectPeriod('Daily')"
+            @click="
+              selectPeriod('Daily')
+            "
             :class="[
               'py-3 rounded-xl font-black transition-all',
               activePeriod === 'Daily'
@@ -667,7 +849,9 @@ onMounted(() => {
 
           <button
             type="button"
-            @click="selectPeriod('MTD')"
+            @click="
+              selectPeriod('MTD')
+            "
             :class="[
               'py-3 rounded-xl font-black transition-all',
               activePeriod === 'MTD'
@@ -688,7 +872,9 @@ onMounted(() => {
 
           <button
             type="button"
-            @click="selectPeriod('YTD')"
+            @click="
+              selectPeriod('YTD')
+            "
             :class="[
               'py-3 rounded-xl font-black transition-all',
               activePeriod === 'YTD'
@@ -711,9 +897,7 @@ onMounted(() => {
 
       </div>
 
-      <!-- ================================================== -->
       <!-- LOADING -->
-      <!-- ================================================== -->
 
       <div
         v-if="isLoading"
@@ -738,9 +922,7 @@ onMounted(() => {
         v-else-if="activeReport"
       >
 
-        <!-- ================================================= -->
         <!-- PERIOD INFO -->
-        <!-- ================================================= -->
 
         <div
           class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm"
@@ -771,9 +953,17 @@ onMounted(() => {
             >
 
               <p>
-                {{ formatDateOnly(activeReport.start) }}
+                {{
+                  formatDateOnly(
+                    activeReport.start
+                  )
+                }}
                 —
-                {{ formatReportEndDate(activeReport.end) }}
+                {{
+                  formatReportEndDate(
+                    activeReport.end
+                  )
+                }}
               </p>
 
             </div>
@@ -782,9 +972,7 @@ onMounted(() => {
 
         </div>
 
-        <!-- ================================================= -->
         <!-- TOP SUMMARY -->
-        <!-- ================================================= -->
 
         <div
           class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
@@ -862,7 +1050,11 @@ onMounted(() => {
                   : 'text-red-600'
               "
             >
-              {{ formatAmount(estimatedProfit) }}
+              {{
+                formatAmount(
+                  estimatedProfit
+                )
+              }}
             </p>
 
             <p
@@ -901,9 +1093,7 @@ onMounted(() => {
 
         </div>
 
-        <!-- ================================================= -->
         <!-- SALES SUMMARY -->
-        <!-- ================================================= -->
 
         <section class="space-y-4">
 
@@ -952,7 +1142,11 @@ onMounted(() => {
                 <span
                   class="font-black text-gray-800"
                 >
-                  {{ formatAmount(grossSales) }}
+                  {{
+                    formatAmount(
+                      grossSales
+                    )
+                  }}
                 </span>
 
               </div>
@@ -970,7 +1164,11 @@ onMounted(() => {
                 <span
                   class="font-black text-red-600"
                 >
-                  -{{ formatAmount(discounts) }}
+                  -{{
+                    formatAmount(
+                      discounts
+                    )
+                  }}
                 </span>
 
               </div>
@@ -988,7 +1186,11 @@ onMounted(() => {
                 <span
                   class="font-black text-blue-600"
                 >
-                  +{{ formatAmount(deliveryFees) }}
+                  +{{
+                    formatAmount(
+                      deliveryFees
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1006,7 +1208,11 @@ onMounted(() => {
                 <span
                   class="font-black text-green-600"
                 >
-                  {{ formatAmount(totalSales) }}
+                  {{
+                    formatAmount(
+                      totalSales
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1038,7 +1244,11 @@ onMounted(() => {
                 <span
                   class="font-black text-green-600"
                 >
-                  {{ formatAmount(cashSales) }}
+                  {{
+                    formatAmount(
+                      cashSales
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1056,7 +1266,11 @@ onMounted(() => {
                 <span
                   class="font-black text-blue-600"
                 >
-                  {{ formatAmount(gcashSales) }}
+                  {{
+                    formatAmount(
+                      gcashSales
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1074,7 +1288,11 @@ onMounted(() => {
                 <span
                   class="font-black text-red-600"
                 >
-                  -{{ formatAmount(refunds) }}
+                  -{{
+                    formatAmount(
+                      refunds
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1092,7 +1310,11 @@ onMounted(() => {
                 <span
                   class="font-black text-blue-600"
                 >
-                  {{ formatAmount(adjustments) }}
+                  {{
+                    formatAmount(
+                      adjustments
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1103,9 +1325,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================= -->
         <!-- ORDER TYPE SALES -->
-        <!-- ================================================= -->
 
         <section class="space-y-4">
 
@@ -1142,7 +1362,10 @@ onMounted(() => {
                 <span
                   class="px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-black"
                 >
-                  {{ sales.dineInCount || 0 }}
+                  {{
+                    sales.dineInCount ||
+                    0
+                  }}
                 </span>
 
               </div>
@@ -1150,7 +1373,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-purple-600 mt-3"
               >
-                {{ formatAmount(dineInSales) }}
+                {{
+                  formatAmount(
+                    dineInSales
+                  )
+                }}
               </p>
 
             </div>
@@ -1174,7 +1401,10 @@ onMounted(() => {
                 <span
                   class="px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-black"
                 >
-                  {{ sales.takeOutCount || 0 }}
+                  {{
+                    sales.takeOutCount ||
+                    0
+                  }}
                 </span>
 
               </div>
@@ -1182,7 +1412,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-orange-600 mt-3"
               >
-                {{ formatAmount(takeOutSales) }}
+                {{
+                  formatAmount(
+                    takeOutSales
+                  )
+                }}
               </p>
 
             </div>
@@ -1206,7 +1440,10 @@ onMounted(() => {
                 <span
                   class="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-black"
                 >
-                  {{ sales.deliveryCount || 0 }}
+                  {{
+                    sales.deliveryCount ||
+                    0
+                  }}
                 </span>
 
               </div>
@@ -1214,7 +1451,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-blue-600 mt-3"
               >
-                {{ formatAmount(deliverySales) }}
+                {{
+                  formatAmount(
+                    deliverySales
+                  )
+                }}
               </p>
 
             </div>
@@ -1223,9 +1464,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================= -->
         <!-- EXPENSE BREAKDOWN -->
-        <!-- ================================================= -->
 
         <section class="space-y-4">
 
@@ -1266,7 +1505,11 @@ onMounted(() => {
                 <span
                   class="font-black text-gray-800"
                 >
-                  {{ formatAmount(ingredientsExpense) }}
+                  {{
+                    formatAmount(
+                      ingredientsExpense
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1274,6 +1517,7 @@ onMounted(() => {
               <div
                 class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
               >
+
                 <div
                   class="h-full bg-green-500 rounded-full"
                   :style="{
@@ -1281,6 +1525,7 @@ onMounted(() => {
                       `${expensePercentage(ingredientsExpense)}%`
                   }"
                 ></div>
+
               </div>
 
             </div>
@@ -1302,7 +1547,11 @@ onMounted(() => {
                 <span
                   class="font-black text-gray-800"
                 >
-                  {{ formatAmount(materialsExpense) }}
+                  {{
+                    formatAmount(
+                      materialsExpense
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1310,6 +1559,7 @@ onMounted(() => {
               <div
                 class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
               >
+
                 <div
                   class="h-full bg-yellow-500 rounded-full"
                   :style="{
@@ -1317,6 +1567,7 @@ onMounted(() => {
                       `${expensePercentage(materialsExpense)}%`
                   }"
                 ></div>
+
               </div>
 
             </div>
@@ -1338,7 +1589,11 @@ onMounted(() => {
                 <span
                   class="font-black text-gray-800"
                 >
-                  {{ formatAmount(maintenanceExpense) }}
+                  {{
+                    formatAmount(
+                      maintenanceExpense
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1346,6 +1601,7 @@ onMounted(() => {
               <div
                 class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
               >
+
                 <div
                   class="h-full bg-orange-500 rounded-full"
                   :style="{
@@ -1353,6 +1609,7 @@ onMounted(() => {
                       `${expensePercentage(maintenanceExpense)}%`
                   }"
                 ></div>
+
               </div>
 
             </div>
@@ -1374,7 +1631,11 @@ onMounted(() => {
                 <span
                   class="font-black text-gray-800"
                 >
-                  {{ formatAmount(billsExpense) }}
+                  {{
+                    formatAmount(
+                      billsExpense
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1382,6 +1643,7 @@ onMounted(() => {
               <div
                 class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
               >
+
                 <div
                   class="h-full bg-red-500 rounded-full"
                   :style="{
@@ -1389,6 +1651,7 @@ onMounted(() => {
                       `${expensePercentage(billsExpense)}%`
                   }"
                 ></div>
+
               </div>
 
             </div>
@@ -1410,7 +1673,11 @@ onMounted(() => {
                 <span
                   class="font-black text-gray-800"
                 >
-                  {{ formatAmount(miscellaneousExpense) }}
+                  {{
+                    formatAmount(
+                      miscellaneousExpense
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1418,6 +1685,7 @@ onMounted(() => {
               <div
                 class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
               >
+
                 <div
                   class="h-full bg-gray-500 rounded-full"
                   :style="{
@@ -1425,6 +1693,7 @@ onMounted(() => {
                       `${expensePercentage(miscellaneousExpense)}%`
                   }"
                 ></div>
+
               </div>
 
             </div>
@@ -1446,7 +1715,11 @@ onMounted(() => {
                 <span
                   class="font-black text-gray-800"
                 >
-                  {{ formatAmount(laborExpense) }}
+                  {{
+                    formatAmount(
+                      laborExpense
+                    )
+                  }}
                 </span>
 
               </div>
@@ -1454,6 +1727,7 @@ onMounted(() => {
               <div
                 class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
               >
+
                 <div
                   class="h-full bg-purple-500 rounded-full"
                   :style="{
@@ -1461,6 +1735,7 @@ onMounted(() => {
                       `${expensePercentage(laborExpense)}%`
                   }"
                 ></div>
+
               </div>
 
             </div>
@@ -1480,7 +1755,11 @@ onMounted(() => {
               <span
                 class="text-xl font-black text-red-600"
               >
-                {{ formatAmount(totalExpenses) }}
+                {{
+                  formatAmount(
+                    totalExpenses
+                  )
+                }}
               </span>
 
             </div>
@@ -1489,9 +1768,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================= -->
         <!-- BILL BREAKDOWN -->
-        <!-- ================================================= -->
 
         <section class="space-y-4">
 
@@ -1530,7 +1807,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-gray-800 mt-2"
               >
-                {{ formatAmount(directBillExpense) }}
+                {{
+                  formatAmount(
+                    directBillExpense
+                  )
+                }}
               </p>
 
               <p
@@ -1556,7 +1837,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-blue-600 mt-2"
               >
-                {{ formatAmount(recurringBillExpense) }}
+                {{
+                  formatAmount(
+                    recurringBillExpense
+                  )
+                }}
               </p>
 
               <p
@@ -1582,7 +1867,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-red-600 mt-2"
               >
-                {{ formatAmount(selectedDateBillAllocation) }}
+                {{
+                  formatAmount(
+                    selectedDateBillAllocation
+                  )
+                }}
               </p>
 
               <p
@@ -1597,9 +1886,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================= -->
         <!-- LABOR BREAKDOWN -->
-        <!-- ================================================= -->
 
         <section class="space-y-4">
 
@@ -1638,7 +1925,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-purple-600 mt-2"
               >
-                {{ formatAmount(regularLaborExpense) }}
+                {{
+                  formatAmount(
+                    regularLaborExpense
+                  )
+                }}
               </p>
 
               <p
@@ -1664,7 +1955,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-blue-600 mt-2"
               >
-                {{ formatAmount(thirteenthMonthExpense) }}
+                {{
+                  formatAmount(
+                    thirteenthMonthExpense
+                  )
+                }}
               </p>
 
               <p
@@ -1690,7 +1985,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-green-600 mt-2"
               >
-                {{ formatAmount(laborBenefitsExpense) }}
+                {{
+                  formatAmount(
+                    laborBenefitsExpense
+                  )
+                }}
               </p>
 
               <p
@@ -1716,13 +2015,18 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-gray-800 mt-2"
               >
-                {{ formatAmount(estimatedDailyRegularLabor) }}
+                {{
+                  formatAmount(
+                    estimatedDailyRegularLabor
+                  )
+                }}
               </p>
 
               <p
                 class="text-xs text-gray-500 mt-1"
               >
-                Source: {{ regularEstimateSource }}
+                Source:
+                {{ regularEstimateSource }}
               </p>
 
             </div>
@@ -1731,9 +2035,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================= -->
         <!-- SELECTED DATE LABOR ALLOCATION -->
-        <!-- ================================================= -->
 
         <section class="space-y-4">
 
@@ -1776,7 +2078,11 @@ onMounted(() => {
                 <p
                   class="text-xl font-black text-purple-700 mt-2"
                 >
-                  {{ formatAmount(selectedDateRegularLabor) }}
+                  {{
+                    formatAmount(
+                      selectedDateRegularLabor
+                    )
+                  }}
                 </p>
 
               </div>
@@ -1796,7 +2102,11 @@ onMounted(() => {
                 <p
                   class="text-xl font-black text-blue-700 mt-2"
                 >
-                  {{ formatAmount(selectedDate13thMonth) }}
+                  {{
+                    formatAmount(
+                      selectedDate13thMonth
+                    )
+                  }}
                 </p>
 
               </div>
@@ -1816,7 +2126,11 @@ onMounted(() => {
                 <p
                   class="text-xl font-black text-green-700 mt-2"
                 >
-                  {{ formatAmount(selectedDateLaborBenefits) }}
+                  {{
+                    formatAmount(
+                      selectedDateLaborBenefits
+                    )
+                  }}
                 </p>
 
               </div>
@@ -1851,9 +2165,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================= -->
         <!-- AVERAGES -->
-        <!-- ================================================= -->
 
         <section class="space-y-4">
 
@@ -1890,7 +2202,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-green-600 mt-2"
               >
-                {{ formatAmount(averageSales) }}
+                {{
+                  formatAmount(
+                    averageSales
+                  )
+                }}
               </p>
 
             </div>
@@ -1908,7 +2224,11 @@ onMounted(() => {
               <p
                 class="text-2xl font-black text-red-600 mt-2"
               >
-                {{ formatAmount(averageExpenses) }}
+                {{
+                  formatAmount(
+                    averageExpenses
+                  )
+                }}
               </p>
 
             </div>
@@ -1931,7 +2251,11 @@ onMounted(() => {
                     : 'text-red-600'
                 "
               >
-                {{ formatAmount(averageProfit) }}
+                {{
+                  formatAmount(
+                    averageProfit
+                  )
+                }}
               </p>
 
             </div>
@@ -1940,9 +2264,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================= -->
         <!-- PROFIT SUMMARY -->
-        <!-- ================================================= -->
 
         <section>
 
@@ -1980,7 +2302,11 @@ onMounted(() => {
                       : 'text-red-700'
                   "
                 >
-                  {{ formatAmount(estimatedProfit) }}
+                  {{
+                    formatAmount(
+                      estimatedProfit
+                    )
+                  }}
                 </p>
 
                 <p
@@ -2028,9 +2354,7 @@ onMounted(() => {
 
       </template>
 
-      <!-- ================================================== -->
       <!-- NO REPORT -->
-      <!-- ================================================== -->
 
       <div
         v-else-if="!isLoading"
