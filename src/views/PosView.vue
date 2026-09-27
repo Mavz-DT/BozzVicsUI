@@ -2490,6 +2490,7 @@ onMounted(() => {
       <div class="max-w-7xl mx-auto">
 
         <!-- Page Header -->
+
         <div
           class="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
         >
@@ -2533,6 +2534,7 @@ onMounted(() => {
           </div>
 
           <!-- Admin Layout Button -->
+
           <button
             v-if="isAdmin"
             type="button"
@@ -2570,6 +2572,7 @@ onMounted(() => {
           >
 
             <!-- Header -->
+
             <div
               class="px-5 py-4 text-white"
               :style="{
@@ -2584,7 +2587,9 @@ onMounted(() => {
 
                 <div>
 
-                  <h2 class="font-black text-lg">
+                  <h2
+                    class="font-black text-lg"
+                  >
                     Order Setup
                   </h2>
 
@@ -2610,6 +2615,7 @@ onMounted(() => {
             <div class="p-5 space-y-5">
 
               <!-- Order Type -->
+
               <div>
 
                 <h3
@@ -2714,6 +2720,7 @@ onMounted(() => {
               </div>
 
               <!-- Order Numbers -->
+
               <div
                 v-if="
                   orderType ===
@@ -2843,6 +2850,7 @@ onMounted(() => {
               </div>
 
               <!-- Delivery Information -->
+
               <div
                 v-if="
                   orderType ===
@@ -2968,6 +2976,7 @@ onMounted(() => {
               </div>
 
             </div>
+
           </div>
 
         </div>
@@ -2984,6 +2993,7 @@ onMounted(() => {
         >
 
           <!-- Layout Editor Banner -->
+
           <div
             v-if="editLayoutMode"
             class="mb-5 rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-4 shadow-sm"
@@ -3055,6 +3065,7 @@ onMounted(() => {
           </div>
 
           <!-- Current Order Setup -->
+
           <div
             v-if="isOrderSetupComplete"
             class="bg-white border border-gray-200 rounded-2xl px-4 py-3 mb-5 shadow-sm flex flex-wrap items-center justify-between gap-3"
@@ -3113,6 +3124,7 @@ onMounted(() => {
           </div>
 
           <!-- Category Filters -->
+
           <Draggable
             v-model="categories"
             item-key="_id"
@@ -3193,6 +3205,7 @@ onMounted(() => {
           </Draggable>
 
           <!-- Menu Grid -->
+
           <Draggable
             v-model="filteredMenus"
             item-key="_id"
@@ -3222,6 +3235,8 @@ onMounted(() => {
 
             <template #item="{ element: item }">
 
+              <!-- MENU CARD -->
+
               <div
                 @click="
                   handleMenuCardClick(
@@ -3240,16 +3255,19 @@ onMounted(() => {
                 ]"
               >
 
-                <!-- Menu Top Area -->
+                <!-- Menu Name - PRIMARY FOCUS -->
+
                 <div
-                  class="h-24 flex items-center justify-center relative"
+                  class="min-h-[96px] p-4 md:p-5 flex items-center relative"
                   :style="{
                     backgroundColor:
                       isMenuOrderable(item)
-                        ? `color-mix(in srgb, ${settingsStore.themeColor} 8%, white)`
+                        ? `color-mix(in srgb, ${settingsStore.themeColor} 6%, white)`
                         : '#f3f4f6'
                   }"
                 >
+
+                  <!-- Drag Handle -->
 
                   <span
                     v-if="editLayoutMode"
@@ -3260,60 +3278,45 @@ onMounted(() => {
                     ☰
                   </span>
 
-                  <!-- Price when orderable -->
-                  <span
-                    v-if="
-                      isMenuOrderable(item)
+                  <div
+                    class="w-full pr-1"
+                    :class="
+                      editLayoutMode
+                        ? 'pl-10'
+                        : ''
                     "
-                    class="text-2xl font-black"
-                    :style="{
-                      color:
-                        settingsStore.themeColor
-                    }"
                   >
-                    ₱{{
-                      Number(
-                        item.price
-                      ).toFixed(2)
-                    }}
-                  </span>
 
-                  <!-- Out of stock -->
-                  <span
-                    v-else-if="
-                      item.isAvailable !== false &&
-                      item.stockMonitoring === true &&
-                      Number(item.stock || 0) <= 0
-                    "
-                    class="text-sm font-black text-red-600 tracking-wide"
-                  >
-                    OUT OF STOCK
-                  </span>
+                    <h3
+                      class="text-lg md:text-xl font-black leading-tight text-gray-900 line-clamp-2"
+                    >
+                      {{ item.name }}
+                    </h3>
 
-                  <!-- Unavailable -->
-                  <span
-                    v-else
-                    class="text-sm font-black text-gray-500 tracking-wide"
-                  >
-                    UNAVAILABLE
-                  </span>
+                    <p
+                      class="text-xs font-semibold text-gray-500 mt-2"
+                    >
+                      Tap to select
+                    </p>
+
+                  </div>
 
                 </div>
 
-                <div class="p-4">
+                <!-- Menu Details -->
 
-                  <h3
-                    class="font-bold text-gray-800 leading-tight"
-                  >
-                    {{ item.name }}
-                  </h3>
+                <div
+                  class="p-4"
+                >
 
                   <div
-                    class="flex items-center justify-between mt-3 gap-2"
+                    class="flex items-center justify-between gap-3"
                   >
 
+                    <!-- Price -->
+
                     <span
-                      class="text-sm font-bold"
+                      class="text-base md:text-lg font-bold"
                       :style="{
                         color:
                           isMenuOrderable(item)
@@ -3328,9 +3331,11 @@ onMounted(() => {
                       }}
                     </span>
 
+                    <!-- Stock / Availability -->
+
                     <span
                       :class="[
-                        'text-xs font-bold px-2.5 py-1 rounded-full',
+                        'text-[11px] md:text-xs font-bold px-2.5 py-1 rounded-full text-right',
 
                         item.isAvailable === false
                           ? 'bg-gray-100 text-gray-500'
@@ -3376,6 +3381,7 @@ onMounted(() => {
     >
 
       <!-- Cart Header -->
+
       <div
         class="shrink-0 p-5 border-b border-gray-100 bg-white flex justify-between items-center"
       >
@@ -3393,6 +3399,7 @@ onMounted(() => {
           >
 
             <span>
+
               {{ orderType }}
 
               <span
@@ -3431,6 +3438,7 @@ onMounted(() => {
       </div>
 
       <!-- Scrollable Orders -->
+
       <div
         class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4 bg-white"
       >
@@ -3445,7 +3453,9 @@ onMounted(() => {
             class="flex justify-between gap-3"
           >
 
-            <div class="min-w-0 flex-1">
+            <div
+              class="min-w-0 flex-1"
+            >
 
               <h4
                 class="font-bold text-gray-800 truncate"
@@ -3483,7 +3493,6 @@ onMounted(() => {
                       addOn.price
                     ).toFixed(2)
                   }})
-
                 </p>
 
               </div>
@@ -3528,6 +3537,7 @@ onMounted(() => {
             <span
               class="text-xs text-gray-400"
             >
+
               <template
                 v-if="
                   item.stockMonitoring === true
@@ -3542,6 +3552,7 @@ onMounted(() => {
               >
                 Stock: Not monitored
               </template>
+
             </span>
 
             <div
@@ -3612,6 +3623,7 @@ onMounted(() => {
       </div>
 
       <!-- Checkout Summary -->
+
       <div
         class="shrink-0 p-5 bg-white border-t border-gray-200 shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.08)]"
       >
@@ -3620,7 +3632,9 @@ onMounted(() => {
           class="flex justify-between items-center text-sm mb-2"
         >
 
-          <span class="text-gray-500">
+          <span
+            class="text-gray-500"
+          >
             Gross Sales
           </span>
 
@@ -3757,11 +3771,13 @@ onMounted(() => {
         </button>
 
       </div>
+
     </div>
 
   </div>
 
   <!-- Checkout Modal -->
+
   <CheckoutModal
     :isOpen="
       isCheckoutOpen
@@ -3781,6 +3797,7 @@ onMounted(() => {
   />
 
   <!-- Add-on Modal -->
+
   <div
     v-if="
       isAddOnModalOpen
@@ -3796,6 +3813,7 @@ onMounted(() => {
     >
 
       <!-- Header -->
+
       <div
         class="px-5 py-4 text-white"
         :style="{
@@ -3839,11 +3857,13 @@ onMounted(() => {
       </div>
 
       <!-- Body -->
+
       <div
         class="p-5 space-y-5"
       >
 
         <!-- Add-ons -->
+
         <div>
 
           <p
@@ -3950,6 +3970,7 @@ onMounted(() => {
         </div>
 
         <!-- Special Instruction -->
+
         <div>
 
           <label
@@ -3970,6 +3991,7 @@ onMounted(() => {
         </div>
 
         <!-- Total -->
+
         <div
           class="border-t border-gray-100 pt-4"
         >
@@ -4003,6 +4025,7 @@ onMounted(() => {
         </div>
 
         <!-- Actions -->
+
         <div
           class="flex gap-3"
         >
@@ -4034,7 +4057,9 @@ onMounted(() => {
         </div>
 
       </div>
+
     </div>
+
   </div>
 </template>
 
