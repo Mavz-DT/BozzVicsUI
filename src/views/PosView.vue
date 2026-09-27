@@ -34,7 +34,7 @@ const isCheckoutOpen =
 // Prevents accidental double-click
 // or duplicate confirm events from
 // creating more than one payment
-// request at the frontend level.
+// request.
 //
 // =========================
 
@@ -732,6 +732,22 @@ const canProceedToCheckout =
     return true
   })
 
+// =========================
+// ACTUAL STORE AMOUNT DUE
+// =========================
+//
+// Customer -> Rider:
+//   Food net only
+//
+// Store -> Rider:
+//   Food net + delivery fee
+//
+// This matches the backend
+// calculateStoreAmountDue()
+// logic.
+//
+// =========================
+
 const finalTotal =
   computed(() => {
     const grossAmount =
@@ -752,11 +768,28 @@ const finalTotal =
           0
       )
 
+    const foodNetAmount =
+      Math.max(
+        0,
+        grossAmount -
+          discount
+      )
+
+    const deliveryCollectedByStore =
+      orderType.value ===
+        'Delivery' &&
+      delivery.value
+        .deliveryFeePaidBy ===
+        'Store'
+
     return Math.max(
       0,
-      grossAmount -
-        discount +
-        deliveryFee
+      foodNetAmount +
+        (
+          deliveryCollectedByStore
+            ? deliveryFee
+            : 0
+        )
     )
   })
 
@@ -1346,7 +1379,8 @@ const printCustomerReceipt =
 
                 <span>
                   ₱${Number(
-                    payment.amount ||
+                    payment.amount ??
+                      order.storeAmountDue ??
                       order.netAmount ||
                       0
                   ).toFixed(2)}
@@ -1868,13 +1902,6 @@ const handlePayment =
     // =========================
     // FRONTEND DUPLICATE GUARD
     // =========================
-    //
-    // Kapag may ongoing payment
-    // request, huwag nang mag-submit
-    // ulit kahit ma-trigger ulit ang
-    // confirm event.
-    //
-    // =========================
 
     if (
       isProcessingPayment.value
@@ -2087,6 +2114,7 @@ const handlePayment =
                   amount:
                     Number(
                       paymentDetails.amount ??
+                        createdOrder.storeAmountDue ??
                         createdOrder.netAmount
                     ),
 
@@ -2139,9 +2167,25 @@ const handlePayment =
             0
           )
 
+        // =========================
+        // IMPORTANT:
+        //
+        // Validate against the
+        // actual amount collectible
+        // by the store.
+        //
+        // Customer -> Rider:
+        //   delivery fee excluded
+        //
+        // Store -> Rider:
+        //   delivery fee included
+        //
+        // =========================
+
         const orderTotal =
           Number(
-            createdOrder.netAmount ||
+            createdOrder.storeAmountDue ??
+              createdOrder.netAmount ??
               0
           )
 
@@ -2152,7 +2196,7 @@ const handlePayment =
           ) > 0.01
         ) {
           throw new Error(
-            `Payment total (${paymentTotal.toFixed(2)}) does not match order total (${orderTotal.toFixed(2)}).`
+            `Payment total (${paymentTotal.toFixed(2)}) does not match store amount due (${orderTotal.toFixed(2)}).`
           )
         }
 
@@ -4323,7 +4367,7 @@ onMounted(() => {
             <p
               class="text-xs font-semibold text-gray-400 uppercase tracking-wide"
             >
-              Net Total
+              Amount Due to Store
             </p>
 
             <p
