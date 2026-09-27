@@ -13,16 +13,49 @@ const authStore = useAuthStore()
 // API
 // =====================================================
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
 const API_URL =
-  'http://localhost:5000/api/expense-items'
+  `${API_BASE_URL}/api/expense-items`
+
+// =====================================================
+// AUTH
+// =====================================================
+
+const getToken = () => {
+  let token = ''
+
+  try {
+    if (
+      typeof authStore.getToken ===
+      'function'
+    ) {
+      token =
+        authStore.getToken() || ''
+    }
+  } catch (err) {
+    console.warn(
+      'Unable to get auth token:',
+      err
+    )
+  }
+
+  if (!token) {
+    token =
+      localStorage.getItem(
+        'token'
+      ) || ''
+  }
+
+  return token
+}
 
 const getAuthHeaders = () => {
   const token =
-    authStore.getToken?.() ||
-    localStorage.getItem(
-      'token'
-    ) ||
-    ''
+    getToken()
 
   return token
     ? {
@@ -30,6 +63,108 @@ const getAuthHeaders = () => {
           `Bearer ${token}`
       }
     : {}
+}
+
+// =====================================================
+// RESPONSE HELPERS
+// =====================================================
+
+const extractItemsArray = data => {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (
+    Array.isArray(
+      data?.expenseItems
+    )
+  ) {
+    return data.expenseItems
+  }
+
+  if (
+    Array.isArray(
+      data?.items
+    )
+  ) {
+    return data.items
+  }
+
+  if (
+    Array.isArray(
+      data?.records
+    )
+  ) {
+    return data.records
+  }
+
+  if (
+    Array.isArray(
+      data?.results
+    )
+  ) {
+    return data.results
+  }
+
+  if (
+    Array.isArray(
+      data?.data
+    )
+  ) {
+    return data.data
+  }
+
+  return []
+}
+
+const parseJsonResponse = async response => {
+  const text =
+    await response.text()
+
+  if (!text) {
+    if (!response.ok) {
+      throw new Error(
+        `Request failed with status ${response.status}.`
+      )
+    }
+
+    return null
+  }
+
+  let data = null
+
+  try {
+    data =
+      JSON.parse(text)
+  } catch {
+    throw new Error(
+      'Hindi valid JSON ang response ng server. I-check ang VITE_API_URL at backend URL.'
+    )
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+      `Request failed with status ${response.status}.`
+    )
+  }
+
+  return data
+}
+
+const fetchJson = async (
+  url,
+  options = {}
+) => {
+  const response =
+    await fetch(
+      url,
+      options
+    )
+
+  return parseJsonResponse(
+    response
+  )
 }
 
 // =====================================================
@@ -76,7 +211,8 @@ const unitOptions = [
 // STATE
 // =====================================================
 
-const items = ref([])
+const items =
+  ref([])
 
 const loading =
   ref(false)
@@ -127,43 +263,42 @@ const filteredItems =
         .trim()
         .toLowerCase()
 
-    return items.value.filter(
+    const list =
+      Array.isArray(
+        items.value
+      )
+        ? items.value
+        : []
+
+    return list.filter(
       item => {
         const matchesSearch =
           !query ||
           String(
-            item.name || ''
+            item?.name || ''
           )
             .toLowerCase()
-            .includes(
-              query
-            ) ||
+            .includes(query) ||
           String(
-            item.category || ''
+            item?.category || ''
           )
             .toLowerCase()
-            .includes(
-              query
-            ) ||
+            .includes(query) ||
           String(
-            item.unit || ''
+            item?.unit || ''
           )
             .toLowerCase()
-            .includes(
-              query
-            ) ||
+            .includes(query) ||
           String(
-            item.laborType || ''
+            item?.laborType || ''
           )
             .toLowerCase()
-            .includes(
-              query
-            )
+            .includes(query)
 
         const matchesCategory =
           categoryFilter.value ===
             'All' ||
-          item.category ===
+          item?.category ===
             categoryFilter.value
 
         const matchesStatus =
@@ -172,8 +307,8 @@ const filteredItems =
           (
             statusFilter.value ===
             'Active'
-              ? item.isActive !== false
-              : item.isActive === false
+              ? item?.isActive !== false
+              : item?.isActive === false
           )
 
         return (
@@ -191,45 +326,79 @@ const filteredItems =
 
 const activeCount =
   computed(() => {
-    return items.value.filter(
+    const list =
+      Array.isArray(
+        items.value
+      )
+        ? items.value
+        : []
+
+    return list.filter(
       item =>
-        item.isActive !==
-        false
+        item?.isActive !== false
     ).length
   })
 
 const ingredientCount =
   computed(() => {
-    return items.value.filter(
+    const list =
+      Array.isArray(
+        items.value
+      )
+        ? items.value
+        : []
+
+    return list.filter(
       item =>
-        item.category ===
+        item?.category ===
         'Ingredient'
     ).length
   })
 
 const materialCount =
   computed(() => {
-    return items.value.filter(
+    const list =
+      Array.isArray(
+        items.value
+      )
+        ? items.value
+        : []
+
+    return list.filter(
       item =>
-        item.category ===
+        item?.category ===
         'Material'
     ).length
   })
 
 const billCount =
   computed(() => {
-    return items.value.filter(
+    const list =
+      Array.isArray(
+        items.value
+      )
+        ? items.value
+        : []
+
+    return list.filter(
       item =>
-        item.category ===
+        item?.category ===
         'Bill'
     ).length
   })
 
 const laborCount =
   computed(() => {
-    return items.value.filter(
+    const list =
+      Array.isArray(
+        items.value
+      )
+        ? items.value
+        : []
+
+    return list.filter(
       item =>
-        item.category ===
+        item?.category ===
         'Labor'
     ).length
   })
@@ -328,41 +497,44 @@ const fetchItems =
       ''
 
     try {
-      const res =
-        await fetch(
-          API_URL,
-          {
-            headers: {
-              ...getAuthHeaders()
-            }
-          }
-        )
+      const token =
+        getToken()
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
+      if (!token) {
         throw new Error(
-          data.message ||
-          'Failed to fetch expense items.'
+          'Walang authentication token. Mag-login ulit sa POS.'
         )
       }
 
-      items.value =
-        Array.isArray(data)
-          ? data
-          : []
+      const data =
+        await fetchJson(
+          API_URL,
+          {
+            headers:
+              getAuthHeaders()
+          }
+        )
 
+      console.log(
+        'Expense items API response:',
+        data
+      )
+
+      items.value =
+        extractItemsArray(
+          data
+        )
     } catch (err) {
       console.error(
         'Error fetching expense items:',
         err
       )
 
+      items.value = []
+
       error.value =
         err.message ||
         'Failed to load expense items.'
-
     } finally {
       loading.value =
         false
@@ -379,19 +551,14 @@ const resetForm =
       name: '',
       category:
         'Ingredient',
-
       unit:
         '',
-
       frequency:
         'One-Time',
-
       defaultAmount:
         '',
-
       estimateMethod:
         'Fixed',
-
       laborType:
         ''
     }
@@ -409,17 +576,6 @@ const resetForm =
 
 const handleCategoryChange =
   () => {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Inventory
-    |--------------------------------------------------------------------------
-    |
-    | Unit is established by actual expense recording.
-    | Master page does not force a unit.
-    |--------------------------------------------------------------------------
-    */
-
     if (
       isInventoryCategory(
         form.value.category
@@ -433,12 +589,6 @@ const handleCategoryChange =
 
       return
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Bill
-    |--------------------------------------------------------------------------
-    */
 
     if (
       form.value.category ===
@@ -462,12 +612,6 @@ const handleCategoryChange =
       return
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Labor
-    |--------------------------------------------------------------------------
-    */
-
     if (
       form.value.category ===
       'Labor'
@@ -480,12 +624,6 @@ const handleCategoryChange =
 
       return
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Other
-    |--------------------------------------------------------------------------
-    */
 
     form.value.laborType =
       ''
@@ -552,12 +690,6 @@ const saveItem =
         category:
           form.value.category,
 
-        /*
-        Inventory unit may be blank because
-        the first actual expense record can
-        establish the unit.
-        */
-
         unit:
           String(
             form.value.unit ||
@@ -590,8 +722,8 @@ const saveItem =
           ? 'PUT'
           : 'POST'
 
-      const res =
-        await fetch(
+      const data =
+        await fetchJson(
           url,
           {
             method,
@@ -610,15 +742,10 @@ const saveItem =
           }
         )
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to save expense item.'
-        )
-      }
+      console.log(
+        'Expense item save response:',
+        data
+      )
 
       success.value =
         isEditMode.value
@@ -633,7 +760,6 @@ const saveItem =
         success.value =
           ''
       }, 3000)
-
     } catch (err) {
       console.error(
         'Error saving expense item:',
@@ -643,7 +769,6 @@ const saveItem =
       error.value =
         err.message ||
         'Failed to save expense item.'
-
     } finally {
       saving.value =
         false
@@ -656,6 +781,10 @@ const saveItem =
 
 const editItem =
   item => {
+    if (!item) {
+      return
+    }
+
     form.value = {
       name:
         item.name ||
@@ -710,13 +839,17 @@ const editItem =
 
 const toggleStatus =
   async item => {
+    if (!item?._id) {
+      return
+    }
+
     const action =
       item.isActive === false
         ? 'activate'
         : 'deactivate'
 
     const confirmed =
-      confirm(
+      window.confirm(
         `Sigurado kang i-${action} ang "${item.name}"?`
       )
 
@@ -731,8 +864,8 @@ const toggleStatus =
       ''
 
     try {
-      const res =
-        await fetch(
+      const data =
+        await fetchJson(
           `${API_URL}/${item._id}/status`,
           {
             method:
@@ -756,15 +889,10 @@ const toggleStatus =
           }
         )
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to update item status.'
-        )
-      }
+      console.log(
+        'Expense item status response:',
+        data
+      )
 
       success.value =
         item.isActive === false
@@ -777,7 +905,6 @@ const toggleStatus =
         success.value =
           ''
       }, 3000)
-
     } catch (err) {
       console.error(
         'Error updating item status:',
@@ -812,11 +939,10 @@ onMounted(() => {
     class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6"
   >
 
-    <!-- ================================================= -->
     <!-- TITLE -->
-    <!-- ================================================= -->
 
     <div>
+
       <h1
         class="text-2xl font-bold text-blue-800 flex items-center gap-2"
       >
@@ -829,17 +955,14 @@ onMounted(() => {
         Manage reusable expense items, units, frequencies,
         default amounts, and estimate settings.
       </p>
+
     </div>
 
-    <!-- ================================================= -->
     <!-- SUMMARY -->
-    <!-- ================================================= -->
 
     <div
       class="grid grid-cols-2 md:grid-cols-5 gap-3"
     >
-
-      <!-- ACTIVE -->
 
       <div
         class="bg-white border border-gray-100 rounded-2xl shadow-sm p-4"
@@ -857,8 +980,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- INGREDIENT -->
-
       <div
         class="bg-white border border-gray-100 rounded-2xl shadow-sm p-4"
       >
@@ -874,8 +995,6 @@ onMounted(() => {
           {{ ingredientCount }}
         </div>
       </div>
-
-      <!-- MATERIAL -->
 
       <div
         class="bg-white border border-gray-100 rounded-2xl shadow-sm p-4"
@@ -893,8 +1012,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- BILLS -->
-
       <div
         class="bg-white border border-gray-100 rounded-2xl shadow-sm p-4"
       >
@@ -910,8 +1027,6 @@ onMounted(() => {
           {{ billCount }}
         </div>
       </div>
-
-      <!-- LABOR -->
 
       <div
         class="bg-white border border-gray-100 rounded-2xl shadow-sm p-4"
@@ -931,9 +1046,7 @@ onMounted(() => {
 
     </div>
 
-    <!-- ================================================= -->
     <!-- FORM -->
-    <!-- ================================================= -->
 
     <div
       class="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden"
@@ -957,8 +1070,6 @@ onMounted(() => {
         class="p-5"
       >
 
-        <!-- ERROR -->
-
         <div
           v-if="error"
           class="mb-4 bg-red-100 text-red-700 p-3 rounded-lg text-sm"
@@ -966,16 +1077,12 @@ onMounted(() => {
           {{ error }}
         </div>
 
-        <!-- SUCCESS -->
-
         <div
           v-if="success"
           class="mb-4 bg-green-100 text-green-700 p-3 rounded-lg text-sm"
         >
           {{ success }}
         </div>
-
-        <!-- FORM GRID -->
 
         <div
           class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-4 items-end"
@@ -1015,7 +1122,9 @@ onMounted(() => {
 
             <select
               v-model="form.category"
-              @change="handleCategoryChange"
+              @change="
+                handleCategoryChange
+              "
               class="w-full border border-gray-300 rounded-lg p-2 bg-white outline-none focus:ring-2 focus:ring-blue-500"
             >
 
@@ -1136,9 +1245,7 @@ onMounted(() => {
 
         </div>
 
-        <!-- ================================================= -->
         <!-- ESTIMATE METHOD -->
-        <!-- ================================================= -->
 
         <div
           class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
@@ -1203,9 +1310,7 @@ onMounted(() => {
 
         </div>
 
-        <!-- ================================================= -->
         <!-- INVENTORY NOTE -->
-        <!-- ================================================= -->
 
         <div
           v-if="
@@ -1233,9 +1338,7 @@ onMounted(() => {
 
         </div>
 
-        <!-- ================================================= -->
         <!-- BUTTONS -->
-        <!-- ================================================= -->
 
         <div
           class="flex gap-2 mt-5"
@@ -1276,9 +1379,7 @@ onMounted(() => {
 
     </div>
 
-    <!-- ================================================= -->
     <!-- LIST -->
-    <!-- ================================================= -->
 
     <div
       class="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden"
@@ -1293,6 +1394,7 @@ onMounted(() => {
         <div
           class="font-bold text-blue-800"
         >
+
           Expense Master Items
 
           <span
@@ -1300,6 +1402,7 @@ onMounted(() => {
           >
             {{ filteredItems.length }}
           </span>
+
         </div>
 
         <div
@@ -1648,9 +1751,7 @@ onMounted(() => {
 
   </div>
 
-  <!-- =================================================== -->
   <!-- NON-ADMIN -->
-  <!-- =================================================== -->
 
   <div
     v-else
