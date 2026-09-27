@@ -13,6 +13,90 @@ const expenseStore = useExpenseStore()
 const authStore = useAuthStore()
 
 // =====================================================
+// API
+// =====================================================
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+// =====================================================
+// API HELPERS
+// =====================================================
+
+const extractArray = data => {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (Array.isArray(data?.expenses)) {
+    return data.expenses
+  }
+
+  if (Array.isArray(data?.records)) {
+    return data.records
+  }
+
+  if (Array.isArray(data?.results)) {
+    return data.results
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data
+  }
+
+  return []
+}
+
+const parseApiResponse = async res => {
+  const text = await res.text()
+
+  if (!text) {
+    if (!res.ok) {
+      throw new Error(
+        `Request failed with status ${res.status}.`
+      )
+    }
+
+    return null
+  }
+
+  let data = null
+
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(
+      'Hindi valid JSON ang response ng server. I-check ang API URL at backend.'
+    )
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      data?.message ||
+      `Request failed with status ${res.status}.`
+    )
+  }
+
+  return data
+}
+
+const fetchJson = async (
+  url,
+  options = {}
+) => {
+  const res = await fetch(
+    url,
+    options
+  )
+
+  return parseApiResponse(res)
+}
+
+// =====================================================
 // DATE
 // =====================================================
 
@@ -52,6 +136,13 @@ const billMonthLoading =
   ref(false)
 
 const billMonthExpenses =
+  ref([])
+
+// =====================================================
+// DAILY EXPENSE RECORDS
+// =====================================================
+
+const dailyExpenses =
   ref([])
 
 // =====================================================
@@ -116,11 +207,6 @@ const isInventoryCategory =
 // =====================================================
 // INITIAL INVENTORY MASTER FALLBACK
 // =====================================================
-//
-// Ito ang initial 58 inventory items.
-// Ginagamit ito bilang local fallback para siguradong
-// may autocomplete kahit hindi kumpleto ang API result.
-//
 
 const inventoryFallbackItems = [
   // ===================================================
@@ -496,16 +582,6 @@ const mergeMasterItems =
         const existing =
           map.get(key)
 
-        /*
-        API item wins over fallback item
-        because API item may contain:
-        _id
-        frequency
-        defaultAmount
-        estimateMethod
-        laborType
-        */
-
         if (
           existing?.source ===
             'fallback' &&
@@ -542,9 +618,9 @@ const fetchMasterExpenseItems =
       true
 
     try {
-      const res =
-        await fetch(
-          'http://localhost:5000/api/expenses/search',
+      const data =
+        await fetchJson(
+          `${API}/expenses/search`,
           {
             headers: {
               ...getAuthHeaders()
@@ -552,28 +628,14 @@ const fetchMasterExpenseItems =
           }
         )
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to fetch expense master items.'
-        )
-      }
+      const rawItems =
+        extractArray(data)
 
       const apiItems =
-        Array.isArray(data)
-          ? data.filter(
-              item =>
-                item?.isActive !==
-                false
-            )
-          : []
-
-      /*
-      Local fallback inventory items.
-      */
+        rawItems.filter(
+          item =>
+            item?.isActive !== false
+        )
 
       const fallbackItems =
         inventoryFallbackItems.map(
@@ -601,11 +663,6 @@ const fetchMasterExpenseItems =
         err
       )
 
-      /*
-      Even if API fails, keep the
-      local inventory fallback.
-      */
-
       masterExpenseItems.value =
         inventoryFallbackItems.map(
           item => ({
@@ -619,7 +676,6 @@ const fetchMasterExpenseItems =
             source: 'fallback'
           })
         )
-
     } finally {
       masterLoading.value =
         false
@@ -701,6 +757,13 @@ const isLaborExpense =
     return (
       form.value.category ===
       'Labor'
+    )
+  })
+
+const isExistingExpenseItem =
+  computed(() => {
+    return Boolean(
+      form.value.expenseItemId
     )
   })
 
@@ -831,12 +894,6 @@ const searchExpenseItems =
       return
     }
 
-    /*
-    ===================================================
-    LOCAL INVENTORY SEARCH
-    ===================================================
-    */
-
     let localItems =
       masterExpenseItems.value
         .filter(
@@ -846,10 +903,6 @@ const searchExpenseItems =
               query
             )
         )
-
-    /*
-    Ingredients + Materials only
-    */
 
     if (
       activeSection.value ===
@@ -870,12 +923,6 @@ const searchExpenseItems =
             form.value.category
         )
     }
-
-    /*
-    ===================================================
-    API SEARCH
-    ===================================================
-    */
 
     let apiItems = []
 
@@ -888,32 +935,19 @@ const searchExpenseItems =
         query
       )
 
-      /*
-      Important:
-      For Ingredients & Materials,
-      explicitly tell backend that
-      we only want inventory categories.
-      */
-
       if (
-        activeSection.value ===
+        activeSection.value !==
         'Ingredient'
       ) {
-        /*
-        We don't send category here because
-        backend expects only one category.
-        We filter both locally.
-        */
-      } else {
         params.append(
           'category',
           form.value.category
         )
       }
 
-      const res =
-        await fetch(
-          `http://localhost:5000/api/expenses/search?${params.toString()}`,
+      const data =
+        await fetchJson(
+          `${API}/expenses/search?${params.toString()}`,
           {
             headers: {
               ...getAuthHeaders()
@@ -921,19 +955,11 @@ const searchExpenseItems =
           }
         )
 
-      if (res.ok) {
-        const data =
-          await res.json()
-
-        apiItems =
-          Array.isArray(data)
-            ? data.filter(
-                item =>
-                  item?.isActive !==
-                  false
-              )
-            : []
-      }
+      apiItems =
+        extractArray(data).filter(
+          item =>
+            item?.isActive !== false
+        )
 
     } catch (err) {
       console.error(
@@ -941,12 +967,6 @@ const searchExpenseItems =
         err
       )
     }
-
-    /*
-    ===================================================
-    FILTER API RESULTS
-    ===================================================
-    */
 
     if (
       activeSection.value ===
@@ -967,12 +987,6 @@ const searchExpenseItems =
             form.value.category
         )
     }
-
-    /*
-    ===================================================
-    MERGE LOCAL + API
-    ===================================================
-    */
 
     const mergedMap =
       new Map()
@@ -995,10 +1009,6 @@ const searchExpenseItems =
       const key =
         getMasterItemKey(item)
 
-      /*
-      API result replaces fallback.
-      */
-
       mergedMap.set(
         key,
         {
@@ -1014,12 +1024,6 @@ const searchExpenseItems =
       Array.from(
         mergedMap.values()
       )
-
-    /*
-    ===================================================
-    SCORE + SORT
-    ===================================================
-    */
 
     combinedItems =
       combinedItems
@@ -1052,11 +1056,6 @@ const searchExpenseItems =
                 a._autocompleteScore
               )
             }
-
-            /*
-            API master items before
-            fallback items.
-            */
 
             if (
               a.source !==
@@ -1094,12 +1093,6 @@ const searchExpenseItems =
           }
         )
 
-    /*
-    ===================================================
-    SAVE API MASTER ITEMS LOCALLY
-    ===================================================
-    */
-
     if (
       apiItems.length > 0
     ) {
@@ -1133,11 +1126,6 @@ const onItemInput =
   async () => {
     const currentName =
       form.value.item.trim()
-
-    /*
-    If user changed the selected item,
-    remove the previous master ID.
-    */
 
     if (
       currentName !==
@@ -1217,10 +1205,6 @@ const selectExpenseItem =
         item.laborType ||
         'Regular'
     }
-
-    /*
-    AUTO-FILL CATEGORY
-    */
 
     form.value.category =
       item.category ||
@@ -1403,9 +1387,9 @@ const fetchBillEstimate =
           selectedBillMonth.value
       )
 
-      const res =
-        await fetch(
-          `http://localhost:5000/api/expenses/bill-estimate?${params.toString()}`,
+      const data =
+        await fetchJson(
+          `${API}/expenses/bill-estimate?${params.toString()}`,
           {
             headers: {
               ...getAuthHeaders()
@@ -1413,18 +1397,8 @@ const fetchBillEstimate =
           }
         )
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to get bill estimate.'
-        )
-      }
-
       if (
-        data.amount !==
+        data?.amount !==
         undefined
       ) {
         form.value.price =
@@ -1432,7 +1406,6 @@ const fetchBillEstimate =
             data.amount || 0
           )
       }
-
     } catch (err) {
       console.error(
         'Error fetching bill estimate:',
@@ -2053,9 +2026,9 @@ const fetch13thMonthEstimate =
         form.value.expenseItemId
       )
 
-      const res =
-        await fetch(
-          `http://localhost:5000/api/expenses/labor/13th-month-estimate?${params.toString()}`,
+      const data =
+        await fetchJson(
+          `${API}/expenses/labor/13th-month-estimate?${params.toString()}`,
           {
             headers: {
               ...getAuthHeaders()
@@ -2063,26 +2036,16 @@ const fetch13thMonthEstimate =
           }
         )
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to get 13th month estimate.'
-        )
-      }
-
       if (
         !isEditMode.value
       ) {
         form.value.price =
           Number(
-            data.amount || 0
+            data?.amount || 0
           )
 
         form.value.laborAmountStatus =
-          data.source ===
+          data?.source ===
           'Actual'
             ? 'Actual'
             : 'Estimated'
@@ -2244,9 +2207,9 @@ const fetchLaborMonthExpenses =
         'true'
       )
 
-      const res =
-        await fetch(
-          `http://localhost:5000/api/expenses?${params.toString()}`,
+      const data =
+        await fetchJson(
+          `${API}/expenses?${params.toString()}`,
           {
             headers: {
               ...getAuthHeaders()
@@ -2254,32 +2217,8 @@ const fetchLaborMonthExpenses =
           }
         )
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to fetch Labor Cost records.'
-        )
-      }
-
       const records =
-        Array.isArray(data)
-          ? data
-          : (
-              Array.isArray(
-                data.records
-              )
-                ? data.records
-                : (
-                    Array.isArray(
-                      data.expenses
-                    )
-                      ? data.expenses
-                      : []
-                  )
-            )
+        extractArray(data)
 
       laborMonthExpenses.value =
         records
@@ -2403,9 +2342,9 @@ const fetchBillMonthExpenses =
         'true'
       )
 
-      const res =
-        await fetch(
-          `http://localhost:5000/api/expenses?${params.toString()}`,
+      const data =
+        await fetchJson(
+          `${API}/expenses?${params.toString()}`,
           {
             headers: {
               ...getAuthHeaders()
@@ -2413,32 +2352,8 @@ const fetchBillMonthExpenses =
           }
         )
 
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to fetch Bill records.'
-        )
-      }
-
       const records =
-        Array.isArray(data)
-          ? data
-          : (
-              Array.isArray(
-                data.records
-              )
-                ? data.records
-                : (
-                    Array.isArray(
-                      data.expenses
-                    )
-                      ? data.expenses
-                      : []
-                  )
-            )
+        extractArray(data)
 
       billMonthExpenses.value =
         records
@@ -2772,7 +2687,7 @@ const submitExpense =
       form.value.category ===
         'Labor' &&
       authStore.user?.role !==
-        'Admin'
+      'Admin'
     ) {
       error.value =
         'Admin access required for Labor Cost.'
@@ -3088,9 +3003,9 @@ const submitExpense =
       if (
         isEditMode.value
       ) {
-        const res =
-          await fetch(
-            `http://localhost:5000/api/expenses/${editingExpenseId.value}`,
+        const result =
+          await fetchJson(
+            `${API}/expenses/${editingExpenseId.value}`,
             {
               method: 'PUT',
 
@@ -3108,24 +3023,12 @@ const submitExpense =
             }
           )
 
-        const result =
-          await res
-            .json()
-            .catch(
-              () => null
-            )
-
-        if (res.ok) {
-          isSuccess =
-            true
-        } else {
-          error.value =
-            result?.message ||
-            'Failed to update expense.'
-        }
+        isSuccess =
+          Boolean(
+            result !== null
+          )
 
       } else {
-
         isSuccess =
           await expenseStore.addExpense(
             data,
@@ -3310,9 +3213,43 @@ const fetchExpenses =
       return
     }
 
-    await expenseStore.fetchExpenses(
-      selectedDate.value
-    )
+    try {
+      const params =
+        new URLSearchParams()
+
+      if (selectedDate.value) {
+        params.append(
+          'date',
+          selectedDate.value
+        )
+      }
+
+      const data =
+        await fetchJson(
+          `${API}/expenses?${params.toString()}`,
+          {
+            headers: {
+              ...getAuthHeaders()
+            }
+          }
+        )
+
+      dailyExpenses.value =
+        extractArray(data)
+
+    } catch (err) {
+      console.error(
+        'Error fetching expenses:',
+        err
+      )
+
+      dailyExpenses.value =
+        []
+
+      error.value =
+        err.message ||
+        'Hindi ma-load ang expenses.'
+    }
   }
 
 // =====================================================
@@ -3428,107 +3365,74 @@ const expenses =
       activeSection.value ===
       'Labor'
     ) {
-      return laborMonthExpenses.value
-        .filter(
-          exp => {
-            const itemName =
-              (
-                exp.name ||
-                exp.title ||
-                exp.item ||
-                ''
-              ).toLowerCase()
-
-            return (
-              !search ||
-              itemName.includes(
-                search
-              )
-            )
-          }
+      return (
+        Array.isArray(
+          laborMonthExpenses.value
         )
+          ? laborMonthExpenses.value
+          : []
+      ).filter(
+        exp => {
+          const itemName =
+            (
+              exp.name ||
+              exp.title ||
+              exp.item ||
+              ''
+            ).toLowerCase()
+
+          return (
+            !search ||
+            itemName.includes(
+              search
+            )
+          )
+        }
+      )
     }
 
     if (
       activeSection.value ===
       'Bill'
     ) {
-      return billMonthExpenses.value
-        .filter(
-          exp => {
-            const itemName =
-              (
-                exp.name ||
-                exp.title ||
-                exp.item ||
-                ''
-              ).toLowerCase()
-
-            return (
-              !search ||
-              itemName.includes(
-                search
-              )
-            )
-          }
+      return (
+        Array.isArray(
+          billMonthExpenses.value
         )
+          ? billMonthExpenses.value
+          : []
+      ).filter(
+        exp => {
+          const itemName =
+            (
+              exp.name ||
+              exp.title ||
+              exp.item ||
+              ''
+            ).toLowerCase()
+
+          return (
+            !search ||
+            itemName.includes(
+              search
+            )
+          )
+        }
+      )
     }
+
+    const records =
+      Array.isArray(
+        dailyExpenses.value
+      )
+        ? dailyExpenses.value
+        : []
 
     if (
       activeSection.value ===
       'Ingredient'
     ) {
-      return expenseStore.expenses
-        .filter(
-          exp => {
-            const rawDate =
-              exp.date ||
-              exp.expenseDate ||
-              ''
-
-            const cleanDate =
-              getDateOnly(
-                rawDate
-              )
-
-            const matchesDate =
-              cleanDate ===
-              selectedDate.value
-
-            const itemName =
-              (
-                exp.name ||
-                exp.title ||
-                exp.item ||
-                ''
-              ).toLowerCase()
-
-            const matchesSearch =
-              !search ||
-              itemName.includes(
-                search
-              )
-
-            const matchesInventoryCategory =
-              inventoryCategoryFilter.value ===
-                'All'
-                ? isInventoryCategory(
-                    exp.category
-                  )
-                : exp.category ===
-                    inventoryCategoryFilter.value
-
-            return (
-              matchesDate &&
-              matchesSearch &&
-              matchesInventoryCategory
-            )
-          }
-        )
-    }
-
-    return expenseStore.expenses
-      .filter(
+      return records.filter(
         exp => {
           const rawDate =
             exp.date ||
@@ -3558,17 +3462,65 @@ const expenses =
               search
             )
 
-          const matchesSection =
-            exp.category ===
-            activeSection.value
+          const matchesInventoryCategory =
+            inventoryCategoryFilter.value ===
+              'All'
+              ? isInventoryCategory(
+                  exp.category
+                )
+              : exp.category ===
+                  inventoryCategoryFilter.value
 
           return (
             matchesDate &&
             matchesSearch &&
-            matchesSection
+            matchesInventoryCategory
           )
         }
       )
+    }
+
+    return records.filter(
+      exp => {
+        const rawDate =
+          exp.date ||
+          exp.expenseDate ||
+          ''
+
+        const cleanDate =
+          getDateOnly(
+            rawDate
+          )
+
+        const matchesDate =
+          cleanDate ===
+          selectedDate.value
+
+        const itemName =
+          (
+            exp.name ||
+            exp.title ||
+            exp.item ||
+            ''
+          ).toLowerCase()
+
+        const matchesSearch =
+          !search ||
+          itemName.includes(
+            search
+          )
+
+        const matchesSection =
+          exp.category ===
+          activeSection.value
+
+        return (
+          matchesDate &&
+          matchesSearch &&
+          matchesSection
+        )
+      }
+    )
   })
 
 // =====================================================
@@ -3577,7 +3529,14 @@ const expenses =
 
 const totalExpenses =
   computed(() => {
-    return expenses.value.reduce(
+    const records =
+      Array.isArray(
+        expenses.value
+      )
+        ? expenses.value
+        : []
+
+    return records.reduce(
       (
         sum,
         exp
@@ -3595,7 +3554,11 @@ const totalExpenses =
 
 const totalExpenseRecords =
   computed(() => {
-    return expenses.value.length
+    return Array.isArray(
+      expenses.value
+    )
+      ? expenses.value.length
+      : 0
   })
 
 const totalBills =
@@ -3607,7 +3570,11 @@ const totalBills =
       return 0
     }
 
-    return expenses.value.length
+    return Array.isArray(
+      expenses.value
+    )
+      ? expenses.value.length
+      : 0
   })
 
 const paidBills =
@@ -3619,7 +3586,13 @@ const paidBills =
       return 0
     }
 
-    return expenses.value.filter(
+    return (
+      Array.isArray(
+        expenses.value
+      )
+        ? expenses.value
+        : []
+    ).filter(
       exp =>
         getBillStatus(exp) ===
         'Paid'
@@ -3635,7 +3608,13 @@ const dueBills =
       return 0
     }
 
-    return expenses.value.filter(
+    return (
+      Array.isArray(
+        expenses.value
+      )
+        ? expenses.value
+        : []
+    ).filter(
       exp =>
         getBillStatus(exp) ===
         'Due'
@@ -3651,7 +3630,13 @@ const overdueBills =
       return 0
     }
 
-    return expenses.value.filter(
+    return (
+      Array.isArray(
+        expenses.value
+      )
+        ? expenses.value
+        : []
+    ).filter(
       exp =>
         getBillStatus(exp) ===
         'Overdue'
@@ -3667,7 +3652,13 @@ const paidBillAmount =
       return 0
     }
 
-    return expenses.value
+    return (
+      Array.isArray(
+        expenses.value
+      )
+        ? expenses.value
+        : []
+    )
       .filter(
         exp =>
           getBillStatus(exp) ===
@@ -3698,7 +3689,13 @@ const unpaidBillAmount =
       return 0
     }
 
-    return expenses.value
+    return (
+      Array.isArray(
+        expenses.value
+      )
+        ? expenses.value
+        : []
+    )
       .filter(
         exp =>
           getBillStatus(exp) !==
@@ -4117,27 +4114,16 @@ const deleteExpense =
     }
 
     try {
-      const res =
-        await fetch(
-          `http://localhost:5000/api/expenses/${id}`,
-          {
-            method: 'DELETE',
+      await fetchJson(
+        `${API}/expenses/${id}`,
+        {
+          method: 'DELETE',
 
-            headers: {
-              ...getAuthHeaders()
-            }
+          headers: {
+            ...getAuthHeaders()
           }
-        )
-
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to delete expense'
-        )
-      }
+        }
+      )
 
       success.value =
         'Expense deleted successfully!'
@@ -4208,27 +4194,16 @@ const markBillPaid =
     }
 
     try {
-      const res =
-        await fetch(
-          `http://localhost:5000/api/expenses/bills/${id}/pay`,
-          {
-            method: 'PUT',
+      await fetchJson(
+        `${API}/expenses/bills/${id}/pay`,
+        {
+          method: 'PUT',
 
-            headers: {
-              ...getAuthHeaders()
-            }
+          headers: {
+            ...getAuthHeaders()
           }
-        )
-
-      const data =
-        await res.json()
-
-      if (!res.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to mark bill as paid.'
-        )
-      }
+        }
+      )
 
       success.value =
         'Bill marked as Paid successfully.'
@@ -4497,7 +4472,7 @@ onMounted(async () => {
                     e.relatedTarget
                   )
                 ) {
-                  showItemSuggestions = false
+                  closeItemSuggestions()
                 }
               }
             "
