@@ -271,11 +271,24 @@ const closeSaleDetails = () => {
 
 const fetchEditMenus = async () => {
   try {
+    const token = authStore.getToken()
+
     const response = await axios.get(
-      `${API}/menus`
+      '/api/menus',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
     )
 
-    editMenus.value = extractArray(response.data)
+    editMenus.value = Array.isArray(response.data)
+      ? response.data
+      : Array.isArray(response.data?.menus)
+        ? response.data.menus
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : []
   } catch (error) {
     console.error(
       'Error fetching menus for edit:',
@@ -292,14 +305,27 @@ const fetchEditMenus = async () => {
 
 const fetchEditAddOns = async () => {
   try {
+    const token = authStore.getToken()
+
     const response = await axios.get(
-      `${API}/add-ons`
+      '/api/add-ons',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
     )
 
-    editAddOns.value = extractArray(
-      response.data
-    ).filter(
-      addOn => addOn.isAvailable
+    const addOns = Array.isArray(response.data)
+      ? response.data
+      : Array.isArray(response.data?.addOns)
+        ? response.data.addOns
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : []
+
+    editAddOns.value = addOns.filter(
+      addOn => addOn?.isAvailable
     )
   } catch (error) {
     console.error(
