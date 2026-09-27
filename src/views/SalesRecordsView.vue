@@ -9,6 +9,53 @@ const salesRecords = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 
+// =========================
+// API
+// =========================
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+// =========================
+// RESPONSE HELPERS
+// =========================
+
+const extractArray = data => {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (Array.isArray(data?.salesRecords)) {
+    return data.salesRecords
+  }
+
+  if (Array.isArray(data?.records)) {
+    return data.records
+  }
+
+  if (Array.isArray(data?.payments)) {
+    return data.payments
+  }
+
+  if (Array.isArray(data?.sales)) {
+    return data.sales
+  }
+
+  if (Array.isArray(data?.results)) {
+    return data.results
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data
+  }
+
+  return []
+}
+
 // Selected sale for detail modal
 const selectedSale = ref(null)
 const isDetailsModalOpen = ref(false)
@@ -141,17 +188,37 @@ const fetchSalesRecords = async () => {
 
     if (isAdmin.value) {
       response = await axios.get(
-        `/api/payments/sales-records?date=${selectedDate.value}`,
+        `${API}/payments/sales-records?date=${selectedDate.value}`,
         config
       )
     } else {
       response = await axios.get(
-        '/api/payments/sales-records',
+        `${API}/payments/sales-records`,
         config
       )
     }
 
-    salesRecords.value = response.data
+    const records = extractArray(response.data)
+
+    salesRecords.value = records
+
+    if (
+      !Array.isArray(response.data) &&
+      !Array.isArray(response.data?.salesRecords) &&
+      !Array.isArray(response.data?.records) &&
+      !Array.isArray(response.data?.payments) &&
+      !Array.isArray(response.data?.sales) &&
+      !Array.isArray(response.data?.results) &&
+      !Array.isArray(response.data?.data)
+    ) {
+      console.warn(
+        'Unexpected sales records API response:',
+        response.data
+      )
+
+      errorMessage.value =
+        'Hindi maintindihan ng Sales Record page ang response ng server.'
+    }
   } catch (error) {
     console.error(
       'Error fetching sales records:',
@@ -204,14 +271,18 @@ const closeSaleDetails = () => {
 
 const fetchEditMenus = async () => {
   try {
-    const response = await axios.get('/api/menus')
+    const response = await axios.get(
+      `${API}/menus`
+    )
 
-    editMenus.value = response.data
+    editMenus.value = extractArray(response.data)
   } catch (error) {
     console.error(
       'Error fetching menus for edit:',
       error
     )
+
+    editMenus.value = []
 
     editError.value =
       error.response?.data?.message ||
@@ -221,9 +292,13 @@ const fetchEditMenus = async () => {
 
 const fetchEditAddOns = async () => {
   try {
-    const response = await axios.get('/api/add-ons')
+    const response = await axios.get(
+      `${API}/add-ons`
+    )
 
-    editAddOns.value = response.data.filter(
+    editAddOns.value = extractArray(
+      response.data
+    ).filter(
       addOn => addOn.isAvailable
     )
   } catch (error) {
@@ -231,6 +306,8 @@ const fetchEditAddOns = async () => {
       'Error fetching add-ons for edit:',
       error
     )
+
+    editAddOns.value = []
 
     editError.value =
       error.response?.data?.message ||
@@ -326,7 +403,6 @@ const closeEditOrder = () => {
 
 const increaseEditQuantity = index => {
   editItems.value[index].quantity += 1
-
   editPreview.value = null
 }
 
@@ -338,13 +414,11 @@ const decreaseEditQuantity = index => {
   }
 
   item.quantity -= 1
-
   editPreview.value = null
 }
 
 const removeEditItem = index => {
   editItems.value.splice(index, 1)
-
   editPreview.value = null
 }
 
@@ -459,7 +533,9 @@ const confirmReplaceItem = () => {
   }
 
   const currentItem =
-    editItems.value[replacingItemIndex.value]
+    editItems.value[
+      replacingItemIndex.value
+    ]
 
   editItems.value[replacingItemIndex.value] = {
     menuId: newMenu._id,
@@ -571,7 +647,7 @@ const previewOrderChanges = async () => {
     }
 
     const response = await axios.post(
-      `/api/orders/${selectedSale.value.order._id}/edit-preview`,
+      `${API}/orders/${selectedSale.value.order._id}/edit-preview`,
       payload,
       {
         headers: {
@@ -693,7 +769,7 @@ const applyEditOrder = async () => {
     }
 
     const response = await axios.post(
-      `/api/orders/${selectedSale.value.order._id}/edit`,
+      `${API}/orders/${selectedSale.value.order._id}/edit`,
       payload,
       {
         headers: {
@@ -725,7 +801,6 @@ const applyEditOrder = async () => {
     selectedSale.value = null
 
     await fetchSalesRecords()
-
   } catch (error) {
     console.error(
       'Error applying order edit:',
@@ -970,7 +1045,7 @@ const confirmVoidOrder = async () => {
     const token = authStore.getToken()
 
     await axios.post(
-      `/api/orders/${selectedSale.value.order._id}/void`,
+      `${API}/orders/${selectedSale.value.order._id}/void`,
       {
         reason: voidReason.value.trim()
       },
@@ -1017,7 +1092,6 @@ const totalSales = computed(() => {
 })
 
 const getCashSalesAmount = sale => {
-  // Primary source from backend
   if (
     sale.cashAmount !== undefined &&
     sale.cashAmount !== null
@@ -1025,7 +1099,6 @@ const getCashSalesAmount = sale => {
     return Number(sale.cashAmount || 0)
   }
 
-  // Fallback for older records
   if (sale.paymentMethod === 'Cash') {
     return Number(sale.amount || 0)
   }
@@ -1034,7 +1107,6 @@ const getCashSalesAmount = sale => {
 }
 
 const getGCashSalesAmount = sale => {
-  // Primary source from backend
   if (
     sale.gcashAmount !== undefined &&
     sale.gcashAmount !== null
@@ -1042,7 +1114,6 @@ const getGCashSalesAmount = sale => {
     return Number(sale.gcashAmount || 0)
   }
 
-  // Fallback for older records
   if (sale.paymentMethod === 'GCash') {
     return Number(sale.amount || 0)
   }
@@ -2859,14 +2930,11 @@ onMounted(() => {
     <!-- EDIT PAYMENT / REFUND -->
     <!-- ========================= -->
 
-    <!-- ========================= -->
-    <!-- EDIT PAYMENT / REFUND -->
-    <!-- ========================= -->
-
     <div
       v-if="isAdjustmentModalOpen && editPreview"
       class="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4"
     >
+
       <div
         class="bg-white w-full max-w-md max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
       >
