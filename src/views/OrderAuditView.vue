@@ -34,12 +34,71 @@ const selectedRecordType = ref('')
 
 /*
 |--------------------------------------------------------------------------
+| API
+|--------------------------------------------------------------------------
+*/
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+/*
+|--------------------------------------------------------------------------
+| Auth
+|--------------------------------------------------------------------------
+*/
+
+const getToken = () => {
+  let token = ''
+
+  try {
+    if (
+      typeof auth.getToken === 'function'
+    ) {
+      token =
+        auth.getToken() || ''
+    }
+  } catch (err) {
+    console.warn(
+      'Unable to get token from auth store:',
+      err
+    )
+  }
+
+  if (!token) {
+    token =
+      localStorage.getItem(
+        'token'
+      ) || ''
+  }
+
+  return token
+}
+
+const getAuthHeaders = () => {
+  const token = getToken()
+
+  return token
+    ? {
+        Authorization:
+          `Bearer ${token}`
+      }
+    : {}
+}
+
+/*
+|--------------------------------------------------------------------------
 | Helpers
 |--------------------------------------------------------------------------
 */
 
 const formatAmount = amount => {
-  return `₱${Number(amount || 0).toLocaleString(
+  return `₱${Number(
+    amount || 0
+  ).toLocaleString(
     'en-PH',
     {
       minimumFractionDigits: 2,
@@ -53,7 +112,17 @@ const formatDateTime = value => {
     return '—'
   }
 
-  return new Date(value).toLocaleString(
+  const date = new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '—'
+  }
+
+  return date.toLocaleString(
     'en-PH',
     {
       year: 'numeric',
@@ -72,7 +141,17 @@ const formatDateOnly = value => {
     return '—'
   }
 
-  return new Date(value).toLocaleDateString(
+  const date = new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '—'
+  }
+
+  return date.toLocaleDateString(
     'en-PH',
     {
       year: 'numeric',
@@ -95,17 +174,10 @@ const getTodayPhilippineDate = () => {
   ).format(new Date())
 }
 
-const getAuthHeaders = () => {
-  const token =
-    typeof auth.getToken === 'function'
-      ? auth.getToken()
-      : ''
-
-  return token
-    ? {
-        Authorization: `Bearer ${token}`
-      }
-    : {}
+const normalizeArray = value => {
+  return Array.isArray(value)
+    ? value
+    : []
 }
 
 /*
@@ -119,33 +191,24 @@ const isAdmin = computed(() => {
 })
 
 const voidedOrders = computed(() => {
-  return salesAudit.value.voided || []
+  return normalizeArray(
+    salesAudit.value?.voided
+  )
 })
 
 const editedOrders = computed(() => {
-  return salesAudit.value.edited || []
+  return normalizeArray(
+    salesAudit.value?.edited
+  )
 })
 
 const totalVoidedAmount = computed(() => {
   return voidedOrders.value.reduce(
-    (total, order) =>
-      total + Number(order.amount || 0),
-    0
-  )
-})
-
-const totalEditedAdjustments = computed(() => {
-  return editedOrders.value.reduce(
-    (total, edit) => {
-      const amount =
-        Number(edit.adjustmentAmount || 0)
-
+    (total, order) => {
       return (
         total +
-        (
-          edit.editType === 'Refund'
-            ? -amount
-            : amount
+        Number(
+          order?.amount || 0
         )
       )
     },
@@ -153,9 +216,33 @@ const totalEditedAdjustments = computed(() => {
   )
 })
 
+const totalEditedAdjustments =
+  computed(() => {
+    return editedOrders.value.reduce(
+      (total, edit) => {
+        const amount =
+          Number(
+            edit?.adjustmentAmount ||
+            0
+          )
+
+        return (
+          total +
+          (
+            edit?.editType ===
+            'Refund'
+              ? -amount
+              : amount
+          )
+        )
+      },
+      0
+    )
+  })
+
 /*
 |--------------------------------------------------------------------------
-| Fetch
+| Fetch Audit Records
 |--------------------------------------------------------------------------
 */
 
@@ -168,26 +255,45 @@ const fetchAuditRecords = async () => {
   error.value = ''
 
   try {
-    const response = await axios.get(
-      '/api/orders/audit-records',
-      {
-        params: {
-          date: selectedDate.value
-        },
-        headers: getAuthHeaders()
-      }
-    )
+    const token = getToken()
+
+    if (!token) {
+      throw new Error(
+        'Walang authentication token. Mag-login ulit sa POS.'
+      )
+    }
+
+    const response =
+      await axios.get(
+        `${API}/orders/audit-records`,
+        {
+          params: {
+            date:
+              selectedDate.value
+          },
+
+          headers:
+            getAuthHeaders()
+        }
+      )
+
+    const data =
+      response?.data || {}
 
     salesAudit.value = {
       date:
-        response.data?.date ||
+        data?.date ||
         selectedDate.value,
 
       voided:
-        response.data?.voided || [],
+        normalizeArray(
+          data?.voided
+        ),
 
       edited:
-        response.data?.edited || []
+        normalizeArray(
+          data?.edited
+        )
     }
   } catch (err) {
     console.error(
@@ -196,14 +302,26 @@ const fetchAuditRecords = async () => {
     )
 
     salesAudit.value = {
-      date: selectedDate.value,
+      date:
+        selectedDate.value,
+
       voided: [],
+
       edited: []
     }
 
-    error.value =
-      err?.response?.data?.message ||
-      'Failed to load order audit records.'
+    if (
+      err?.response?.status ===
+      401
+    ) {
+      error.value =
+        'Session expired o invalid ang login token. Mag-login ulit sa POS.'
+    } else {
+      error.value =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to load order audit records.'
+    }
   } finally {
     isLoading.value = false
   }
@@ -221,12 +339,14 @@ const handleDateChange = () => {
 
 const openVoidDetails = order => {
   selectedRecord.value = order
-  selectedRecordType.value = 'Void'
+  selectedRecordType.value =
+    'Void'
 }
 
 const openEditDetails = edit => {
   selectedRecord.value = edit
-  selectedRecordType.value = 'Edit'
+  selectedRecordType.value =
+    'Edit'
 }
 
 const closeDetails = () => {
@@ -236,24 +356,45 @@ const closeDetails = () => {
 
 /*
 |--------------------------------------------------------------------------
-| Item helpers
+| Item Helpers
 |--------------------------------------------------------------------------
 */
 
 const itemAddOnTotal = item => {
-  return (item?.addOns || []).reduce(
-    (total, addOn) =>
-      total + Number(addOn.price || 0),
+  const addOns =
+    Array.isArray(
+      item?.addOns
+    )
+      ? item.addOns
+      : []
+
+  return addOns.reduce(
+    (total, addOn) => {
+      return (
+        total +
+        Number(
+          addOn?.price || 0
+        )
+      )
+    },
     0
   )
 }
 
 const itemUnitTotal = item => {
   return (
-    Number(item?.price || 0) +
+    Number(
+      item?.price || 0
+    ) +
     itemAddOnTotal(item)
   )
 }
+
+/*
+|--------------------------------------------------------------------------
+| Initial Load
+|--------------------------------------------------------------------------
+*/
 
 onMounted(() => {
   selectedDate.value =
@@ -268,9 +409,7 @@ onMounted(() => {
     class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6"
   >
 
-    <!-- ====================================================== -->
     <!-- HEADER -->
-    <!-- ====================================================== -->
 
     <div
       class="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
@@ -314,9 +453,7 @@ onMounted(() => {
 
     </div>
 
-    <!-- ====================================================== -->
     <!-- ADMIN NOTICE -->
-    <!-- ====================================================== -->
 
     <div
       v-if="!isAdmin"
@@ -325,9 +462,7 @@ onMounted(() => {
       Admin access is required to view these records.
     </div>
 
-    <!-- ====================================================== -->
     <!-- ERROR -->
-    <!-- ====================================================== -->
 
     <div
       v-if="error"
@@ -338,9 +473,7 @@ onMounted(() => {
 
     <template v-if="isAdmin">
 
-      <!-- ================================================== -->
       <!-- SUMMARY CARDS -->
-      <!-- ================================================== -->
 
       <div
         class="grid grid-cols-1 sm:grid-cols-3 gap-4"
@@ -367,7 +500,11 @@ onMounted(() => {
           <p
             class="text-sm text-gray-500 mt-1"
           >
-            {{ formatAmount(totalVoidedAmount) }}
+            {{
+              formatAmount(
+                totalVoidedAmount
+              )
+            }}
           </p>
 
         </div>
@@ -440,9 +577,7 @@ onMounted(() => {
 
       </div>
 
-      <!-- ================================================== -->
       <!-- LOADING -->
-      <!-- ================================================== -->
 
       <div
         v-if="isLoading"
@@ -453,11 +588,11 @@ onMounted(() => {
 
       <template v-else>
 
-        <!-- ================================================ -->
         <!-- VOIDED ORDERS -->
-        <!-- ================================================ -->
 
-        <section class="space-y-4">
+        <section
+          class="space-y-4"
+        >
 
           <div
             class="flex items-center justify-between gap-3"
@@ -518,7 +653,9 @@ onMounted(() => {
             class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden"
           >
 
-            <div class="overflow-x-auto">
+            <div
+              class="overflow-x-auto"
+            >
 
               <table
                 class="w-full text-sm text-left"
@@ -595,7 +732,11 @@ onMounted(() => {
                     <td
                       class="px-4 py-4 text-gray-500 whitespace-nowrap"
                     >
-                      {{ formatDateTime(order.voidedAt) }}
+                      {{
+                        formatDateTime(
+                          order.voidedAt
+                        )
+                      }}
                     </td>
 
                     <td
@@ -611,6 +752,7 @@ onMounted(() => {
                     <td
                       class="px-4 py-4"
                     >
+
                       <p
                         class="font-bold text-gray-800"
                       >
@@ -628,6 +770,7 @@ onMounted(() => {
                           '—'
                         }}
                       </p>
+
                     </td>
 
                     <td
@@ -651,12 +794,16 @@ onMounted(() => {
                     <td
                       class="px-4 py-4 text-gray-600 max-w-xs"
                     >
-                      <p class="truncate">
+
+                      <p
+                        class="truncate"
+                      >
                         {{
                           order.voidReason ||
                           'No reason provided'
                         }}
                       </p>
+
                     </td>
 
                     <td
@@ -723,9 +870,7 @@ onMounted(() => {
 
         </section>
 
-        <!-- ================================================ -->
         <!-- EDITED ORDERS -->
-        <!-- ================================================ -->
 
         <section
           class="space-y-4 pt-4"
@@ -790,7 +935,9 @@ onMounted(() => {
             class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden"
           >
 
-            <div class="overflow-x-auto">
+            <div
+              class="overflow-x-auto"
+            >
 
               <table
                 class="w-full text-sm text-left"
@@ -893,6 +1040,7 @@ onMounted(() => {
                     <td
                       class="px-4 py-4"
                     >
+
                       <p
                         class="font-bold text-gray-800"
                       >
@@ -910,6 +1058,7 @@ onMounted(() => {
                           '—'
                         }}
                       </p>
+
                     </td>
 
                     <td
@@ -1043,9 +1192,7 @@ onMounted(() => {
 
     </template>
 
-    <!-- ====================================================== -->
     <!-- DETAILS MODAL -->
-    <!-- ====================================================== -->
 
     <div
       v-if="selectedRecord"
@@ -1098,11 +1245,11 @@ onMounted(() => {
 
         </div>
 
-        <div class="p-6 space-y-5">
+        <div
+          class="p-6 space-y-5"
+        >
 
-          <!-- ============================================ -->
           <!-- VOID DETAILS -->
-          <!-- ============================================ -->
 
           <template
             v-if="
@@ -1144,83 +1291,119 @@ onMounted(() => {
             >
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Order
                 </p>
 
-                <p class="font-black text-gray-800 mt-1">
+                <p
+                  class="font-black text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.orderNumber
                       ? `#${selectedRecord.orderNumber}`
                       : '—'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Order Type
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.orderType ||
                     '—'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Customer
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.customer?.name ||
                     'Walk-in'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Cashier
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.cashier?.username ||
                     '—'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Voided By
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.voidedBy?.username ||
                     '—'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Voided At
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     formatDateTime(
                       selectedRecord.voidedAt
                     )
                   }}
                 </p>
+
               </div>
 
             </div>
@@ -1250,7 +1433,10 @@ onMounted(() => {
 
             <div
               v-if="
-                selectedRecord.items?.length
+                Array.isArray(
+                  selectedRecord.items
+                ) &&
+                selectedRecord.items.length
               "
               class="border border-gray-200 rounded-xl overflow-hidden"
             >
@@ -1258,11 +1444,13 @@ onMounted(() => {
               <div
                 class="px-4 py-3 bg-gray-50 border-b border-gray-200"
               >
+
                 <p
                   class="font-black text-gray-700"
                 >
                   Order Items
                 </p>
+
               </div>
 
               <div
@@ -1318,7 +1506,12 @@ onMounted(() => {
                   </div>
 
                   <div
-                    v-if="item.addOns?.length"
+                    v-if="
+                      Array.isArray(
+                        item.addOns
+                      ) &&
+                      item.addOns.length
+                    "
                     class="mt-2 text-xs text-gray-500"
                   >
                     Add-ons:
@@ -1333,7 +1526,9 @@ onMounted(() => {
                   </div>
 
                   <div
-                    v-if="item.specialInstructions"
+                    v-if="
+                      item.specialInstructions
+                    "
                     class="mt-2 text-xs text-orange-600"
                   >
                     Note:
@@ -1358,11 +1553,15 @@ onMounted(() => {
                 class="flex justify-between"
               >
 
-                <span class="text-gray-600">
+                <span
+                  class="text-gray-600"
+                >
                   Gross
                 </span>
 
-                <span class="font-bold">
+                <span
+                  class="font-bold"
+                >
                   {{
                     formatAmount(
                       selectedRecord.grossAmount
@@ -1382,11 +1581,15 @@ onMounted(() => {
                 class="flex justify-between"
               >
 
-                <span class="text-gray-600">
+                <span
+                  class="text-gray-600"
+                >
                   Discount
                 </span>
 
-                <span class="font-bold text-red-600">
+                <span
+                  class="font-bold text-red-600"
+                >
                   -{{
                     formatAmount(
                       selectedRecord.discountAmount
@@ -1406,11 +1609,15 @@ onMounted(() => {
                 class="flex justify-between"
               >
 
-                <span class="text-gray-600">
+                <span
+                  class="text-gray-600"
+                >
                   Delivery Fee
                 </span>
 
-                <span class="font-bold text-blue-600">
+                <span
+                  class="font-bold text-blue-600"
+                >
                   +{{
                     formatAmount(
                       selectedRecord.deliveryFee
@@ -1446,9 +1653,7 @@ onMounted(() => {
 
           </template>
 
-          <!-- ============================================ -->
           <!-- EDIT DETAILS -->
-          <!-- ============================================ -->
 
           <template
             v-else
@@ -1513,83 +1718,119 @@ onMounted(() => {
             >
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Order
                 </p>
 
-                <p class="font-black text-gray-800 mt-1">
+                <p
+                  class="font-black text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.orderNumber
                       ? `#${selectedRecord.orderNumber}`
                       : '—'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Order Type
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.orderType ||
                     '—'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Customer
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.customer?.name ||
                     'Walk-in'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Edited By
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.editedBy?.username ||
                     '—'
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Edited At
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     formatDateTime(
                       selectedRecord.editedAt
                     )
                   }}
                 </p>
+
               </div>
 
               <div>
-                <p class="text-xs text-gray-500">
+
+                <p
+                  class="text-xs text-gray-500"
+                >
                   Payment Method
                 </p>
 
-                <p class="font-bold text-gray-800 mt-1">
+                <p
+                  class="font-bold text-gray-800 mt-1"
+                >
                   {{
                     selectedRecord.paymentMethod ||
                     '—'
                   }}
                 </p>
+
               </div>
 
             </div>
