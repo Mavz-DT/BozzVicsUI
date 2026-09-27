@@ -797,6 +797,7 @@ const isSettleFormValid =
     }
 
     // CASH
+
     if (
       paymentMethod.value ===
       'Cash'
@@ -811,6 +812,7 @@ const isSettleFormValid =
     }
 
     // GCASH
+
     if (
       paymentMethod.value ===
       'GCash'
@@ -823,6 +825,7 @@ const isSettleFormValid =
     }
 
     // SPLIT
+
     if (
       paymentMethod.value ===
       'Split'
@@ -897,6 +900,16 @@ const keypadValue =
         return splitCashTendered.value
       }
 
+      // IMPORTANT:
+      // GCash reference must also
+      // be supported by keypad.
+      if (
+        keypadTarget.value ===
+        'splitGCashReference'
+      ) {
+        return splitGCashReference.value
+      }
+
       return ''
     },
 
@@ -937,6 +950,18 @@ const keypadValue =
       ) {
         splitCashTendered.value =
           value
+
+        return
+      }
+
+      // IMPORTANT:
+      // GCash reference keypad input
+      if (
+        keypadTarget.value ===
+        'splitGCashReference'
+      ) {
+        splitGCashReference.value =
+          value
       }
     }
   })
@@ -976,6 +1001,33 @@ const appendKey =
       return
     }
 
+    // =========================
+    // GCASH REFERENCE
+    // =========================
+    //
+    // Reference number is numeric only.
+    // Decimal point is not allowed.
+    //
+    if (
+      keypadTarget.value ===
+      'splitGCashReference'
+    ) {
+      if (
+        !/^\d$/.test(key)
+      ) {
+        return
+      }
+
+      keypadValue.value +=
+        key
+
+      return
+    }
+
+    // =========================
+    // DECIMAL POINT
+    // =========================
+
     if (
       key === '.'
     ) {
@@ -1001,6 +1053,10 @@ const appendKey =
       return
     }
 
+    // =========================
+    // MAXIMUM 2 DECIMALS
+    // =========================
+
     if (
       keypadValue.value.includes(
         '.'
@@ -1018,6 +1074,10 @@ const appendKey =
         return
       }
     }
+
+    // =========================
+    // PREVENT LEADING ZEROES
+    // =========================
 
     if (
       keypadValue.value ===
@@ -1040,6 +1100,12 @@ const appendKey =
 
 const selectPaymentMethod =
   method => {
+    if (
+      isSettling.value
+    ) {
+      return
+    }
+
     paymentMethod.value =
       method
 
@@ -1482,7 +1548,7 @@ const printSettledReceipt =
               payment?.paymentMethod ||
               sale.paymentMethod ||
               '-'
-            }
+          }
           </span>
 
         </div>
@@ -1995,6 +2061,12 @@ const printSettledReceipt =
 
 const openSettleModal =
   order => {
+    if (
+      isSettling.value
+    ) {
+      return
+    }
+
     selectedOrder.value =
       order
 
@@ -2078,204 +2150,266 @@ const closeSettleModal =
 // SETTLE ORDER
 // =========================
 
-  const settleOrder = async () => {
-    // Prevent double-click / duplicate payment requests
-    if (isSettling.value) {
-      return
-    }
+const settleOrder = async () => {
+  // Prevent double-click / duplicate payment requests
+  if (
+    isSettling.value
+  ) {
+    return
+  }
+
+  if (
+    !isSettleFormValid.value ||
+    !selectedOrder.value
+  ) {
+    return
+  }
+
+  try {
+    isSettling.value = true
+
+    error.value = ''
+    success.value = ''
+
+    let payments = []
+
+    // =========================
+    // CASH
+    // =========================
 
     if (
-      !isSettleFormValid.value ||
-      !selectedOrder.value
+      paymentMethod.value ===
+      'Cash'
     ) {
-      return
-    }
+      payments = [
+        {
+          paymentMethod:
+            'Cash',
 
-    try {
-      isSettling.value = true
+          amount:
+            settleAmount.value,
 
-      error.value = ''
-      success.value = ''
-
-      let payments = []
-
-      // CASH
-      if (
-        paymentMethod.value ===
-        'Cash'
-      ) {
-        payments = [
-          {
-            paymentMethod:
-              'Cash',
-
-            amount:
-              settleAmount.value,
-
-            amountTendered:
-              Number(
-                amountTendered.value
-              ),
-
-            change:
-              change.value,
-
-            referenceNumber:
-              ''
-          }
-        ]
-      }
-
-      // GCASH
-      if (
-        paymentMethod.value ===
-        'GCash'
-      ) {
-        payments = [
-          {
-            paymentMethod:
-              'GCash',
-
-            amount:
-              settleAmount.value,
-
-            amountTendered:
-              0,
-
-            change:
-              0,
-
-            referenceNumber:
-              referenceNumber.value.trim()
-          }
-        ]
-      }
-
-      // SPLIT
-      if (
-        paymentMethod.value ===
-        'Split'
-      ) {
-        if (
-          splitCash.value > 0
-        ) {
-          payments.push({
-            paymentMethod:
-              'Cash',
-
-            amount:
-              splitCash.value,
-
-            amountTendered:
-              splitCashTenderedValue.value,
-
-            change:
-              splitChange.value,
-
-            referenceNumber:
-              ''
-          })
-        }
-
-        if (
-          splitGCash.value > 0
-        ) {
-          payments.push({
-            paymentMethod:
-              'GCash',
-
-            amount:
-              splitGCash.value,
-
-            amountTendered:
-              0,
-
-            change:
-              0,
-
-            referenceNumber:
-              splitGCashReference.value.trim()
-          })
-        }
-      }
-
-      const paymentTotal =
-        payments.reduce(
-          (
-            total,
-            payment
-          ) =>
-            total +
+          amountTendered:
             Number(
-              payment.amount || 0
+              amountTendered.value
             ),
-          0
-        )
+
+          change:
+            change.value,
+
+          referenceNumber:
+            ''
+        }
+      ]
+    }
+
+    // =========================
+    // GCASH
+    // =========================
+
+    if (
+      paymentMethod.value ===
+      'GCash'
+    ) {
+      payments = [
+        {
+          paymentMethod:
+            'GCash',
+
+          amount:
+            settleAmount.value,
+
+          amountTendered:
+            0,
+
+          change:
+            0,
+
+          referenceNumber:
+            referenceNumber.value.trim()
+        }
+      ]
+    }
+
+    // =========================
+    // SPLIT
+    // =========================
+
+    if (
+      paymentMethod.value ===
+      'Split'
+    ) {
+      if (
+        splitCash.value > 0
+      ) {
+        payments.push({
+          paymentMethod:
+            'Cash',
+
+          amount:
+            splitCash.value,
+
+          amountTendered:
+            splitCashTenderedValue.value,
+
+          change:
+            splitChange.value,
+
+          referenceNumber:
+            ''
+        })
+      }
 
       if (
-        Math.abs(
-          paymentTotal -
-            settleAmount.value
-        ) > 0.01
+        splitGCash.value > 0
       ) {
-        throw new Error(
-          'Ang payment total ay hindi tugma sa amount due.'
-        )
+        payments.push({
+          paymentMethod:
+            'GCash',
+
+          amount:
+            splitGCash.value,
+
+          amountTendered:
+            0,
+
+          change:
+            0,
+
+          referenceNumber:
+            splitGCashReference.value.trim()
+        })
       }
-
-      const token =
-        authStore.getToken()
-
-      const config = {
-        headers: {
-          Authorization:
-            `Bearer ${token}`
-        }
-      }
-
-      const res =
-        await axios.post(
-          `${API}/payments`,
-          {
-            orderId:
-              selectedOrder.value._id,
-
-            receivedBy:
-              authStore.user?._id,
-
-            payments
-          },
-          config
-        )
-
-      success.value =
-        res.data?.message ||
-        'Order settled successfully.'
-
-      closeSettleModal(
-        true
-      )
-
-      await refreshOrders()
-
-      setTimeout(() => {
-        success.value = ''
-      }, 3000)
-    } catch (err) {
-      console.error(
-        'Error settling order:',
-        err
-      )
-
-      error.value =
-        err.response?.data?.message ||
-        err.message ||
-        'Hindi ma-settle ang order.'
-    } finally {
-      isSettling.value =
-        false
     }
+
+    // =========================
+    // VALIDATE PAYMENT TOTAL
+    // =========================
+
+    const paymentTotal =
+      payments.reduce(
+        (
+          total,
+          payment
+        ) =>
+          total +
+          Number(
+            payment.amount || 0
+          ),
+        0
+      )
+
+    if (
+      Math.abs(
+        paymentTotal -
+          settleAmount.value
+      ) > 0.01
+    ) {
+      throw new Error(
+        'Ang payment total ay hindi tugma sa amount due.'
+      )
+    }
+
+    // =========================
+    // GENERATE PAYMENT REQUEST ID
+    // =========================
+    //
+    // One ID = one complete
+    // payment submission.
+    //
+    // This protects the settlement
+    // flow from duplicate requests.
+    //
+    // For Split Payment, this same
+    // request ID represents the
+    // entire Cash + GCash submission.
+    //
+    // =========================
+
+    let paymentRequestId = ''
+
+    if (
+      typeof crypto !== 'undefined' &&
+      typeof crypto.randomUUID ===
+        'function'
+    ) {
+      paymentRequestId =
+        crypto.randomUUID()
+    } else {
+      paymentRequestId =
+        `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 11)}`
+    }
+
+    // =========================
+    // AUTH CONFIG
+    // =========================
+
+    const token =
+      authStore.getToken()
+
+    const config = {
+      headers: {
+        Authorization:
+          `Bearer ${token}`
+      }
+    }
+
+    // =========================
+    // SAVE PAYMENT
+    // =========================
+
+    const res =
+      await axios.post(
+        `${API}/payments`,
+        {
+          orderId:
+            selectedOrder.value._id,
+
+          receivedBy:
+            authStore.user?._id,
+
+          paymentRequestId,
+
+          payments
+        },
+        config
+      )
+
+    // =========================
+    // SUCCESS
+    // =========================
+
+    success.value =
+      res.data?.message ||
+      'Order settled successfully.'
+
+    closeSettleModal(
+      true
+    )
+
+    await refreshOrders()
+
+    setTimeout(() => {
+      success.value = ''
+    }, 3000)
+
+  } catch (err) {
+    console.error(
+      'Error settling order:',
+      err
+    )
+
+    error.value =
+      err.response?.data?.message ||
+      err.message ||
+      'Hindi ma-settle ang order.'
+  } finally {
+    isSettling.value =
+      false
   }
+}
 
 // =========================
 // DATE CHANGE
@@ -2695,7 +2829,8 @@ onMounted(() => {
                       "
                       type="button"
                       title="Settle order"
-                      class="p-2 rounded-lg text-white transition-colors"
+                      :disabled="isSettling"
+                      class="p-2 rounded-lg text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                       :style="{
                         backgroundColor:
                           settingsStore.themeColor
@@ -3286,7 +3421,8 @@ onMounted(() => {
                       "
                       type="button"
                       title="Pay rider"
-                      class="px-3 py-2 rounded-lg text-white text-xs font-black shadow-sm transition-colors"
+                      :disabled="isRiderSettling"
+                      class="px-3 py-2 rounded-lg text-white text-xs font-black shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                       :style="{
                         backgroundColor:
                           settingsStore.themeColor
@@ -3606,11 +3742,15 @@ onMounted(() => {
                         'Cash'
                       )
                     "
+                    :disabled="isSettling"
                     :class="[
                       'h-11 md:h-12 rounded-lg border font-bold transition-all text-xs md:text-sm',
                       paymentMethod === 'Cash'
                         ? 'bg-green-600 text-white border-green-600 shadow-sm'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                      isSettling
+                        ? 'cursor-not-allowed opacity-60'
+                        : ''
                     ]"
                   >
                     💵 Cash
@@ -3625,11 +3765,15 @@ onMounted(() => {
                         'GCash'
                       )
                     "
+                    :disabled="isSettling"
                     :class="[
                       'h-11 md:h-12 rounded-lg border font-bold transition-all text-xs md:text-sm',
                       paymentMethod === 'GCash'
                         ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                      isSettling
+                        ? 'cursor-not-allowed opacity-60'
+                        : ''
                     ]"
                   >
                     📱 GCash
@@ -3644,11 +3788,15 @@ onMounted(() => {
                         'Split'
                       )
                     "
+                    :disabled="isSettling"
                     :class="[
                       'h-11 md:h-12 rounded-lg border font-bold transition-all text-xs md:text-sm',
                       paymentMethod === 'Split'
                         ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+                      isSettling
+                        ? 'cursor-not-allowed opacity-60'
+                        : ''
                     ]"
                   >
                     Split
@@ -3741,6 +3889,7 @@ onMounted(() => {
                   inputmode="numeric"
                   placeholder="e.g. 10023456789"
                   class="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 font-bold text-base"
+                  :disabled="isSettling"
                 />
 
                 <p
@@ -3867,7 +4016,8 @@ onMounted(() => {
                           'splitCashAmount'
                         )
                       "
-                      class="w-full min-h-[52px] p-2.5 border rounded-lg text-xl font-black text-right"
+                      :disabled="isSettling"
+                      class="w-full min-h-[52px] p-2.5 border rounded-lg text-xl font-black text-right disabled:cursor-not-allowed disabled:opacity-60"
                       :class="
                         keypadTarget ===
                         'splitCashAmount'
@@ -3902,7 +4052,8 @@ onMounted(() => {
                           'splitGCashAmount'
                         )
                       "
-                      class="w-full min-h-[52px] p-2.5 border rounded-lg text-xl font-black text-right"
+                      :disabled="isSettling"
+                      class="w-full min-h-[52px] p-2.5 border rounded-lg text-xl font-black text-right disabled:cursor-not-allowed disabled:opacity-60"
                       :class="
                         keypadTarget ===
                         'splitGCashAmount'
@@ -3940,7 +4091,8 @@ onMounted(() => {
                           'splitCashTendered'
                         )
                       "
-                      class="w-full min-h-[52px] p-2.5 border rounded-lg text-xl font-black text-right"
+                      :disabled="isSettling"
+                      class="w-full min-h-[52px] p-2.5 border rounded-lg text-xl font-black text-right disabled:cursor-not-allowed disabled:opacity-60"
                       :class="
                         keypadTarget ===
                         'splitCashTendered'
@@ -3997,11 +4149,28 @@ onMounted(() => {
                       v-model="
                         splitGCashReference
                       "
+                      @focus="
+                        setKeypadTarget(
+                          'splitGCashReference'
+                        )
+                      "
+                      @click="
+                        setKeypadTarget(
+                          'splitGCashReference'
+                        )
+                      "
                       type="text"
                       inputmode="numeric"
                       placeholder="Reference number"
-                      class="w-full min-h-[52px] p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 text-sm font-bold"
+                      :disabled="isSettling"
+                      class="w-full min-h-[52px] p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
                     />
+
+                    <p
+                      class="text-[10px] text-gray-500 mt-1"
+                    >
+                      Tap this field, then use the touchscreen keypad.
+                    </p>
 
                   </div>
 
@@ -4053,7 +4222,13 @@ onMounted(() => {
                               : keypadTarget ===
                                   'splitGCashAmount'
                                 ? 'GCash Amount'
-                                : 'Cash Tendered'
+                                : keypadTarget ===
+                                    'splitCashTendered'
+                                  ? 'Cash Tendered'
+                                  : keypadTarget ===
+                                      'splitGCashReference'
+                                    ? 'GCash Reference'
+                                    : 'Payment Input'
                             : 'No keypad needed'
                       }}
                     </p>
@@ -4087,7 +4262,8 @@ onMounted(() => {
                     @click="
                       appendKey('1')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     1
                   </button>
@@ -4097,7 +4273,8 @@ onMounted(() => {
                     @click="
                       appendKey('2')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     2
                   </button>
@@ -4107,7 +4284,8 @@ onMounted(() => {
                     @click="
                       appendKey('3')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     3
                   </button>
@@ -4117,7 +4295,8 @@ onMounted(() => {
                     @click="
                       appendKey('4')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     4
                   </button>
@@ -4127,7 +4306,8 @@ onMounted(() => {
                     @click="
                       appendKey('5')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     5
                   </button>
@@ -4137,7 +4317,8 @@ onMounted(() => {
                     @click="
                       appendKey('6')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     6
                   </button>
@@ -4147,7 +4328,8 @@ onMounted(() => {
                     @click="
                       appendKey('7')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     7
                   </button>
@@ -4157,7 +4339,8 @@ onMounted(() => {
                     @click="
                       appendKey('8')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     8
                   </button>
@@ -4167,7 +4350,8 @@ onMounted(() => {
                     @click="
                       appendKey('9')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     9
                   </button>
@@ -4177,7 +4361,8 @@ onMounted(() => {
                     @click="
                       appendKey('clear')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm md:text-base font-black shadow-sm hover:bg-red-100 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm md:text-base font-black shadow-sm hover:bg-red-100 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Clear
                   </button>
@@ -4187,7 +4372,8 @@ onMounted(() => {
                     @click="
                       appendKey('0')
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-white border border-gray-200 text-xl md:text-2xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     0
                   </button>
@@ -4199,7 +4385,8 @@ onMounted(() => {
                         'backspace'
                       )
                     "
-                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-gray-200 border border-gray-300 text-lg md:text-xl font-black shadow-sm hover:bg-gray-300 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling"
+                    class="h-12 sm:h-14 md:h-14 rounded-lg bg-gray-200 border border-gray-300 text-lg md:text-xl font-black shadow-sm hover:bg-gray-300 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     ←
                   </button>
@@ -4209,7 +4396,8 @@ onMounted(() => {
                     @click="
                       appendKey('.')
                     "
-                    class="col-span-3 h-10 md:h-11 rounded-lg bg-white border border-gray-200 text-xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform"
+                    :disabled="isSettling || keypadTarget === 'splitGCashReference'"
+                    class="col-span-3 h-10 md:h-11 rounded-lg bg-white border border-gray-200 text-xl font-black shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     .
                   </button>
