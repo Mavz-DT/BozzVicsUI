@@ -1,24 +1,145 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import {
+  ref,
+  onMounted,
+  computed
+} from 'vue'
+
 import axios from 'axios'
+
 import { useSettingsStore } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
+
+/*
+|--------------------------------------------------------------------------
+| API
+|--------------------------------------------------------------------------
+*/
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const API = `${API_BASE_URL}/api`
+
+/*
+|--------------------------------------------------------------------------
+| STATE
+|--------------------------------------------------------------------------
+*/
 
 const orders = ref([])
 const isLoading = ref(true)
 const error = ref('')
 const search = ref('')
 
+/*
+|--------------------------------------------------------------------------
+| HELPERS
+|--------------------------------------------------------------------------
+*/
+
+const extractOrders = data => {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (Array.isArray(data?.orders)) {
+    return data.orders
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data
+  }
+
+  if (Array.isArray(data?.results)) {
+    return data.results
+  }
+
+  return []
+}
+
+const normalizeOrderItems = items => {
+  if (!Array.isArray(items)) {
+    return []
+  }
+
+  return items.filter(item => {
+    return (
+      item &&
+      Number(item.quantity || 0) > 0
+    )
+  })
+}
+
+/*
+|--------------------------------------------------------------------------
+| FETCH ORDERS
+|--------------------------------------------------------------------------
+*/
+
 const fetchOrders = async () => {
   try {
     isLoading.value = true
     error.value = ''
 
-    const res = await axios.get('/api/orders')
-    orders.value = res.data
+    const res = await axios.get(
+      `${API}/orders`
+    )
+
+    const allOrders = extractOrders(
+      res.data
+    )
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active Orders only
+    |--------------------------------------------------------------------------
+    |
+    | Hindi natin ipapakita dito ang:
+    | - Completed
+    | - Settled
+    | - Void
+    | - Cancelled
+    | - Unsettled
+    | - ibang historical orders
+    |
+    */
+
+    orders.value = allOrders
+      .filter(order => {
+        return [
+          'Active',
+          'Preparing',
+          'Ready'
+        ].includes(order?.status)
+      })
+      .map(order => {
+        return {
+          ...order,
+          items: normalizeOrderItems(
+            order?.items
+          )
+        }
+      })
+      .filter(order => {
+        /*
+        |--------------------------------------------------------------------------
+        | Huwag ipakita ang empty order
+        |--------------------------------------------------------------------------
+        */
+
+        return order.items.length > 0
+      })
   } catch (err) {
-    console.error('Error fetching orders:', err)
+    console.error(
+      'Error fetching active orders:',
+      err
+    )
+
+    orders.value = []
 
     error.value =
       err.response?.data?.message ||
@@ -28,16 +149,30 @@ const fetchOrders = async () => {
   }
 }
 
-const updateStatus = async (order, status) => {
+/*
+|--------------------------------------------------------------------------
+| UPDATE STATUS
+|--------------------------------------------------------------------------
+*/
+
+const updateStatus = async (
+  order,
+  status
+) => {
   try {
     await axios.put(
-      `/api/orders/${order._id}/status`,
-      { status }
+      `${API}/orders/${order._id}/status`,
+      {
+        status
+      }
     )
 
     await fetchOrders()
   } catch (err) {
-    console.error('Error updating order status:', err)
+    console.error(
+      'Error updating order status:',
+      err
+    )
 
     alert(
       err.response?.data?.message ||
@@ -45,6 +180,12 @@ const updateStatus = async (order, status) => {
     )
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| RELEASE ORDER NUMBER
+|--------------------------------------------------------------------------
+*/
 
 const releaseOrderNumber = async order => {
   if (!order.orderNumber) {
@@ -61,8 +202,14 @@ const releaseOrderNumber = async order => {
 
   try {
     await axios.put(
-      `/api/order-numbers/${order.orderNumber}/release`
+      `${API}/order-numbers/${order.orderNumber}/release`
     )
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh after release
+    |--------------------------------------------------------------------------
+    */
 
     await fetchOrders()
   } catch (err) {
@@ -78,8 +225,16 @@ const releaseOrderNumber = async order => {
   }
 }
 
+/*
+|--------------------------------------------------------------------------
+| SEARCH
+|--------------------------------------------------------------------------
+*/
+
 const filteredOrders = computed(() => {
-  const query = search.value.trim().toLowerCase()
+  const query = search.value
+    .trim()
+    .toLowerCase()
 
   if (!query) {
     return orders.value
@@ -87,16 +242,24 @@ const filteredOrders = computed(() => {
 
   return orders.value.filter(order => {
     const customerName =
-      order.customer?.name?.toLowerCase() || ''
+      String(
+        order?.customer?.name || ''
+      ).toLowerCase()
 
     const contact =
-      order.customer?.contactNumber?.toLowerCase() || ''
+      String(
+        order?.customer?.contactNumber || ''
+      ).toLowerCase()
 
     const orderNumber =
-      String(order.orderNumber || '')
+      String(
+        order?.orderNumber || ''
+      )
 
     const orderType =
-      order.orderType?.toLowerCase() || ''
+      String(
+        order?.orderType || ''
+      ).toLowerCase()
 
     return (
       customerName.includes(query) ||
@@ -111,20 +274,42 @@ const activeCount = computed(() => {
   return filteredOrders.value.length
 })
 
+/*
+|--------------------------------------------------------------------------
+| FORMAT
+|--------------------------------------------------------------------------
+*/
+
 const formatAmount = amount => {
-  return '₱' + Number(amount || 0).toLocaleString(
-    'en-US',
-    {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }
+  return (
+    '₱' +
+    Number(amount || 0).toLocaleString(
+      'en-US',
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }
+    )
   )
 }
 
 const formatDate = date => {
-  if (!date) return ''
+  if (!date) {
+    return ''
+  }
 
-  return new Date(date).toLocaleString(
+  const parsedDate =
+    new Date(date)
+
+  if (
+    Number.isNaN(
+      parsedDate.getTime()
+    )
+  ) {
+    return ''
+  }
+
+  return parsedDate.toLocaleString(
     'en-PH',
     {
       dateStyle: 'medium',
@@ -132,6 +317,12 @@ const formatDate = date => {
     }
   )
 }
+
+/*
+|--------------------------------------------------------------------------
+| STATUS
+|--------------------------------------------------------------------------
+*/
 
 const getStatusClass = status => {
   switch (status) {
@@ -141,19 +332,29 @@ const getStatusClass = status => {
     case 'Ready':
       return 'bg-green-100 text-green-700'
 
-    case 'Unsettled':
-      return 'bg-orange-100 text-orange-700'
-
     case 'Active':
     default:
       return 'bg-blue-100 text-blue-700'
   }
 }
 
+/*
+|--------------------------------------------------------------------------
+| VIEW ORDER
+|--------------------------------------------------------------------------
+*/
+
 const viewOrder = order => {
-  const items = order.items
-    .map(item => `${item.name} x${item.quantity}`)
-    .join('\n')
+  const items = Array.isArray(
+    order.items
+  )
+    ? order.items
+        .map(
+          item =>
+            `${item.name} x${item.quantity}`
+        )
+        .join('\n')
+    : ''
 
   alert(
     `Order Type: ${order.orderType}\n` +
@@ -165,40 +366,63 @@ const viewOrder = order => {
   )
 }
 
+/*
+|--------------------------------------------------------------------------
+| INITIAL LOAD
+|--------------------------------------------------------------------------
+*/
+
 onMounted(() => {
   fetchOrders()
 })
 </script>
 
 <template>
-  <div class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+  <div
+    class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6"
+  >
 
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div
+      class="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+    >
 
       <div>
-        <h1 class="text-2xl md:text-3xl font-black text-gray-800">
+        <h1
+          class="text-2xl md:text-3xl font-black text-gray-800"
+        >
           Active Orders
         </h1>
 
-        <p class="text-sm text-gray-500 mt-1">
+        <p
+          class="text-sm text-gray-500 mt-1"
+        >
           Monitor current dine-in, take-out, and delivery orders.
         </p>
       </div>
 
       <div
         class="px-4 py-3 rounded-xl text-white shadow-sm"
-        :style="{ backgroundColor: settingsStore.themeColor }"
+        :style="{
+          backgroundColor:
+            settingsStore.themeColor
+        }"
       >
-        <p class="text-xs text-white/70">
+        <p
+          class="text-xs text-white/70"
+        >
           Active Orders
         </p>
 
-        <p class="font-black text-lg">
+        <p
+          class="font-black text-lg"
+        >
           {{ activeCount }}
         </p>
       </div>
+
     </div>
+
 
     <!-- Error -->
     <div
@@ -208,8 +432,11 @@ onMounted(() => {
       {{ error }}
     </div>
 
+
     <!-- Search -->
-    <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+    <div
+      class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm"
+    >
       <input
         v-model="search"
         type="text"
@@ -217,6 +444,7 @@ onMounted(() => {
         class="w-full border border-gray-300 rounded-xl p-3 outline-none focus:ring-2 focus:ring-red-200"
       />
     </div>
+
 
     <!-- Loading -->
     <div
@@ -226,23 +454,33 @@ onMounted(() => {
       Loading active orders...
     </div>
 
+
     <!-- Empty -->
     <div
       v-else-if="filteredOrders.length === 0"
       class="bg-white border border-gray-200 rounded-2xl p-12 text-center"
     >
-      <div class="text-4xl mb-3">
+
+      <div
+        class="text-4xl mb-3"
+      >
         ✓
       </div>
 
-      <h2 class="font-black text-gray-700">
+      <h2
+        class="font-black text-gray-700"
+      >
         No Active Orders
       </h2>
 
-      <p class="text-sm text-gray-400 mt-1">
+      <p
+        class="text-sm text-gray-400 mt-1"
+      >
         Walang kasalukuyang active orders.
       </p>
+
     </div>
+
 
     <!-- Orders -->
     <div
@@ -257,15 +495,23 @@ onMounted(() => {
       >
 
         <!-- Card Header -->
-        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <div
+          class="p-4 border-b border-gray-100 flex items-center justify-between"
+        >
 
           <div>
-            <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+            <p
+              class="text-xs text-gray-400 font-semibold uppercase tracking-wide"
+            >
               {{ order.orderType }}
             </p>
 
-            <h2 class="text-lg font-black text-gray-800 mt-1">
-              <span v-if="order.orderNumber">
+            <h2
+              class="text-lg font-black text-gray-800 mt-1"
+            >
+              <span
+                v-if="order.orderNumber"
+              >
                 Order #{{ order.orderNumber }}
               </span>
 
@@ -277,84 +523,163 @@ onMounted(() => {
 
           <span
             class="px-3 py-1 rounded-full text-xs font-bold"
-            :class="getStatusClass(order.status)"
+            :class="
+              getStatusClass(
+                order.status
+              )
+            "
           >
             {{ order.status }}
           </span>
 
         </div>
 
-        <!-- Customer -->
-        <div class="p-4 space-y-3">
 
-          <div v-if="order.orderType === 'Delivery'">
-            <p class="text-xs text-gray-400">
+        <!-- Customer -->
+        <div
+          class="p-4 space-y-3"
+        >
+
+          <div
+            v-if="
+              order.orderType ===
+              'Delivery'
+            "
+          >
+
+            <p
+              class="text-xs text-gray-400"
+            >
               Customer
             </p>
 
-            <p class="font-bold text-gray-800">
-              {{ order.customer?.name || '—' }}
+            <p
+              class="font-bold text-gray-800"
+            >
+              {{
+                order.customer?.name ||
+                '—'
+              }}
             </p>
 
-            <p class="text-sm text-gray-500">
-              {{ order.customer?.contactNumber || '—' }}
+            <p
+              class="text-sm text-gray-500"
+            >
+              {{
+                order.customer
+                  ?.contactNumber ||
+                '—'
+              }}
             </p>
 
-            <p class="text-sm text-gray-500 mt-1">
-              {{ order.customer?.address || '—' }}
+            <p
+              class="text-sm text-gray-500 mt-1"
+            >
+              {{
+                order.customer?.address ||
+                '—'
+              }}
             </p>
+
           </div>
+
 
           <!-- Items -->
           <div>
-            <p class="text-xs text-gray-400 mb-2">
+
+            <p
+              class="text-xs text-gray-400 mb-2"
+            >
               Order Items
             </p>
 
-            <div class="space-y-2">
+            <div
+              class="space-y-2"
+            >
+
               <div
                 v-for="item in order.items"
                 :key="item._id"
                 class="flex justify-between gap-3 text-sm"
               >
-                <span class="text-gray-700">
+
+                <span
+                  class="text-gray-700"
+                >
                   {{ item.name }}
-                  <span class="text-gray-400">
-                    × {{ item.quantity }}
+
+                  <span
+                    class="text-gray-400"
+                  >
+                    ×
+                    {{ item.quantity }}
                   </span>
                 </span>
 
-                <span class="font-semibold text-gray-800">
-                  {{ formatAmount(item.subtotal) }}
+                <span
+                  class="font-semibold text-gray-800"
+                >
+                  {{
+                    formatAmount(
+                      item.subtotal
+                    )
+                  }}
                 </span>
+
               </div>
+
             </div>
+
           </div>
 
+
           <!-- Total -->
-          <div class="pt-3 border-t border-gray-100 flex justify-between items-center">
-            <span class="font-bold text-gray-600">
+          <div
+            class="pt-3 border-t border-gray-100 flex justify-between items-center"
+          >
+
+            <span
+              class="font-bold text-gray-600"
+            >
               Total
             </span>
 
             <span
               class="text-xl font-black"
-              :style="{ color: settingsStore.themeColor }"
+              :style="{
+                color:
+                  settingsStore.themeColor
+              }"
             >
-              {{ formatAmount(order.netAmount) }}
+              {{
+                formatAmount(
+                  order.netAmount
+                )
+              }}
             </span>
+
           </div>
 
+
           <!-- Metadata -->
-          <div class="text-xs text-gray-400">
-            Created {{ formatDate(order.createdAt) }}
+          <div
+            class="text-xs text-gray-400"
+          >
+            Created
+            {{ formatDate(order.createdAt) }}
           </div>
 
         </div>
 
+
         <!-- Actions -->
-        <div class="p-4 bg-gray-50 border-t border-gray-100">
-          <div class="space-y-2">
+        <div
+          class="p-4 bg-gray-50 border-t border-gray-100"
+        >
+
+          <div
+            class="space-y-2"
+          >
 
             <button
               @click="viewOrder(order)"
@@ -364,42 +689,78 @@ onMounted(() => {
               View Order
             </button>
 
+
             <button
-              v-if="order.status === 'Active'"
-              @click="updateStatus(order, 'Preparing')"
+              v-if="
+                order.status ===
+                'Active'
+              "
+              @click="
+                updateStatus(
+                  order,
+                  'Preparing'
+                )
+              "
               type="button"
               class="w-full py-2.5 rounded-xl text-white font-bold"
-              :style="{ backgroundColor: settingsStore.themeColor }"
+              :style="{
+                backgroundColor:
+                  settingsStore.themeColor
+              }"
             >
               Start Preparing
             </button>
 
+
             <button
-              v-if="order.status === 'Preparing'"
-              @click="updateStatus(order, 'Ready')"
+              v-if="
+                order.status ===
+                'Preparing'
+              "
+              @click="
+                updateStatus(
+                  order,
+                  'Ready'
+                )
+              "
               type="button"
               class="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold"
             >
               Mark Ready
             </button>
 
+
             <button
-              v-if="order.status === 'Ready'"
-              @click="updateStatus(order, 'Preparing')"
+              v-if="
+                order.status ===
+                'Ready'
+              "
+              @click="
+                updateStatus(
+                  order,
+                  'Preparing'
+                )
+              "
               type="button"
               class="w-full py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white font-bold"
             >
               Back to Preparing
             </button>
+
+
             <button
               v-if="
                 order.orderNumber &&
                 (
-                  order.orderType === 'Dine-In' ||
-                  order.orderType === 'Take-Out'
+                  order.orderType ===
+                    'Dine-In' ||
+                  order.orderType ===
+                    'Take-Out'
                 )
               "
-              @click="releaseOrderNumber(order)"
+              @click="
+                releaseOrderNumber(order)
+              "
               type="button"
               class="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-gray-900 text-white font-bold transition-colors"
             >
@@ -407,6 +768,7 @@ onMounted(() => {
             </button>
 
           </div>
+
         </div>
 
       </div>
