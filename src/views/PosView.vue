@@ -987,321 +987,349 @@ const finalTotal =
 // KITCHEN TICKET
 // =========================
 
-const printKitchenTicket =
-  order => {
-    const printWindow =
-      window.open(
-        '',
-        '_blank',
-        'width=400,height=700'
-      )
+  const printKitchenTicket =
+    order => {
+      const printWindow =
+        window.open(
+          '',
+          '_blank',
+          'width=400,height=700'
+        )
 
-    if (!printWindow) {
-      alert(
-        'Hindi mabuksan ang KOT print window. I-check ang browser popup blocker.'
-      )
+      if (!printWindow) {
+        alert(
+          'Hindi mabuksan ang KOT print window. I-check ang browser popup blocker.'
+        )
 
-      return
-    }
+        return
+      }
 
-    const orderNumber =
-      order.orderNumber
-        ? `#${order.orderNumber}`
-        : 'DELIVERY'
+      const orderNumber =
+        order.orderNumber
+          ? `#${order.orderNumber}`
+          : 'DELIVERY'
 
-    const itemsHtml =
-      order.items
-        .map(
-          item => `
-            <div class="item">
+      const itemsHtml =
+        order.items
+          .map(
+            item => `
+              <div class="item">
 
-              <div class="qty">
-                ${item.quantity}x
+                <div class="qty">
+                  ${item.quantity}x
+                </div>
+
+                <div class="name">
+
+                  ${item.name}
+
+                  ${
+                    item.addOns?.length
+                      ? `
+                        <div class="instruction">
+                          Add-ons:
+                          ${item.addOns
+                            .map(
+                              addOn =>
+                                `${addOn.name} (+₱${Number(
+                                  addOn.price
+                                ).toFixed(2)})`
+                            )
+                            .join(', ')}
+                        </div>
+                      `
+                      : ''
+                  }
+
+                  ${
+                    item.specialInstructions
+                      ? `
+                        <div class="instruction">
+                          Note:
+                          ${item.specialInstructions}
+                        </div>
+                      `
+                      : ''
+                  }
+
+                </div>
+
               </div>
+            `
+          )
+          .join('')
 
-              <div class="name">
+      const customerSection =
+        order.orderType ===
+          'Delivery' &&
+        order.customer?.name
+          ? `
+            <div class="meta-row">
 
-                ${item.name}
+              <span class="label">
+                Customer
+              </span>
 
-                ${
-                  item.addOns?.length
-                    ? `
-                      <div class="instruction">
-                        Add-ons:
-                        ${item.addOns
-                          .map(
-                            addOn =>
-                              `${addOn.name} (+₱${Number(
-                                addOn.price
-                              ).toFixed(2)})`
-                          )
-                          .join(', ')}
-                      </div>
-                    `
-                    : ''
-                }
-
-                ${
-                  item.specialInstructions
-                    ? `
-                      <div class="instruction">
-                        Note:
-                        ${item.specialInstructions}
-                      </div>
-                    `
-                    : ''
-                }
-
-              </div>
+              <span>
+                ${order.customer.name}
+              </span>
 
             </div>
           `
-        )
-        .join('')
+          : ''
 
-    const customerSection =
-      order.orderType ===
-        'Delivery' &&
-      order.customer?.name
-        ? `
-          <div class="meta-row">
+      printWindow.document.write(`
+        <!DOCTYPE html>
 
-            <span class="label">
-              Customer
-            </span>
+        <html>
 
-            <span>
-              ${order.customer.name}
-            </span>
+          <head>
 
-          </div>
-        `
-        : ''
+            <title>
+              Kitchen Order Ticket
+            </title>
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
+            <style>
 
-      <html>
-
-        <head>
-
-          <title>
-            Kitchen Order Ticket
-          </title>
-
-          <style>
-
-            * {
-              box-sizing: border-box;
-            }
-
-            body {
-              margin: 0;
-              padding: 12px;
-              width: 80mm;
-              background: #fff;
-              color: #000;
-              font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
-            }
-
-            .header {
-              text-align: center;
-              border-bottom: 2px dashed #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
-            }
-
-            .business {
-              font-size: 16px;
-              font-weight: 900;
-            }
-
-            .title {
-              font-size: 18px;
-              font-weight: 900;
-              margin-top: 5px;
-            }
-
-            .meta {
-              margin-bottom: 10px;
-            }
-
-            .meta-row {
-              display: flex;
-              justify-content: space-between;
-              gap: 10px;
-              margin-bottom: 4px;
-              font-size: 13px;
-            }
-
-            .label {
-              font-weight: 700;
-            }
-
-            .items {
-              border-top: 2px solid #000;
-              border-bottom: 2px solid #000;
-              padding: 10px 0;
-            }
-
-            .item {
-              display: flex;
-              gap: 8px;
-              margin-bottom: 10px;
-              font-size: 16px;
-              line-height: 1.2;
-            }
-
-            .item:last-child {
-              margin-bottom: 0;
-            }
-
-            .qty {
-              width: 35px;
-              flex-shrink: 0;
-              font-weight: 900;
-            }
-
-            .name {
-              flex: 1;
-              font-weight: 700;
-            }
-
-            .instruction {
-              margin-top: 4px;
-              padding-left: 6px;
-              border-left: 3px solid #000;
-              font-size: 12px;
-              font-weight: 400;
-            }
-
-            .footer {
-              margin-top: 12px;
-              text-align: center;
-              font-size: 11px;
-            }
-
-            @media print {
-              body {
-                width: 80mm;
+              * {
+                box-sizing: border-box;
               }
-            }
 
-          </style>
+              @page {
+                size: 80mm auto;
+                margin: 0;
+              }
 
-        </head>
+              html,
+              body {
+                margin: 0;
+                padding: 0;
+                width: 80mm;
+                background: #fff;
+                color: #000;
+              }
 
-        <body>
+              body {
+                padding: 4px;
+                font-family:
+                  Arial,
+                  Helvetica,
+                  sans-serif;
+                font-size: 12px;
+              }
 
-          <div class="header">
+              .header {
+                text-align: center;
+                border-bottom: 1px dashed #000;
+                padding-bottom: 5px;
+                margin-bottom: 6px;
+              }
 
-            <div class="business">
-              ${settingsStore.businessName}
+              .business {
+                font-size: 14px;
+                font-weight: 900;
+                line-height: 1.1;
+              }
+
+              .title {
+                font-size: 15px;
+                font-weight: 900;
+                margin-top: 3px;
+                line-height: 1.1;
+              }
+
+              .meta {
+                margin-bottom: 6px;
+              }
+
+              .meta-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 6px;
+                margin-bottom: 2px;
+                font-size: 11px;
+                line-height: 1.15;
+              }
+
+              .label {
+                font-weight: 700;
+              }
+
+              .items {
+                border-top: 1px solid #000;
+                border-bottom: 1px solid #000;
+                padding: 6px 0;
+              }
+
+              .item {
+                display: flex;
+                gap: 5px;
+                margin-bottom: 6px;
+                font-size: 14px;
+                line-height: 1.15;
+              }
+
+              .item:last-child {
+                margin-bottom: 0;
+              }
+
+              .qty {
+                width: 28px;
+                flex-shrink: 0;
+                font-weight: 900;
+              }
+
+              .name {
+                flex: 1;
+                min-width: 0;
+                font-weight: 700;
+              }
+
+              .instruction {
+                margin-top: 2px;
+                padding-left: 4px;
+                border-left: 2px solid #000;
+                font-size: 10px;
+                line-height: 1.15;
+                font-weight: 400;
+              }
+
+              .footer {
+                margin-top: 6px;
+                padding-bottom: 2px;
+                text-align: center;
+                font-size: 9px;
+                line-height: 1.1;
+              }
+
+              @media print {
+
+                html,
+                body {
+                  width: 80mm;
+                  margin: 0;
+                  padding: 0;
+                }
+
+                body {
+                  padding: 4px;
+                }
+
+              }
+
+            </style>
+
+          </head>
+
+          <body>
+
+            <div class="header">
+
+              <div class="business">
+                ${settingsStore.businessName}
+              </div>
+
+              <div class="title">
+                KITCHEN ORDER TICKET
+              </div>
+
             </div>
 
-            <div class="title">
-              KITCHEN ORDER TICKET
-            </div>
+            <div class="meta">
 
-          </div>
+              <div class="meta-row">
 
-          <div class="meta">
+                <span class="label">
+                  Order
+                </span>
 
-            <div class="meta-row">
+                <span>
+                  ${orderNumber}
+                </span>
 
-              <span class="label">
-                Order
-              </span>
+              </div>
 
-              <span>
-                ${orderNumber}
-              </span>
+              <div class="meta-row">
 
-            </div>
+                <span class="label">
+                  Type
+                </span>
 
-            <div class="meta-row">
+                <span>
+                  ${order.orderType}
+                </span>
 
-              <span class="label">
-                Type
-              </span>
+              </div>
 
-              <span>
-                ${order.orderType}
-              </span>
+              <div class="meta-row">
 
-            </div>
+                <span class="label">
+                  Date
+                </span>
 
-            <div class="meta-row">
+                <span>
+                  ${new Date(
+                    order.createdAt
+                  ).toLocaleDateString(
+                    'en-PH'
+                  )}
+                </span>
 
-              <span class="label">
-                Date
-              </span>
+              </div>
 
-              <span>
-                ${new Date(
-                  order.createdAt
-                ).toLocaleDateString(
-                  'en-PH'
-                )}
-              </span>
+              <div class="meta-row">
 
-            </div>
+                <span class="label">
+                  Time
+                </span>
 
-            <div class="meta-row">
+                <span>
+                  ${new Date(
+                    order.createdAt
+                  ).toLocaleTimeString(
+                    'en-PH',
+                    {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    }
+                  )}
+                </span>
 
-              <span class="label">
-                Time
-              </span>
+              </div>
 
-              <span>
-                ${new Date(
-                  order.createdAt
-                ).toLocaleTimeString(
-                  'en-PH',
-                  {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    second: '2-digit'
-                  }
-                )}
-              </span>
+              ${customerSection}
 
             </div>
 
-            ${customerSection}
+            <div class="items">
+              ${itemsHtml}
+            </div>
 
-          </div>
+            <div class="footer">
+              Please prepare the order carefully.
+            </div>
 
-          <div class="items">
-            ${itemsHtml}
-          </div>
+            <script>
 
-          <div class="footer">
-            Please prepare the order carefully.
-          </div>
+              window.onload = function () {
+                window.print()
+              }
 
-          <script>
+              window.onafterprint = function () {
+                window.close()
+              }
 
-            window.onload = function () {
-              window.print()
-            }
+            <\\/script>
 
-            window.onafterprint = function () {
-              window.close()
-            }
+          </body>
 
-          <\/script>
+        </html>
+      `)
 
-        </body>
-
-      </html>
-    `)
-
-    printWindow.document.close()
-  }
+      printWindow.document.close()
+    }
 
 // =========================
 // CUSTOMER RECEIPT
