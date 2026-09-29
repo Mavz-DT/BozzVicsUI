@@ -2130,6 +2130,7 @@ const handlePayment =
       true
 
     try {
+
       if (
         !canProceedToCheckout.value
       ) {
@@ -2140,19 +2141,24 @@ const handlePayment =
         return
       }
 
+
       const discount =
         Number(
           discountAmount.value ||
             0
         )
 
-      if (discount < 0) {
+
+      if (
+        discount < 0
+      ) {
         alert(
           'Hindi puwedeng negative ang discount.'
         )
 
         return
       }
+
 
       if (
         discount >
@@ -2167,6 +2173,7 @@ const handlePayment =
 
         return
       }
+
 
       // =========================
       // BUILD ORDER ITEMS
@@ -2199,8 +2206,7 @@ const handlePayment =
 
                     price:
                       Number(
-                        addOn.price ||
-                          0
+                        addOn.price || 0
                       )
                   })
                 ),
@@ -2217,11 +2223,13 @@ const handlePayment =
           })
         )
 
+
       // =========================
       // BUILD ORDER
       // =========================
 
       const orderData = {
+
         cashier:
           authStore.user._id,
 
@@ -2278,6 +2286,7 @@ const handlePayment =
             : ''
       }
 
+
       // =========================
       // CREATE ORDER
       // =========================
@@ -2286,11 +2295,18 @@ const handlePayment =
         await axios.post(
           `${API}/orders`,
           orderData,
-          getAuthConfig()
+          {
+            ...getAuthConfig(),
+
+            timeout:
+              60000
+          }
         )
+
 
       const createdOrder =
         orderResponse.data.order
+
 
       // =========================
       // PRINT KOT
@@ -2300,6 +2316,7 @@ const handlePayment =
         createdOrder
       )
 
+
       // =========================
       // UNSETTLED DELIVERY
       // =========================
@@ -2308,10 +2325,29 @@ const handlePayment =
         paymentDetails.paymentStatus ===
         'Unsettled'
       ) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLOSE CHECKOUT IMMEDIATELY
+        |--------------------------------------------------------------------------
+        |
+        | The order is already successfully saved.
+        | Do not keep the payment modal in Processing state
+        | while the page is doing refresh work.
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        isCheckoutOpen.value =
+          false
+
+
         alert(
           `Unsettled delivery order saved!\nOrder ID: ${createdOrder._id}`
         )
+
       } else {
+
         // =========================
         // NORMALIZE PAYMENT LIST
         // =========================
@@ -2322,7 +2358,9 @@ const handlePayment =
           ) &&
           paymentDetails.payments.length >
             0
+
             ? paymentDetails.payments
+
             : [
                 {
                   paymentMethod:
@@ -2353,6 +2391,7 @@ const handlePayment =
                 }
               ]
 
+
         // =========================
         // VALIDATE PAYMENT LIST
         // =========================
@@ -2365,6 +2404,7 @@ const handlePayment =
             'Walang payment information.'
           )
         }
+
 
         // =========================
         // VALIDATE TOTAL
@@ -2384,20 +2424,6 @@ const handlePayment =
             0
           )
 
-        // =========================
-        // IMPORTANT:
-        //
-        // Validate against the
-        // actual amount collectible
-        // by the store.
-        //
-        // Customer -> Rider:
-        //   delivery fee excluded
-        //
-        // Store -> Rider:
-        //   delivery fee included
-        //
-        // =========================
 
         const orderTotal =
           Number(
@@ -2405,6 +2431,7 @@ const handlePayment =
               createdOrder.netAmount ??
               0
           )
+
 
         if (
           Math.abs(
@@ -2417,20 +2444,14 @@ const handlePayment =
           )
         }
 
+
         // =========================
         // CREATE PAYMENT REQUEST ID
         // =========================
-        //
-        // One ID represents one
-        // complete payment submission.
-        //
-        // Split Cash + GCash will use
-        // the same request ID because
-        // they belong to one checkout.
-        //
-        // =========================
 
-        let paymentRequestId = ''
+        let paymentRequestId =
+          ''
+
 
         if (
           typeof crypto !==
@@ -2438,14 +2459,18 @@ const handlePayment =
           typeof crypto.randomUUID ===
             'function'
         ) {
+
           paymentRequestId =
             crypto.randomUUID()
+
         } else {
+
           paymentRequestId =
             `${Date.now()}-${Math.random()
               .toString(36)
               .slice(2, 11)}`
         }
+
 
         // =========================
         // CREATE ALL PAYMENTS
@@ -2494,21 +2519,47 @@ const handlePayment =
                   })
                 )
             },
-            getAuthConfig()
+            {
+              ...getAuthConfig(),
+
+              timeout:
+                60000
+            }
           )
+
 
         const createdPayments =
           paymentResponse.data
             ?.payments || []
 
+
         // =========================
-        // SUCCESS
+        // PAYMENT SUCCESS
         // =========================
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT
+        |--------------------------------------------------------------------------
+        |
+        | Close the payment modal immediately after the
+        | payment API itself succeeds.
+        |
+        | This prevents "Processing..." from staying on screen
+        | while fetchData() or fetchOrderNumbers() is running.
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        isCheckoutOpen.value =
+          false
+
 
         alert(
           `Payment successful!\nOrder ID: ${createdOrder._id}\nPayments: ${createdPayments.length}`
         )
       }
+
 
       // =========================
       // PRINT RECEIPT
@@ -2518,14 +2569,17 @@ const handlePayment =
         paymentDetails.paymentStatus !==
         'Unsettled'
       ) {
+
         const shouldPrintReceipt =
           window.confirm(
             'Print customer receipt?'
           )
 
+
         if (
           shouldPrintReceipt
         ) {
+
           printCustomerReceipt(
             createdOrder,
             paymentDetails
@@ -2533,14 +2587,12 @@ const handlePayment =
         }
       }
 
+
       // =========================
       // RESET POS
       // =========================
 
       cartStore.clearCart()
-
-      isCheckoutOpen.value =
-        false
 
       orderType.value =
         ''
@@ -2556,25 +2608,77 @@ const handlePayment =
 
       resetDelivery()
 
-      await fetchData()
-      await fetchOrderNumbers()
+
+      // =========================
+      // REFRESH POS DATA
+      // =========================
+      //
+      // Important:
+      // Hindi na naka-depend ang modal
+      // sa completion ng refresh.
+      //
+      // Kapag mabagal ang refresh,
+      // hindi na mukhang Processing ang
+      // payment button.
+      //
+      // =========================
+
+      try {
+
+        await fetchData()
+
+        await fetchOrderNumbers()
+
+      } catch (refreshError) {
+
+        console.error(
+          'POS refresh after payment failed:',
+          refreshError
+        )
+
+        /*
+        |--------------------------------------------------------------------
+        | Important:
+        | Hindi natin babawiin ang successful payment.
+        | Data refresh lang ang nag-fail.
+        |--------------------------------------------------------------------
+        */
+
+      }
+
 
     } catch (error) {
+
       console.error(
         'Error processing order:',
         error
       )
 
-      alert(
-        error.response?.data
-          ?.message ||
-          error.message ||
-          'May naging problema sa pag-process ng order.'
-      )
+
+      if (
+        error.code ===
+        'ECONNABORTED'
+      ) {
+
+        alert(
+          'Hindi nakatanggap ng server response sa loob ng 60 seconds. I-check muna ang Server status bago ulitin ang payment.'
+        )
+
+      } else {
+
+        alert(
+          error.response?.data
+            ?.message ||
+            error.message ||
+            'May naging problema sa pag-process ng order.'
+        )
+      }
+
 
     } finally {
-      // Always release the frontend
-      // payment submission lock.
+
+      // Always release frontend payment lock.
+
       isProcessingPayment.value =
         false
     }
