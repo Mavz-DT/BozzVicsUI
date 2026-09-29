@@ -2,8 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
 
 const authStore = useAuthStore()
+const settingsStore =
+  useSettingsStore()
 
 const salesRecords = ref([])
 const loading = ref(false)
@@ -1105,6 +1108,1077 @@ const confirmVoidOrder = async () => {
   }
 }
 
+// ==========================================================================
+// REPRINT CUSTOMER RECEIPT
+// ==========================================================================
+
+const reprintCustomerReceipt =
+  sale => {
+
+    if (
+      !sale?.order
+    ) {
+
+      alert(
+        'Walang order information para sa receipt.'
+      )
+
+      return
+    }
+
+
+    const printWindow =
+      window.open(
+        '',
+        '_blank',
+        'width=400,height=700'
+      )
+
+
+    if (
+      !printWindow
+    ) {
+
+      alert(
+        'Hindi mabuksan ang receipt print window. I-check ang browser popup blocker.'
+      )
+
+      return
+    }
+
+
+    const order =
+      sale.order
+
+
+    const orderNumber =
+      order.orderNumber
+        ? `#${order.orderNumber}`
+        : 'DELIVERY'
+
+
+    // =========================
+    // ITEMS
+    // =========================
+
+    const itemsHtml =
+      (order.items || [])
+        .map(
+          item => {
+
+            const addOnTotal =
+              (item.addOns || [])
+                .reduce(
+                  (
+                    total,
+                    addOn
+                  ) =>
+                    total +
+                    Number(
+                      addOn.price || 0
+                    ),
+                  0
+                )
+
+
+            const unitPrice =
+              Number(
+                item.price || 0
+              ) +
+              addOnTotal
+
+
+            const addOnsHtml =
+              item.addOns?.length
+
+                ? `
+
+                  <div class="sub-item">
+
+                    +
+                    ${item.addOns
+                      .map(
+                        addOn =>
+                          `${addOn.name} (${Number(
+                            addOn.price || 0
+                          ).toFixed(2)})`
+                      )
+                      .join(', ')}
+
+                  </div>
+
+                `
+
+                : ''
+
+
+            const instructionHtml =
+              item.specialInstructions
+
+                ? `
+
+                  <div class="instruction">
+
+                    Note:
+                    ${item.specialInstructions}
+
+                  </div>
+
+                `
+
+                : ''
+
+
+            return `
+
+              <div class="item">
+
+                <div class="item-main">
+
+                  <span>
+                    ${item.quantity}x ${item.name}
+                  </span>
+
+                  <span>
+                    ₱${Number(
+                      item.subtotal || 0
+                    ).toFixed(2)}
+                  </span>
+
+                </div>
+
+
+                <div class="unit-price">
+                  ₱${unitPrice.toFixed(2)} each
+                </div>
+
+
+                ${addOnsHtml}
+
+                ${instructionHtml}
+
+              </div>
+
+            `
+          }
+        )
+        .join('')
+
+
+    // =========================
+    // PAYMENT DETAILS
+    // =========================
+
+    const payments =
+      Array.isArray(
+        sale.payments
+      )
+        ? sale.payments
+        : []
+
+
+    let paymentHtml =
+      ''
+
+
+    if (
+      payments.length > 1
+    ) {
+
+      paymentHtml = `
+
+        <div class="section-title">
+          PAYMENT DETAILS
+        </div>
+
+      `
+
+
+      paymentHtml +=
+        payments
+          .map(
+            (
+              payment,
+              index
+            ) => `
+
+              <div class="payment-block">
+
+                <div class="summary-row">
+
+                  <span>
+                    Payment ${index + 1}
+                  </span>
+
+                  <span>
+                    ${payment.paymentMethod || '-'}
+                  </span>
+
+                </div>
+
+
+                <div class="summary-row">
+
+                  <span>
+                    Amount
+                  </span>
+
+                  <span>
+                    ₱${Number(
+                      payment.amount || 0
+                    ).toFixed(2)}
+                  </span>
+
+                </div>
+
+
+                ${
+                  payment.paymentMethod ===
+                    'Cash' &&
+                  payment.type !== 'Refund'
+
+                    ? `
+
+                      <div class="summary-row">
+
+                        <span>
+                          Tendered
+                        </span>
+
+                        <span>
+                          ₱${Number(
+                            payment.amountTendered || 0
+                          ).toFixed(2)}
+                        </span>
+
+                      </div>
+
+
+                      <div class="summary-row">
+
+                        <span>
+                          Change
+                        </span>
+
+                        <span>
+                          ₱${Number(
+                            payment.change || 0
+                          ).toFixed(2)}
+                        </span>
+
+                      </div>
+
+                    `
+
+                    : ''
+                }
+
+
+                ${
+                  payment.paymentMethod ===
+                    'GCash' &&
+                  payment.referenceNumber
+
+                    ? `
+
+                      <div class="summary-row">
+
+                        <span>
+                          Reference
+                        </span>
+
+                        <span class="reference">
+                          ${payment.referenceNumber}
+                        </span>
+
+                      </div>
+
+                    `
+
+                    : ''
+                }
+
+              </div>
+
+            `
+          )
+          .join('')
+
+    } else {
+
+      const payment =
+        payments[0] || sale
+
+
+      paymentHtml = `
+
+        <div class="summary-row">
+
+          <span>
+            Payment
+          </span>
+
+          <span>
+            ${payment.paymentMethod || '-'}
+          </span>
+
+        </div>
+
+
+        ${
+          payment.paymentMethod ===
+          'Cash'
+
+            ? `
+
+              <div class="summary-row">
+
+                <span>
+                  Amount
+                </span>
+
+                <span>
+                  ₱${Number(
+                    payment.amount ??
+                    sale.amount ??
+                    order.netAmount ??
+                    0
+                  ).toFixed(2)}
+                </span>
+
+              </div>
+
+
+              <div class="summary-row">
+
+                <span>
+                  Amount Tendered
+                </span>
+
+                <span>
+                  ₱${Number(
+                    payment.amountTendered || 0
+                  ).toFixed(2)}
+                </span>
+
+              </div>
+
+
+              <div class="summary-row">
+
+                <span>
+                  Change
+                </span>
+
+                <span>
+                  ₱${Number(
+                    payment.change || 0
+                  ).toFixed(2)}
+                </span>
+
+              </div>
+
+            `
+
+            : ''
+        }
+
+
+        ${
+          payment.paymentMethod ===
+            'GCash' &&
+          payment.referenceNumber
+
+            ? `
+
+              <div class="summary-row">
+
+                <span>
+                  Reference
+                </span>
+
+                <span class="reference">
+                  ${payment.referenceNumber}
+                </span>
+
+              </div>
+
+            `
+
+            : ''
+        }
+
+      `
+    }
+
+
+    // =========================
+    // DELIVERY
+    // =========================
+
+    const deliveryHtml =
+      order.orderType ===
+      'Delivery'
+
+        ? `
+
+          <div class="section">
+
+            <div class="section-title">
+              DELIVERY DETAILS
+            </div>
+
+
+            ${
+              order.customer?.name
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Customer
+                    </span>
+
+                    <span>
+                      ${order.customer.name}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
+              order.customer?.contactNumber
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Contact
+                    </span>
+
+                    <span>
+                      ${order.customer.contactNumber}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
+              Number(
+                order.deliveryFee || 0
+              ) > 0
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Delivery Fee
+                    </span>
+
+                    <span>
+                      ₱${Number(
+                        order.deliveryFee || 0
+                      ).toFixed(2)}
+                    </span>
+
+                  </div>
+
+
+                  <div class="info-row">
+
+                    <span>
+                      Fee Paid By
+                    </span>
+
+                    <span>
+                      ${
+                        order.deliveryFeePaidBy ===
+                        'Store'
+                          ? 'Store'
+                          : 'Customer'
+                      }
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+          </div>
+
+        `
+
+        : ''
+
+
+    // =========================
+    // PRINT DOCUMENT
+    // =========================
+
+    printWindow.document.open()
+
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+
+      <html>
+
+        <head>
+
+          <title>
+            Customer Receipt
+          </title>
+
+
+          <style>
+
+            * {
+              box-sizing: border-box;
+            }
+
+
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+
+
+            body {
+
+              margin: 0;
+              padding: 4px;
+              width: 80mm;
+
+              background: #fff;
+              color: #000;
+
+              font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+              font-size: 12px;
+            }
+
+
+            .header {
+
+              text-align: center;
+
+              border-bottom:
+                2px dashed #000;
+
+              padding-bottom:
+                6px;
+
+              margin-bottom:
+                6px;
+            }
+
+
+            .business {
+
+              font-size:
+                16px;
+
+              font-weight:
+                900;
+            }
+
+
+            .subtitle {
+
+              margin-top:
+                2px;
+
+              font-size:
+                10px;
+            }
+
+
+            .receipt-title {
+
+              margin-top:
+                5px;
+
+              font-size:
+                14px;
+
+              font-weight:
+                900;
+            }
+
+
+            .meta {
+
+              margin-bottom:
+                7px;
+            }
+
+
+            .meta-row,
+            .summary-row,
+            .info-row {
+
+              display:
+                flex;
+
+              justify-content:
+                space-between;
+
+              gap:
+                8px;
+
+              margin-bottom:
+                3px;
+            }
+
+
+            .summary-row span:last-child,
+            .info-row span:last-child {
+
+              text-align:
+                right;
+
+              word-break:
+                break-word;
+            }
+
+
+            .label {
+
+              font-weight:
+                700;
+            }
+
+
+            .items {
+
+              border-top:
+                2px solid #000;
+
+              border-bottom:
+                2px solid #000;
+
+              padding:
+                7px 0;
+            }
+
+
+            .item {
+
+              margin-bottom:
+                7px;
+            }
+
+
+            .item:last-child {
+
+              margin-bottom:
+                0;
+            }
+
+
+            .item-main {
+
+              display:
+                flex;
+
+              justify-content:
+                space-between;
+
+              gap:
+                7px;
+
+              font-size:
+                12px;
+
+              font-weight:
+                700;
+            }
+
+
+            .unit-price,
+            .sub-item,
+            .instruction {
+
+              font-size:
+                9px;
+
+              color:
+                #333;
+
+              margin-top:
+                2px;
+            }
+
+
+            .instruction {
+
+              font-style:
+                italic;
+            }
+
+
+            .summary {
+
+              margin-top:
+                7px;
+
+              padding-top:
+                6px;
+
+              border-top:
+                1px dashed #000;
+            }
+
+
+            .payment-block {
+
+              margin-top:
+                5px;
+
+              padding-top:
+                5px;
+
+              border-top:
+                1px dotted #000;
+            }
+
+
+            .reference {
+
+              text-align:
+                right;
+
+              word-break:
+                break-all;
+            }
+
+
+            .net-total {
+
+              font-size:
+                14px;
+
+              font-weight:
+                900;
+
+              margin-top:
+                5px;
+
+              padding-top:
+                5px;
+
+              border-top:
+                1px solid #000;
+            }
+
+
+            .section {
+
+              margin-top:
+                7px;
+
+              padding-top:
+                6px;
+
+              border-top:
+                1px dashed #000;
+            }
+
+
+            .section-title {
+
+              font-weight:
+                900;
+
+              margin-bottom:
+                4px;
+            }
+
+
+            .footer {
+
+              text-align:
+                center;
+
+              border-top:
+                2px dashed #000;
+
+              margin-top:
+                8px;
+
+              padding-top:
+                7px;
+
+              font-size:
+                10px;
+            }
+
+          </style>
+
+        </head>
+
+
+        <body>
+
+
+          <div class="header">
+
+            <div class="business">
+              ${settingsStore.businessName}
+            </div>
+
+
+            <div class="subtitle">
+              ${settingsStore.businessSubtitle}
+            </div>
+
+
+            <div class="receipt-title">
+              CUSTOMER RECEIPT
+            </div>
+
+          </div>
+
+
+          <div class="meta">
+
+            <div class="meta-row">
+
+              <span class="label">
+                Order
+              </span>
+
+              <span>
+                ${orderNumber}
+              </span>
+
+            </div>
+
+
+            <div class="meta-row">
+
+              <span class="label">
+                Type
+              </span>
+
+              <span>
+                ${order.orderType || '-'}
+              </span>
+
+            </div>
+
+
+            <div class="meta-row">
+
+              <span class="label">
+                Date
+              </span>
+
+              <span>
+                ${new Date(
+                  order.createdAt ||
+                  sale.createdAt
+                ).toLocaleString(
+                  'en-PH'
+                )}
+              </span>
+
+            </div>
+
+          </div>
+
+
+          ${deliveryHtml}
+
+
+          <div class="items">
+
+            ${itemsHtml}
+
+          </div>
+
+
+          <div class="summary">
+
+
+            <div class="summary-row">
+
+              <span>
+                Gross Sales
+              </span>
+
+              <span>
+                ₱${Number(
+                  order.grossAmount || 0
+                ).toFixed(2)}
+              </span>
+
+            </div>
+
+
+            ${
+              Number(
+                order.discountAmount || 0
+              ) > 0
+
+                ? `
+
+                  <div class="summary-row">
+
+                    <span>
+                      Discount
+                    </span>
+
+                    <span>
+                      -₱${Number(
+                        order.discountAmount || 0
+                      ).toFixed(2)}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
+              Number(
+                order.deliveryFee || 0
+              ) > 0
+
+                ? `
+
+                  <div class="summary-row">
+
+                    <span>
+                      Delivery Fee
+                    </span>
+
+                    <span>
+                      ₱${Number(
+                        order.deliveryFee || 0
+                      ).toFixed(2)}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            <div class="summary-row net-total">
+
+              <span>
+                NET TOTAL
+              </span>
+
+              <span>
+                ₱${Number(
+                  order.netAmount ||
+                  sale.amount ||
+                  0
+                ).toFixed(2)}
+              </span>
+
+            </div>
+
+
+            ${paymentHtml}
+
+
+          </div>
+
+
+          <div class="footer">
+
+            Thank you for dining with us!
+
+          </div>
+
+
+        </body>
+
+      </html>
+    `)
+
+
+    printWindow.document.close()
+
+
+    printWindow.focus()
+
+
+    setTimeout(() => {
+
+      try {
+
+        if (
+          !printWindow.closed
+        ) {
+
+          printWindow.print()
+        }
+
+      } catch (error) {
+
+        console.error(
+          'Sales Record receipt print error:',
+          error
+        )
+
+      }
+
+    }, 500)
+
+
+    printWindow.onafterprint =
+      () => {
+
+        setTimeout(() => {
+
+          try {
+
+            if (
+              !printWindow.closed
+            ) {
+
+              printWindow.close()
+            }
+
+          } catch (error) {
+
+            console.warn(
+              'Unable to close Sales Record receipt window:',
+              error
+            )
+          }
+
+        }, 300)
+      }
+  }
+
 // =========================
 // SALES TOTALS
 // =========================
@@ -1385,6 +2459,12 @@ onMounted(() => {
                 Amount
               </th>
 
+              <th
+                class="text-center px-5 py-3 font-bold text-gray-600 whitespace-nowrap"
+              >
+                Actions
+              </th>
+
             </tr>
           </thead>
 
@@ -1461,6 +2541,22 @@ onMounted(() => {
                 class="px-5 py-4 text-right font-black text-gray-800 whitespace-nowrap"
               >
                 {{ formatCurrency(payment.amount) }}
+              </td>
+
+              <td
+                class="px-5 py-4 text-center"
+              >
+                <button
+                  type="button"
+                  @click.stop="
+                    reprintCustomerReceipt(payment)
+                  "
+                  class="w-10 h-10 inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 transition-all"
+                  title="Reprint Customer Receipt"
+                  aria-label="Reprint Customer Receipt"
+                >
+                  🖨️
+                </button>
               </td>
 
             </tr>
