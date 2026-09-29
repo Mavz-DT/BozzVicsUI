@@ -1,9 +1,6 @@
 <script setup>
-import {
-  ref,
-  computed,
-  onMounted
-} from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useNetworkStatus } from '../composables/useNetworkStatus'
 
 import axios from 'axios'
 
@@ -12,6 +9,15 @@ import Draggable from 'vuedraggable'
 import { useCartStore } from '../stores/cart'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
+import {
+  refreshAllOfflineCache
+} from '../services/offlineCacheService'
+
+import {
+  getCachedCategories,
+  getCachedMenus,
+  getCachedOrderNumbers
+} from '../db/posDatabase'
 
 import { storeToRefs } from 'pinia'
 
@@ -20,6 +26,10 @@ import CheckoutModal from '../components/CheckoutModal.vue'
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const {
+  isOnline,
+  isOffline
+} = useNetworkStatus()
 
 const { cart, totalAmount } =
   storeToRefs(cartStore)
@@ -66,9 +76,9 @@ const selectedCategory =
   ref('')
 
 /*
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 | API
-|---------------------------------------------------------------------------
+|--------------------------------------------------------------------------
 */
 
 const API_BASE_URL = (
@@ -272,6 +282,108 @@ const getAuthConfig =
       }
     }
   }
+
+const loadOfflinePosData = async () => {
+  try {
+    const [
+      cachedCategories,
+      cachedMenus,
+      cachedOrderNumbers
+    ] = await Promise.all([
+      getCachedCategories(),
+      getCachedMenus(),
+      getCachedOrderNumbers()
+    ])
+
+    categories.value =
+      Array.isArray(cachedCategories)
+        ? cachedCategories
+        : []
+
+    menus.value =
+      Array.isArray(cachedMenus)
+        ? cachedMenus.map(menu => {
+
+            if (menu.category) {
+              return menu
+            }
+
+            const categoryId =
+              String(
+                menu.categoryId ||
+                ''
+              )
+
+            const category =
+              categories.value.find(
+                item =>
+                  String(
+                    item._id ||
+                    item.id ||
+                    ''
+                  ) === categoryId
+              )
+
+            return category
+              ? {
+                  ...menu,
+                  category
+                }
+              : menu
+          })
+        : []
+
+    orderNumbers.value =
+      Array.isArray(cachedOrderNumbers)
+        ? cachedOrderNumbers
+        : []
+
+    if (
+      categories.value.length > 0
+    ) {
+      const categoryStillExists =
+        categories.value.some(
+          category =>
+            category.name ===
+            selectedCategory.value
+        )
+
+      if (
+        !categoryStillExists
+      ) {
+        selectedCategory.value =
+          categories.value[0].name
+      }
+    } else {
+      selectedCategory.value = ''
+    }
+
+    console.log(
+      'POS offline data loaded:',
+      {
+        categories:
+          categories.value.length,
+        menus:
+          menus.value.length,
+        orderNumbers:
+          orderNumbers.value.length,
+        selectedCategory:
+          selectedCategory.value
+      }
+    )
+
+  } catch (error) {
+    console.error(
+      'Error loading POS offline data:',
+      error
+    )
+
+    categories.value = []
+    menus.value = []
+    orderNumbers.value = []
+    selectedCategory.value = ''
+  }
+}
 
 // =========================
 // DELIVERY INFORMATION
@@ -510,28 +622,83 @@ const confirmAddToCart =
 // ORDER NUMBERS
 // =========================
 
-const fetchOrderNumbers =
-  async () => {
-    try {
-      const res =
-        await axios.get(
-          `${API}/order-numbers`,
-          getAuthConfig()
-        )
+  const fetchOrderNumbers =
+    async () => {
 
-      orderNumbers.value =
-        Array.isArray(
-          res.data
+      /*
+      |----------------------------------------------------------------------
+      | OFFLINE
+      |----------------------------------------------------------------------
+      |
+      | Kapag enabled ang Offline Caching at disconnected,
+      | gamitin ang order numbers mula sa IndexedDB.
+      |
+      |----------------------------------------------------------------------
+      */
+
+      if (
+        settingsStore.offlineCachingEnabled === true &&
+        isOffline.value === true
+      ) {
+        try {
+          const cachedOrderNumbers =
+            await getCachedOrderNumbers()
+
+          orderNumbers.value =
+            Array.isArray(
+              cachedOrderNumbers
+            )
+              ? cachedOrderNumbers
+              : []
+
+          console.log(
+            'POS using offline order numbers:',
+            orderNumbers.value
+          )
+
+          return
+        } catch (error) {
+          console.error(
+            'Error loading offline order numbers:',
+            error
+          )
+
+          orderNumbers.value = []
+
+          return
+        }
+      }
+
+      /*
+      |----------------------------------------------------------------------
+      | ONLINE
+      |----------------------------------------------------------------------
+      |
+      | Existing online behavior remains unchanged.
+      |
+      |----------------------------------------------------------------------
+      */
+
+      try {
+        const res =
+          await axios.get(
+            `${API}/order-numbers`,
+            getAuthConfig()
+          )
+
+        orderNumbers.value =
+          Array.isArray(
+            res.data
+          )
+            ? res.data
+            : []
+      } catch (error) {
+        console.error(
+          'Error fetching order numbers:',
+          error
         )
-          ? res.data
-          : []
-    } catch (error) {
-      console.error(
-        'Error fetching order numbers:',
-        error
-      )
+      }
     }
-  }
 
 const resetDelivery =
   () => {
@@ -545,7 +712,8 @@ const resetDelivery =
   }
 
 const handleOrderTypeChange =
-  type => {
+  async type => {
+
     orderType.value =
       type
 
@@ -565,53 +733,35 @@ const handleOrderTypeChange =
       type === 'Take-Out'
     ) {
       resetDelivery()
-      fetchOrderNumbers()
-    } else {
+
+      if (
+        settingsStore.offlineCachingEnabled === true &&
+        isOffline.value === true
+      ) {
+        await loadOfflinePosData()
+      } else {
+        await fetchOrderNumbers()
+      }
+
+      return
+    }
+
+    if (
+      type === 'Delivery'
+    ) {
       orderNumbers.value = []
-    }
-  }
 
-const confirmDeliverySetup =
-  () => {
-    if (
-      !delivery.value.customerName.trim()
-    ) {
-      alert(
-        'Maglagay muna ng Customer Name.'
-      )
+      if (
+        settingsStore.offlineCachingEnabled === true &&
+        isOffline.value === true
+      ) {
+        await loadOfflinePosData()
+      }
 
       return
     }
 
-    if (
-      Number(
-        delivery.value.deliveryFee
-      ) < 0
-    ) {
-      alert(
-        'Hindi puwedeng negative ang Delivery Fee.'
-      )
-
-      return
-    }
-
-    if (
-      ![
-        'Customer',
-        'Store'
-      ].includes(
-        delivery.value.deliveryFeePaidBy
-      )
-    ) {
-      alert(
-        'Piliin kung Customer o Store ang magbabayad ng delivery fee.'
-      )
-
-      return
-    }
-
-    deliverySetupConfirmed.value =
-      true
+    orderNumbers.value = []
   }
 
 const releaseOrderNumber =
@@ -2433,6 +2583,40 @@ const fetchData =
         'POS menus:',
         menus.value
       )
+
+      /*
+      |--------------------------------------------------------------------------
+      | BACKGROUND OFFLINE CACHE
+      |--------------------------------------------------------------------------
+      |
+      | Important:
+      | The POS UI already has its data from the API above.
+      | Caching happens separately and must never block
+      | or replace the live POS data.
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        settingsStore.offlineCachingEnabled === true
+      ) {
+        refreshAllOfflineCache()
+          .then(
+            result => {
+              console.log(
+                'POS offline cache refreshed:',
+                result
+              )
+            }
+          )
+          .catch(
+            error => {
+              console.error(
+                'POS offline cache failed:',
+                error
+              )
+            }
+          )
+      }
     } catch (error) {
       console.error(
         'Error fetching data:',
@@ -2637,68 +2821,142 @@ const saveMenuOrder =
 // Writable computed
 // =========================
 
-const filteredMenus =
-  computed({
-    get() {
-      if (
-        !selectedCategory.value
-      ) {
-        return []
-      }
+  // =========================
+  // FILTERED MENU
+  // Writable computed
+  // =========================
 
-      return menus.value
-        .filter(
-          menu =>
-            menu.category &&
-            menu.category.name ===
+  const filteredMenus =
+    computed({
+      get() {
+        if (
+          !selectedCategory.value
+        ) {
+          return []
+        }
+
+        const selectedCategoryObject =
+          categories.value.find(
+            category =>
+              category.name ===
               selectedCategory.value
-        )
-        .slice()
-        .sort(
-          (a, b) =>
-            Number(
-              a.sortOrder ?? 0
-            ) -
-            Number(
-              b.sortOrder ?? 0
-            )
-        )
-    },
-
-    set(
-      reorderedList
-    ) {
-      const reorderedMenus =
-        reorderedList.map(
-          (
-            menu,
-            index
-          ) => ({
-            ...menu,
-            sortOrder:
-              index
-          })
-        )
-
-      const reorderMap =
-        new Map(
-          reorderedMenus.map(
-            menu => [
-              menu._id,
-              menu
-            ]
           )
-        )
 
-      menus.value =
-        menus.value.map(
-          menu =>
-            reorderMap.get(
-              menu._id
-            ) || menu
-        )
-    }
-  })
+        const selectedCategoryId =
+          String(
+            selectedCategoryObject?._id ||
+            selectedCategoryObject?.id ||
+            ''
+          )
+
+        return menus.value
+          .filter(menu => {
+
+            /*
+            |------------------------------------------------------------------
+            | ONLINE DATA
+            |------------------------------------------------------------------
+            |
+            | Online menus normally have:
+            | menu.category.name
+            |
+            |------------------------------------------------------------------
+            */
+
+            const menuCategoryName =
+              menu.category?.name ||
+              null
+
+            if (
+              menuCategoryName ===
+              selectedCategory.value
+            ) {
+              return true
+            }
+
+            /*
+            |------------------------------------------------------------------
+            | OFFLINE CACHE
+            |------------------------------------------------------------------
+            |
+            | Cached menus may only have:
+            | menu.categoryId
+            |
+            | So compare the cached categoryId with
+            | the selected category ID.
+            |
+            |------------------------------------------------------------------
+            */
+
+            const menuCategoryId =
+              String(
+                menu.categoryId ||
+                menu.category?._id ||
+                menu.category?.id ||
+                (
+                  typeof menu.category ===
+                  'string'
+                    ? menu.category
+                    : ''
+                )
+              )
+
+            if (
+              selectedCategoryId &&
+              menuCategoryId ===
+              selectedCategoryId
+            ) {
+              return true
+            }
+
+            return false
+          })
+          .slice()
+          .sort(
+            (a, b) =>
+              Number(
+                a.sortOrder ?? 0
+              ) -
+              Number(
+                b.sortOrder ?? 0
+              )
+          )
+      },
+
+      set(
+        reorderedList
+      ) {
+        const reorderedMenus =
+          reorderedList.map(
+            (
+              menu,
+              index
+            ) => ({
+              ...menu,
+              sortOrder:
+                index
+            })
+          )
+
+        const reorderMap =
+          new Map(
+            reorderedMenus.map(
+              menu => [
+                menu._id,
+                menu
+              ]
+            )
+          )
+
+        menus.value =
+          menus.value.map(
+            menu =>
+              reorderMap.get(
+                menu._id
+              ) || menu
+          )
+      }
+    })
 
 // =========================
 // MENU STOCK / AVAILABILITY
@@ -2790,11 +3048,29 @@ const handleMenuCardClick =
 // INITIAL LOAD
 // =========================
 
-onMounted(() => {
-  fetchData()
-  fetchAddOns()
-  fetchOrderNumbers()
-})
+  onMounted(async () => {
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD SYSTEM SETTINGS FIRST
+    |--------------------------------------------------------------------------
+    |
+    | This ensures offlineCachingEnabled is available
+    | before fetchData() decides whether to refresh
+    | the IndexedDB cache.
+    |--------------------------------------------------------------------------
+    */
+
+    await settingsStore.fetchSettings()
+
+    console.log(
+      'POS offline caching enabled:',
+      settingsStore.offlineCachingEnabled
+    )
+
+    fetchData()
+    fetchAddOns()
+    fetchOrderNumbers()
+  })
 </script>
 
 <template>
@@ -2856,25 +3132,68 @@ onMounted(() => {
 
           </div>
 
-          <!-- Admin Layout Button -->
+          <!-- Header Actions -->
 
-          <button
-            v-if="isAdmin"
-            type="button"
-            @click="toggleEditLayoutMode"
-            class="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors shadow-sm"
-            :class="
-              editLayoutMode
-                ? 'bg-gray-800 text-white hover:bg-gray-700'
-                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-            "
+          <div
+            class="flex items-center gap-3 shrink-0"
           >
-            {{
-              editLayoutMode
-                ? 'Exit Layout'
-                : 'Edit Layout'
-            }}
-          </button>
+
+            <!-- Online / Offline Status -->
+
+            <div
+              class="flex items-center gap-1.5 text-xs font-bold"
+              :class="
+                isOnline
+                  ? 'text-green-600'
+                  : 'text-red-600'
+              "
+              :title="
+                isOnline
+                  ? 'POS is online'
+                  : 'POS is offline'
+              "
+            >
+
+              <span
+                class="w-2 h-2 rounded-full shrink-0"
+                :class="
+                  isOnline
+                    ? 'bg-green-500'
+                    : 'bg-red-500'
+                "
+              ></span>
+
+              <span class="hidden sm:inline">
+                {{
+                  isOnline
+                    ? 'Online'
+                    : 'Offline'
+                }}
+              </span>
+
+            </div>
+
+            <!-- Admin Layout Button -->
+
+            <button
+              v-if="isAdmin"
+              type="button"
+              @click="toggleEditLayoutMode"
+              class="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors shadow-sm"
+              :class="
+                editLayoutMode
+                  ? 'bg-gray-800 text-white hover:bg-gray-700'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              "
+            >
+              {{
+                editLayoutMode
+                  ? 'Exit Layout'
+                  : 'Edit Layout'
+              }}
+            </button>
+
+          </div>
 
         </div>
 

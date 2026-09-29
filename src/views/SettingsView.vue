@@ -11,7 +11,8 @@ const success = ref('')
 const settings = ref({
   businessName: '',
   businessSubtitle: '',
-  themeColor: '#7f1d1d'
+  themeColor: '#7f1d1d',
+  offlineCachingEnabled: false
 })
 
 const fetchSettings = async () => {
@@ -24,7 +25,9 @@ const fetchSettings = async () => {
     settings.value = {
       businessName: settingsStore.businessName,
       businessSubtitle: settingsStore.businessSubtitle,
-      themeColor: settingsStore.themeColor
+      themeColor: settingsStore.themeColor,
+      offlineCachingEnabled:
+        settingsStore.offlineCachingEnabled
     }
   } catch (err) {
     console.error('Error fetching settings:', err)
@@ -48,13 +51,17 @@ const saveSettings = async () => {
     const updated = await settingsStore.updateSettings({
       businessName: settings.value.businessName.trim(),
       businessSubtitle: settings.value.businessSubtitle.trim(),
-      themeColor: settings.value.themeColor
+      themeColor: settings.value.themeColor,
+      offlineCachingEnabled:
+        settings.value.offlineCachingEnabled
     })
 
     settings.value = {
       businessName: updated.businessName || '',
       businessSubtitle: updated.businessSubtitle || '',
-      themeColor: updated.themeColor || '#7f1d1d'
+      themeColor: updated.themeColor || '#7f1d1d',
+      offlineCachingEnabled:
+        updated.offlineCachingEnabled === true
     }
 
     success.value = 'Settings saved successfully!'
@@ -87,7 +94,7 @@ onMounted(() => {
       </h1>
 
       <p class="text-gray-500 mt-1">
-        I-customize ang pangalan at appearance ng POS system.
+        I-customize ang pangalan, appearance, at offline capability ng POS system.
       </p>
     </div>
 
@@ -172,6 +179,86 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- OFFLINE CACHING SETTINGS -->
+
+        <div class="border border-gray-200 rounded-xl p-4">
+          <div
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          >
+            <div>
+              <h3 class="text-sm font-bold text-gray-800">
+                Offline Caching
+              </h3>
+
+              <p class="text-sm text-gray-500 mt-1">
+                Payagan ang POS na gumamit ng locally cached data kapag nawalan ng internet.
+              </p>
+
+              <p
+                class="text-xs font-semibold mt-2"
+                :class="
+                  settings.offlineCachingEnabled
+                    ? 'text-green-600'
+                    : 'text-gray-400'
+                "
+              >
+                {{
+                  settings.offlineCachingEnabled
+                    ? 'Enabled'
+                    : 'Disabled'
+                }}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="settings.offlineCachingEnabled"
+              :disabled="isSaving"
+              @click="
+                settings.offlineCachingEnabled =
+                  !settings.offlineCachingEnabled
+              "
+              class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50"
+              :class="
+                settings.offlineCachingEnabled
+                  ? 'bg-green-600'
+                  : 'bg-gray-300'
+              "
+            >
+              <span class="sr-only">
+                Toggle offline caching
+              </span>
+
+              <span
+                class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition"
+                :class="
+                  settings.offlineCachingEnabled
+                    ? 'translate-x-6'
+                    : 'translate-x-1'
+                "
+              ></span>
+            </button>
+          </div>
+
+          <div
+            v-if="settings.offlineCachingEnabled"
+            class="mt-4 bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700"
+          >
+            Offline capability is enabled. Kapag mawalan ng internet,
+            maaaring gamitin ng POS ang local cache. Ang actual offline
+            sales at synchronization ay ise-set up sa mga susunod na steps.
+          </div>
+
+          <div
+            v-else
+            class="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600"
+          >
+            Offline capability is disabled. Mananatiling online-only ang
+            POS hanggang i-enable ito ng Admin.
+          </div>
+        </div>
+
         <div
           class="rounded-xl p-4 border"
           :style="{
@@ -198,7 +285,9 @@ onMounted(() => {
             :disabled="isSaving"
             class="px-5 py-3 rounded-lg text-white font-bold shadow-md disabled:bg-gray-300"
             :style="{
-              backgroundColor: isSaving ? '#d1d5db' : settings.themeColor
+              backgroundColor: isSaving
+                ? '#d1d5db'
+                : settings.themeColor
             }"
           >
             {{ isSaving ? 'Saving...' : 'Save Settings' }}

@@ -1,105 +1,197 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
+import { getCachedSettings } from '../db/posDatabase'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_URL ||
   'http://localhost:5000'
 ).replace(/\/$/, '')
 
-const API = `${API_BASE_URL}/api`
+const API =
+  `${API_BASE_URL}/api`
 
-export const useSettingsStore = defineStore(
-  'settings',
-  () => {
-    const businessName = ref(
-      "BOZZ VIC'S LOMI HOUSE"
-    )
+export const useSettingsStore =
+  defineStore(
+    'settings',
+    () => {
+      const businessName =
+        ref(
+          "BOZZ VIC'S LOMI HOUSE"
+        )
 
-    const businessSubtitle = ref(
-      'Point of Sale System'
-    )
+      const businessSubtitle =
+        ref(
+          'Point of Sale System'
+        )
 
-    const themeColor = ref(
-      '#7f1d1d'
-    )
+      const themeColor =
+        ref(
+          '#7f1d1d'
+        )
 
-    const isLoaded = ref(false)
+      /*
+      |--------------------------------------------------------------------------
+      | OFFLINE CACHING
+      |--------------------------------------------------------------------------
+      |
+      | Admin controls whether the POS is allowed to use
+      | local cached data for future offline operation.
+      |
+      | Default is OFF.
+      |--------------------------------------------------------------------------
+      */
 
-    const applyTheme = () => {
-      document.documentElement.style.setProperty(
-        '--theme-color',
-        themeColor.value
-      )
-    }
+      const offlineCachingEnabled =
+        ref(false)
 
-    const fetchSettings = async () => {
-      try {
-        const res =
-          await axios.get(
+      const isLoaded =
+        ref(false)
+
+      /*
+      |--------------------------------------------------------------------------
+      | APPLY THEME
+      |--------------------------------------------------------------------------
+      */
+
+      const applyTheme = () => {
+        document.documentElement.style.setProperty(
+          '--theme-color',
+          themeColor.value
+        )
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | FETCH SETTINGS
+      |--------------------------------------------------------------------------
+      */
+
+      const fetchSettings = async () => {
+        try {
+          const res = await axios.get(
             `${API}/settings`
           )
 
-        businessName.value =
-          res.data.businessName ||
-          "BOZZ VIC'S LOMI HOUSE"
+          const settings = res.data
 
-        businessSubtitle.value =
-          res.data.businessSubtitle ||
-          'Point of Sale System'
+          businessName.value =
+            settings.businessName ||
+            businessName.value
 
-        themeColor.value =
-          res.data.themeColor ||
-          '#7f1d1d'
+          businessSubtitle.value =
+            settings.businessSubtitle ||
+            businessSubtitle.value
 
-        applyTheme()
+          themeColor.value =
+            settings.themeColor ||
+            themeColor.value
 
-        isLoaded.value =
-          true
-      } catch (error) {
-        console.error(
-          'Error fetching settings:',
-          error
-        )
-      }
-    }
+          offlineCachingEnabled.value =
+            settings.offlineCachingEnabled === true
 
-    const updateSettings =
-      async data => {
-        const res =
-          await axios.put(
-            `${API}/settings`,
-            data
+          applyTheme()
+
+          isLoaded.value = true
+
+        } catch (error) {
+          console.error(
+            'Error fetching settings:',
+            error
           )
 
-        businessName.value =
-          res.data.businessName ||
-          businessName.value
+          // =====================================================
+          // OFFLINE FALLBACK
+          // =====================================================
 
-        businessSubtitle.value =
-          res.data.businessSubtitle ||
-          businessSubtitle.value
+          try {
+            const cachedSettings =
+              await getCachedSettings()
 
-        themeColor.value =
-          res.data.themeColor ||
-          themeColor.value
+            if (cachedSettings) {
 
-        applyTheme()
+              businessName.value =
+                cachedSettings.businessName ||
+                businessName.value
 
-        isLoaded.value =
-          true
+              businessSubtitle.value =
+                cachedSettings.businessSubtitle ||
+                businessSubtitle.value
 
-        return res.data
+              themeColor.value =
+                cachedSettings.themeColor ||
+                themeColor.value
+
+              offlineCachingEnabled.value =
+                cachedSettings.offlineCachingEnabled === true
+
+              applyTheme()
+
+              console.log(
+                'POS using cached settings:',
+                cachedSettings
+              )
+            }
+
+          } catch (cacheError) {
+            console.error(
+              'Error loading cached settings:',
+              cacheError
+            )
+          }
+
+          isLoaded.value = true
+        }
       }
 
-    return {
-      businessName,
-      businessSubtitle,
-      themeColor,
-      isLoaded,
-      fetchSettings,
-      updateSettings,
-      applyTheme
+      /*
+      |--------------------------------------------------------------------------
+      | UPDATE SETTINGS
+      |--------------------------------------------------------------------------
+      */
+
+      const updateSettings =
+        async (
+          data
+        ) => {
+          const res =
+            await axios.put(
+              `${API}/settings`,
+              data
+            )
+
+          businessName.value =
+            res.data.businessName ||
+            businessName.value
+
+          businessSubtitle.value =
+            res.data.businessSubtitle ||
+            businessSubtitle.value
+
+          themeColor.value =
+            res.data.themeColor ||
+            themeColor.value
+
+          offlineCachingEnabled.value =
+            res.data.offlineCachingEnabled === true
+
+          applyTheme()
+
+          isLoaded.value =
+            true
+
+          return res.data
+        }
+
+      return {
+        businessName,
+        businessSubtitle,
+        themeColor,
+        offlineCachingEnabled,
+        isLoaded,
+        fetchSettings,
+        updateSettings,
+        applyTheme
+      }
     }
-  }
-)
+  )
