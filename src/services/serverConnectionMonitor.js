@@ -8,19 +8,25 @@ import { ref } from 'vue'
 //
 // Purpose:
 // - Monitor API requests globally
-// - Detect slow API responses / Render cold starts
-// - Give the cashier visible feedback instead of looking
-//   like the POS has frozen
-// - Works with both Axios and native fetch()
+// - Distinguish Internet connection from API server connection
+// - Detect slow requests / Render cold starts
+// - Keep server status visible even when there is no active request
+// - Works with Axios and native fetch()
 // - Only monitors /api/... requests
 //
-// States:
-// - idle
+// Server states:
+// - checking
+// - connected
 // - connecting
 // - waking
-// - connected
 // - offline
 // - error
+//
+// IMPORTANT:
+// "connected" means the API server has successfully responded
+// to an HTTP request. A 401/403/404/500 still proves that the
+// server is reachable; those application errors are handled
+// separately by the page/auth logic.
 // =====================================================
 
 
@@ -29,11 +35,10 @@ import { ref } from 'vue'
 // =====================================================
 
 export const serverConnectionState =
-  ref('idle')
+  ref('checking')
 
 export const serverConnectionMessage =
-  ref('')
-
+  ref('Checking server connection...')
 
 export const isServerConnecting =
   ref(false)
@@ -122,10 +127,10 @@ const clearTimers =
 
 
 // =====================================================
-// SHOW IDLE
+// SET SERVER CONNECTED
 // =====================================================
 
-const setIdle =
+const setServerConnected =
   () => {
 
     clearTimers()
@@ -134,10 +139,10 @@ const setIdle =
       false
 
     serverConnectionState.value =
-      'idle'
+      'connected'
 
     serverConnectionMessage.value =
-      ''
+      'Connected to server.'
 
     slowMessageShown =
       false
@@ -145,7 +150,7 @@ const setIdle =
 
 
 // =====================================================
-// START MONITORING
+// START REQUEST MONITORING
 // =====================================================
 
 const beginRequest =
@@ -153,24 +158,23 @@ const beginRequest =
 
     pendingRequests += 1
 
+    // Another API request is already active.
     if (
       pendingRequests !== 1
     ) {
       return
     }
 
-    // Reset any previous state
     clearTimers()
 
     slowMessageShown =
       false
 
     // =================================================
-    // WAIT A LITTLE FIRST
+    // WAIT BEFORE SHOWING STATUS CHANGE
     // =================================================
     //
-    // Fast API requests should feel completely normal.
-    // We do not show a banner immediately.
+    // Fast requests remain visually quiet.
     //
     slowTimer =
       setTimeout(() => {
@@ -184,11 +188,12 @@ const beginRequest =
         if (
           navigator.onLine === false
         ) {
+
           serverConnectionState.value =
             'offline'
 
           serverConnectionMessage.value =
-            'Walang internet connection.'
+            'No internet connection.'
 
           isServerConnecting.value =
             false
@@ -212,7 +217,7 @@ const beginRequest =
           true
 
         // =============================================
-        // RENDER COLD START
+        // POSSIBLE RENDER COLD START
         // =============================================
 
         wakingTimer =
@@ -227,11 +232,15 @@ const beginRequest =
             if (
               navigator.onLine === false
             ) {
+
               serverConnectionState.value =
                 'offline'
 
               serverConnectionMessage.value =
-                'Walang internet connection.'
+                'No internet connection.'
+
+              isServerConnecting.value =
+                false
 
               return
             }
@@ -242,6 +251,9 @@ const beginRequest =
             serverConnectionMessage.value =
               'Server is waking up. Please wait...'
 
+            isServerConnecting.value =
+              true
+
           }, 5500)
 
       }, 2500)
@@ -249,7 +261,7 @@ const beginRequest =
 
 
 // =====================================================
-// FINISH MONITORING
+// FINISH REQUEST MONITORING
 // =====================================================
 
 const endRequest =
@@ -263,43 +275,75 @@ const endRequest =
         pendingRequests - 1
       )
 
-    // Another API request is still running.
+    // Another request is still running.
     if (
       pendingRequests > 0
     ) {
       return
     }
 
-    clearTimers()
-
     // =================================================
-    // NETWORK ERROR
+    // NETWORK FAILURE
     // =================================================
 
     if (
       networkError
     ) {
 
+      clearTimers()
+
       isServerConnecting.value =
         false
 
-      serverConnectionState.value =
+      if (
         navigator.onLine === false
-          ? 'offline'
-          : 'error'
+      ) {
 
-      serverConnectionMessage.value =
-        navigator.onLine === false
-          ? 'Walang internet connection.'
-          : 'Unable to connect to the server.'
+        serverConnectionState.value =
+          'offline'
+
+        serverConnectionMessage.value =
+          'No internet connection.'
+
+      } else {
+
+        serverConnectionState.value =
+          'error'
+
+        serverConnectionMessage.value =
+          'Unable to connect to server.'
+
+      }
 
       slowMessageShown =
         true
 
-      // Keep the message visible for a while.
+      // Keep error status visible.
       connectedTimer =
         setTimeout(() => {
-          setIdle()
+
+          if (
+            navigator.onLine === false
+          ) {
+
+            serverConnectionState.value =
+              'offline'
+
+            serverConnectionMessage.value =
+              'No internet connection.'
+
+            return
+          }
+
+          serverConnectionState.value =
+            'checking'
+
+          serverConnectionMessage.value =
+            'Waiting for next server connection check.'
+
+          slowMessageShown =
+            false
+
         }, 4500)
 
       return
@@ -307,36 +351,19 @@ const endRequest =
 
 
     // =================================================
-    // SUCCESS AFTER A SLOW REQUEST
+    // SERVER RESPONDED
+    // =================================================
+    //
+    // Important:
+    // Even a 401/403/404/500 means the server was reached.
+    //
+    // The individual page/auth logic will handle the
+    // actual HTTP/application error.
+    //
+    // So our global status becomes CONNECTED.
     // =================================================
 
-    if (
-      slowMessageShown
-    ) {
-
-      isServerConnecting.value =
-        false
-
-      serverConnectionState.value =
-        'connected'
-
-      serverConnectionMessage.value =
-        'Server connected.'
-
-      connectedTimer =
-        setTimeout(() => {
-          setIdle()
-        }, 1200)
-
-      return
-    }
-
-
-    // =================================================
-    // NORMAL FAST REQUEST
-    // =================================================
-
-    setIdle()
+    setServerConnected()
   }
 
 
@@ -347,42 +374,42 @@ const endRequest =
 const handleOffline =
   () => {
 
-    if (
-      pendingRequests > 0
-    ) {
+    clearTimers()
 
-      serverConnectionState.value =
-        'offline'
+    isServerConnecting.value =
+      false
 
-      serverConnectionMessage.value =
-        'Walang internet connection.'
+    serverConnectionState.value =
+      'offline'
 
-      isServerConnecting.value =
-        false
-    }
+    serverConnectionMessage.value =
+      'No internet connection.'
+
+    slowMessageShown =
+      true
   }
 
 
 const handleOnline =
   () => {
 
-    if (
-      pendingRequests > 0
-    ) {
+    clearTimers()
 
-      serverConnectionState.value =
-        'connecting'
+    isServerConnecting.value =
+      false
 
-      serverConnectionMessage.value =
-        'Internet connection restored. Connecting to server...'
+    // We know internet is back, but we do not
+    // yet know whether the API server is reachable.
+    // The next API request will confirm it.
 
-      isServerConnecting.value =
-        true
+    serverConnectionState.value =
+      'checking'
 
-      return
-    }
+    serverConnectionMessage.value =
+      'Internet connection restored. Checking server...'
 
-    setIdle()
+    slowMessageShown =
+      false
   }
 
 
@@ -409,8 +436,8 @@ const installAxiosMonitor =
 
         return config
       },
-      error => {
 
+      error => {
         return Promise.reject(
           error
         )
@@ -429,6 +456,7 @@ const installAxiosMonitor =
             requestUrl
           )
         ) {
+
           endRequest({
             networkError:
               false
@@ -448,6 +476,9 @@ const installAxiosMonitor =
             requestUrl
           )
         ) {
+
+          // HTTP error = server was reached.
+          // No response = network/server connection failure.
 
           endRequest({
             networkError:
@@ -509,18 +540,22 @@ const installFetchMonitor =
           typeof input ===
           'string'
         ) {
+
           requestUrl =
             input
+
         } else if (
           input &&
           typeof input.url ===
           'string'
         ) {
+
           requestUrl =
             input.url
         }
 
 
+        // Non-API fetch requests are untouched.
         if (
           !isApiRequest(
             requestUrl
@@ -578,7 +613,6 @@ export const initServerConnectionMonitor =
     monitorInstalled =
       true
 
-
     installAxiosMonitor()
 
     installFetchMonitor()
@@ -604,18 +638,19 @@ export const initServerConnectionMonitor =
         navigator.onLine ===
         false
       ) {
+
         serverConnectionState.value =
           'offline'
 
         serverConnectionMessage.value =
-          'Walang internet connection.'
+          'No internet connection.'
       }
     }
   }
 
 
 // =====================================================
-// OPTIONAL DEBUG HELPERS
+// DEBUG HELPER
 // =====================================================
 
 export const getPendingServerRequests =

@@ -27,7 +27,6 @@ const cartStore = useCartStore()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const {
-  isOnline,
   isOffline
 } = useNetworkStatus()
 
@@ -3205,41 +3204,6 @@ const handleMenuCardClick =
           <div
             class="flex items-center gap-3 shrink-0"
           >
-
-            <!-- Online / Offline Status -->
-
-            <div
-              class="flex items-center gap-1.5 text-xs font-bold"
-              :class="
-                isOnline
-                  ? 'text-green-600'
-                  : 'text-red-600'
-              "
-              :title="
-                isOnline
-                  ? 'POS is online'
-                  : 'POS is offline'
-              "
-            >
-
-              <span
-                class="w-2 h-2 rounded-full shrink-0"
-                :class="
-                  isOnline
-                    ? 'bg-green-500'
-                    : 'bg-red-500'
-                "
-              ></span>
-
-              <span class="hidden sm:inline">
-                {{
-                  isOnline
-                    ? 'Online'
-                    : 'Offline'
-                }}
-              </span>
-
-            </div>
 
             <!-- Admin Layout Button -->
 

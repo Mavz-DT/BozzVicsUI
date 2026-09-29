@@ -2,7 +2,9 @@
 import {
   ref,
   computed,
-  watch
+  watch,
+  onMounted,
+  onBeforeUnmount
 } from 'vue'
 
 import {
@@ -13,6 +15,11 @@ import {
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 
+import {
+  serverConnectionState,
+  serverConnectionMessage
+} from '../services/serverConnectionMonitor'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -22,6 +29,12 @@ const settingsStore = useSettingsStore()
 const mobileMenuOpen = ref(false)
 const moreMenuOpen = ref(false)
 const adminMenuOpen = ref(false)
+
+const isOnline = ref(
+  typeof navigator !== 'undefined'
+    ? navigator.onLine
+    : true
+)
 
 const isAdmin = computed(() => {
   return auth.user?.role === 'Admin'
@@ -39,6 +52,95 @@ const businessSubtitle = computed(() => {
     settingsStore.businessSubtitle ||
     'Restaurant POS'
   )
+})
+
+
+/*
+|--------------------------------------------------------------------------
+| Connection Status
+|--------------------------------------------------------------------------
+*/
+
+const updateInternetStatus = () => {
+  isOnline.value =
+    navigator.onLine
+}
+
+const internetStatusLabel = computed(() => {
+  return isOnline.value
+    ? 'Online'
+    : 'Offline'
+})
+
+const serverStatusLabel = computed(() => {
+  switch (
+    serverConnectionState.value
+  ) {
+    case 'connected':
+      return 'Connected'
+
+    case 'connecting':
+      return 'Connecting...'
+
+    case 'waking':
+      return 'Waking...'
+
+    case 'offline':
+      return 'Offline'
+
+    case 'error':
+      return 'Unavailable'
+
+    default:
+      return 'Checking...'
+  }
+})
+
+const serverStatusTitle = computed(() => {
+  return (
+    serverConnectionMessage.value ||
+    'Checking server connection...'
+  )
+})
+
+const serverStatusDotClass = computed(() => {
+  switch (
+    serverConnectionState.value
+  ) {
+    case 'connected':
+      return 'bg-emerald-400'
+
+    case 'connecting':
+    case 'waking':
+      return 'bg-amber-300 animate-pulse'
+
+    case 'offline':
+    case 'error':
+      return 'bg-red-400'
+
+    default:
+      return 'bg-gray-300 animate-pulse'
+  }
+})
+
+const serverStatusTextClass = computed(() => {
+  switch (
+    serverConnectionState.value
+  ) {
+    case 'connected':
+      return 'text-emerald-100'
+
+    case 'connecting':
+    case 'waking':
+      return 'text-amber-100'
+
+    case 'offline':
+    case 'error':
+      return 'text-red-100'
+
+    default:
+      return 'text-white/70'
+  }
 })
 
 
@@ -167,12 +269,14 @@ const closeAllMenus = () => {
 
 const toggleMoreMenu = () => {
   adminMenuOpen.value = false
-  moreMenuOpen.value = !moreMenuOpen.value
+  moreMenuOpen.value =
+    !moreMenuOpen.value
 }
 
 const toggleAdminMenu = () => {
   moreMenuOpen.value = false
-  adminMenuOpen.value = !adminMenuOpen.value
+  adminMenuOpen.value =
+    !adminMenuOpen.value
 }
 
 const closeMobileMenu = () => {
@@ -181,7 +285,9 @@ const closeMobileMenu = () => {
 }
 
 const toggleMobileMenu = () => {
-  mobileMenuOpen.value = !mobileMenuOpen.value
+  mobileMenuOpen.value =
+    !mobileMenuOpen.value
+
   closeAllMenus()
 }
 
@@ -196,7 +302,10 @@ const handleLogout = async () => {
   closeMobileMenu()
 
   try {
-    if (typeof auth.logout === 'function') {
+    if (
+      typeof auth.logout ===
+      'function'
+    ) {
       await auth.logout()
     }
   } catch (error) {
@@ -239,12 +348,46 @@ const handleDocumentClick = () => {
   closeAllMenus()
 }
 
-if (typeof document !== 'undefined') {
+
+/*
+|--------------------------------------------------------------------------
+| Lifecycle
+|--------------------------------------------------------------------------
+*/
+
+onMounted(() => {
+  window.addEventListener(
+    'online',
+    updateInternetStatus
+  )
+
+  window.addEventListener(
+    'offline',
+    updateInternetStatus
+  )
+
   document.addEventListener(
     'click',
     handleDocumentClick
   )
-}
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(
+    'online',
+    updateInternetStatus
+  )
+
+  window.removeEventListener(
+    'offline',
+    updateInternetStatus
+  )
+
+  document.removeEventListener(
+    'click',
+    handleDocumentClick
+  )
+})
 </script>
 
 
@@ -295,7 +438,9 @@ if (typeof document !== 'undefined') {
 
 
       <!-- Primary menus -->
-      <div class="flex shrink-0 items-center gap-1">
+      <div
+        class="flex shrink-0 items-center gap-1"
+      >
         <router-link
           v-for="item in primaryMenuItems"
           :key="item.to"
@@ -323,7 +468,11 @@ if (typeof document !== 'undefined') {
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-4 w-4 transition-transform"
-            :class="moreMenuOpen ? 'rotate-180' : ''"
+            :class="
+              moreMenuOpen
+                ? 'rotate-180'
+                : ''
+            "
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -361,7 +510,8 @@ if (typeof document !== 'undefined') {
               :style="
                 isActiveRoute(item.to)
                   ? {
-                      backgroundColor: settingsStore.themeColor
+                      backgroundColor:
+                        settingsStore.themeColor
                     }
                   : {}
               "
@@ -398,7 +548,11 @@ if (typeof document !== 'undefined') {
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-4 w-4 transition-transform"
-            :class="adminMenuOpen ? 'rotate-180' : ''"
+            :class="
+              adminMenuOpen
+                ? 'rotate-180'
+                : ''
+            "
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -436,7 +590,8 @@ if (typeof document !== 'undefined') {
               :style="
                 isActiveRoute(item.to)
                   ? {
-                      backgroundColor: settingsStore.themeColor
+                      backgroundColor:
+                        settingsStore.themeColor
                     }
                   : {}
               "
@@ -459,6 +614,113 @@ if (typeof document !== 'undefined') {
 
       <!-- Spacer -->
       <div class="min-w-1 flex-1"></div>
+
+
+      <!-- =================================================== -->
+      <!-- CONNECTION STATUS -->
+      <!-- =================================================== -->
+
+      <div
+        class="hidden shrink-0 items-center gap-2 xl:flex"
+        :title="serverStatusTitle"
+      >
+
+        <!-- Internet -->
+        <div
+          class="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-bold"
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="
+              isOnline
+                ? 'bg-emerald-400'
+                : 'bg-red-400'
+            "
+          ></span>
+
+          <span class="text-white/70">
+            Internet
+          </span>
+
+          <span
+            :class="
+              isOnline
+                ? 'text-emerald-100'
+                : 'text-red-100'
+            "
+          >
+            {{ internetStatusLabel }}
+          </span>
+        </div>
+
+
+        <!-- Server -->
+        <div
+          class="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-bold"
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="serverStatusDotClass"
+          ></span>
+
+          <span class="text-white/70">
+            Server
+          </span>
+
+          <span
+            :class="
+              serverStatusTextClass
+            "
+          >
+            {{ serverStatusLabel }}
+          </span>
+        </div>
+
+      </div>
+
+
+      <!-- Compact connection status for smaller desktop/tablet -->
+      <div
+        class="hidden md:flex xl:hidden shrink-0 items-center gap-1"
+        :title="serverStatusTitle"
+      >
+
+        <span
+          class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10"
+          :class="
+            isOnline
+              ? 'text-emerald-100'
+              : 'text-red-100'
+          "
+          :title="
+            `Internet: ${internetStatusLabel}`
+          "
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="
+              isOnline
+                ? 'bg-emerald-400'
+                : 'bg-red-400'
+            "
+          ></span>
+        </span>
+
+        <span
+          class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10"
+          :title="
+            `Server: ${serverStatusLabel}`
+          "
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="
+              serverStatusDotClass
+            "
+          ></span>
+        </span>
+
+      </div>
 
 
       <!-- Logged-in user -->
@@ -537,12 +799,69 @@ if (typeof document !== 'undefined') {
       </router-link>
 
 
+      <!-- Mobile connection status -->
+      <div
+        class="flex shrink-0 items-center gap-1"
+      >
+
+        <!-- Internet -->
+        <div
+          class="flex h-8 items-center gap-1 rounded-lg bg-white/10 px-1.5"
+          :title="
+            `Internet: ${internetStatusLabel}`
+          "
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="
+              isOnline
+                ? 'bg-emerald-400'
+                : 'bg-red-400'
+            "
+          ></span>
+
+          <span
+            class="hidden sm:inline text-[9px] font-bold"
+            :class="
+              isOnline
+                ? 'text-emerald-100'
+                : 'text-red-100'
+            "
+          >
+            {{ internetStatusLabel }}
+          </span>
+        </div>
+
+
+        <!-- Server -->
+        <div
+          class="flex h-8 items-center gap-1 rounded-lg bg-white/10 px-1.5"
+          :title="serverStatusTitle"
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="serverStatusDotClass"
+          ></span>
+
+          <span
+            class="hidden sm:inline text-[9px] font-bold"
+            :class="serverStatusTextClass"
+          >
+            {{
+              serverStatusLabel
+            }}
+          </span>
+        </div>
+
+      </div>
+
+
       <!-- User + hamburger -->
       <div
         class="flex shrink-0 items-center gap-2"
       >
         <div
-          class="max-w-[95px] text-right leading-tight"
+          class="hidden sm:block max-w-[95px] text-right leading-tight"
         >
           <div
             class="truncate text-xs font-black"
@@ -627,7 +946,8 @@ if (typeof document !== 'undefined') {
         <div
           class="flex shrink-0 items-center justify-between p-4 text-white"
           :style="{
-            backgroundColor: settingsStore.themeColor
+            backgroundColor:
+              settingsStore.themeColor
           }"
         >
           <div
@@ -685,7 +1005,8 @@ if (typeof document !== 'undefined') {
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-black"
             :style="{
-              backgroundColor: settingsStore.themeColor
+              backgroundColor:
+                settingsStore.themeColor
             }"
           >
             {{
@@ -711,6 +1032,118 @@ if (typeof document !== 'undefined') {
         </div>
 
 
+        <!-- Mobile server status -->
+        <div
+          class="border-b border-gray-200 bg-white px-4 py-3"
+        >
+          <div
+            class="flex items-center justify-between gap-3"
+          >
+
+            <div
+              class="flex items-center gap-2"
+            >
+              <span
+                class="h-2.5 w-2.5 rounded-full"
+                :class="
+                  isOnline
+                    ? 'bg-emerald-500'
+                    : 'bg-red-500'
+                "
+              ></span>
+
+              <span
+                class="text-xs font-bold text-gray-600"
+              >
+                Internet
+              </span>
+
+              <span
+                class="text-xs font-black"
+                :class="
+                  isOnline
+                    ? 'text-emerald-600'
+                    : 'text-red-600'
+                "
+              >
+                {{ internetStatusLabel }}
+              </span>
+            </div>
+
+
+            <div
+              class="flex items-center gap-2"
+              :title="serverStatusTitle"
+            >
+              <span
+                class="h-2.5 w-2.5 rounded-full"
+                :class="
+                  serverConnectionState ===
+                    'connected'
+                    ? 'bg-emerald-500'
+                    : serverConnectionState ===
+                        'connecting' ||
+                      serverConnectionState ===
+                        'waking'
+                      ? 'bg-amber-500 animate-pulse'
+                      : serverConnectionState ===
+                          'offline' ||
+                        serverConnectionState ===
+                          'error'
+                        ? 'bg-red-500'
+                        : 'bg-gray-400 animate-pulse'
+                "
+              ></span>
+
+              <span
+                class="text-xs font-bold text-gray-600"
+              >
+                Server
+              </span>
+
+              <span
+                class="text-xs font-black"
+                :class="
+                  serverConnectionState ===
+                    'connected'
+                    ? 'text-emerald-600'
+                    : serverConnectionState ===
+                        'connecting' ||
+                      serverConnectionState ===
+                        'waking'
+                      ? 'text-amber-600'
+                      : serverConnectionState ===
+                          'offline' ||
+                        serverConnectionState ===
+                          'error'
+                        ? 'text-red-600'
+                        : 'text-gray-500'
+                "
+              >
+                {{
+                  serverStatusLabel
+                }}
+              </span>
+            </div>
+
+          </div>
+
+          <p
+            v-if="
+              serverConnectionState ===
+                'connecting' ||
+              serverConnectionState ===
+                'waking'
+            "
+            class="mt-2 text-[10px] font-semibold text-amber-600"
+          >
+            {{
+              serverConnectionMessage
+            }}
+          </p>
+        </div>
+
+
         <!-- Mobile menu content -->
         <div class="flex-1 overflow-y-auto p-3">
 
@@ -724,13 +1157,16 @@ if (typeof document !== 'undefined') {
           <!-- Primary -->
           <router-link
             v-for="item in primaryMenuItems"
-            :key="`mobile-primary-${item.to}`"
+            :key="
+              `mobile-primary-${item.to}`
+            "
             :to="item.to"
             class="mb-1 flex items-center rounded-xl px-4 py-3 font-bold transition-colors hover:bg-gray-100"
             :style="
               isActiveRoute(item.to)
                 ? {
-                    backgroundColor: settingsStore.themeColor,
+                    backgroundColor:
+                      settingsStore.themeColor,
                     color: '#ffffff'
                   }
                 : {}
@@ -744,13 +1180,16 @@ if (typeof document !== 'undefined') {
           <!-- More menus -->
           <router-link
             v-for="item in moreMenuItems"
-            :key="`mobile-more-${item.to}`"
+            :key="
+              `mobile-more-${item.to}`
+            "
             :to="item.to"
             class="mb-1 flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-colors hover:bg-gray-100"
             :style="
               isActiveRoute(item.to)
                 ? {
-                    backgroundColor: settingsStore.themeColor,
+                    backgroundColor:
+                      settingsStore.themeColor,
                     color: '#ffffff'
                   }
                 : {}
@@ -771,6 +1210,7 @@ if (typeof document !== 'undefined') {
 
           <!-- Admin -->
           <template v-if="isAdmin">
+
             <div
               class="mt-4 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-gray-400"
             >
@@ -779,13 +1219,16 @@ if (typeof document !== 'undefined') {
 
             <router-link
               v-for="item in adminMenuItems"
-              :key="`mobile-admin-${item.to}`"
+              :key="
+                `mobile-admin-${item.to}`
+              "
               :to="item.to"
               class="mb-1 flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-colors hover:bg-gray-100"
               :style="
                 isActiveRoute(item.to)
                   ? {
-                      backgroundColor: settingsStore.themeColor,
+                      backgroundColor:
+                        settingsStore.themeColor,
                       color: '#ffffff'
                     }
                   : {}
@@ -802,6 +1245,7 @@ if (typeof document !== 'undefined') {
                 {{ item.label }}
               </span>
             </router-link>
+
           </template>
         </div>
 

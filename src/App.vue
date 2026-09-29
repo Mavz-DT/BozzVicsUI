@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 
 import Navbar from './components/Navbar.vue'
 import SessionExpiredBanner from './components/SessionExpiredBanner.vue'
-import ServerConnectionBanner from './components/ServerConnectionBanner.vue'
 
 import { useSettingsStore } from './stores/settings'
 
@@ -26,11 +25,6 @@ onMounted(() => {
     class="min-h-screen flex flex-col bg-gray-100"
   >
     <Navbar
-      v-if="!hideNavbar()"
-    />
-
-    <!-- Global Server Connection Banner -->
-    <ServerConnectionBanner
       v-if="!hideNavbar()"
     />
 
