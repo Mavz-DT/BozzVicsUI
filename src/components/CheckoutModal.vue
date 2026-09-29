@@ -1,5 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
+import {
+  ref,
+  computed,
+  watch
+} from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { useCartStore } from '../stores/cart'
@@ -733,6 +737,63 @@ const closeModal = () => {
 
   emit('close')
 }
+
+// ==========================================================================
+// RESET PAYMENT FORM WHEN MODAL OPENS / CLOSES
+// ==========================================================================
+
+watch(
+  () => props.isOpen,
+  isOpen => {
+
+    // Kapag isinara ng parent ang modal
+    // pagkatapos ng successful payment,
+    // siguraduhing tanggal ang submitting lock.
+
+    if (!isOpen) {
+
+      isSubmitting.value =
+        false
+
+      return
+    }
+
+
+    // Kapag bagong checkout,
+    // siguraduhing bagong payment state.
+
+    isSubmitting.value =
+      false
+
+    amountTendered.value =
+      ''
+
+    referenceNumber.value =
+      ''
+
+    splitCashAmount.value =
+      ''
+
+    splitGCashAmount.value =
+      ''
+
+    splitCashTendered.value =
+      ''
+
+    splitGCashReference.value =
+      ''
+
+    paymentMethod.value =
+      'Cash'
+
+    paymentStatus.value =
+      'Paid'
+
+    keypadTarget.value =
+      'amountTendered'
+  }
+)
+
 </script>
 
 <template>
