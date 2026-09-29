@@ -8,6 +8,24 @@ export const useExpenseStore = defineStore('expense', () => {
 
   const authStore = useAuthStore()
 
+  // =====================================================
+  // API BASE URL
+  // Local:
+  // http://localhost:5000
+  //
+  // Production:
+  // uses VITE_API_URL from Vercel environment variable
+  // =====================================================
+  const API_BASE_URL = (
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:5000'
+  ).replace(/\/$/, '')
+
+  const API = `${API_BASE_URL}/api/expenses`
+
+  // =====================================================
+  // AUTH HEADERS
+  // =====================================================
   const getAuthHeaders = () => {
     const token =
       authStore.getToken?.() ||
@@ -30,8 +48,8 @@ export const useExpenseStore = defineStore('expense', () => {
 
     try {
       const url = date
-        ? `/api/expenses?date=${encodeURIComponent(date)}`
-        : '/api/expenses'
+        ? `${API}?date=${encodeURIComponent(date)}`
+        : API
 
       const res = await fetch(url, {
         headers: {
@@ -67,7 +85,7 @@ export const useExpenseStore = defineStore('expense', () => {
   ) => {
     try {
       const res = await fetch(
-        '/api/expenses',
+        API,
         {
           method: 'POST',
 
