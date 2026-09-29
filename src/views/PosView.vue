@@ -40,6 +40,22 @@ const {
 const isCheckoutOpen =
   ref(false)
 
+  // =========================
+  // CUSTOMER RECEIPT PROMPT
+  // =========================
+
+  const isReceiptPromptOpen =
+    ref(false)
+
+  const pendingReceiptOrder =
+    ref(null)
+
+  const pendingReceiptPaymentDetails =
+    ref(null)
+
+  const pendingReceiptPrintWindow =
+    ref(null)
+
 
 // =========================
 // PAYMENT SUBMISSION GUARD
@@ -2897,6 +2913,70 @@ const printCustomerReceipt =
     return true
   }
 
+  // =========================
+  // PRINT CUSTOMER RECEIPT
+  // FROM VUE PROMPT
+  // =========================
+
+  const confirmCustomerReceiptPrint =
+    () => {
+
+      if (
+        pendingReceiptOrder.value
+      ) {
+
+        printCustomerReceipt(
+          pendingReceiptOrder.value,
+          pendingReceiptPaymentDetails.value,
+          pendingReceiptPrintWindow.value
+        )
+      }
+
+      isReceiptPromptOpen.value =
+        false
+
+      pendingReceiptOrder.value =
+        null
+
+      pendingReceiptPaymentDetails.value =
+        null
+
+      pendingReceiptPrintWindow.value =
+        null
+    }
+
+
+  // =========================
+  // SKIP CUSTOMER RECEIPT
+  // =========================
+
+  const skipCustomerReceiptPrint =
+    () => {
+
+      const printWindow =
+        pendingReceiptPrintWindow.value
+
+      if (
+        printWindow &&
+        !printWindow.closed
+      ) {
+
+        printWindow.close()
+      }
+
+      isReceiptPromptOpen.value =
+        false
+
+      pendingReceiptOrder.value =
+        null
+
+      pendingReceiptPaymentDetails.value =
+        null
+
+      pendingReceiptPrintWindow.value =
+        null
+    }
+
 
 // ==========================================================================
 // HANDLE PAYMENT
@@ -3418,7 +3498,7 @@ const handlePayment =
 
 
       // =========================
-      // PRINT RECEIPT
+      // CUSTOMER RECEIPT PROMPT
       // =========================
 
       if (
@@ -3426,34 +3506,18 @@ const handlePayment =
         'Unsettled'
       ) {
 
-        const shouldPrintReceipt =
-          window.confirm(
-            'Print customer receipt?'
-          )
+        pendingReceiptOrder.value =
+          createdOrder
 
+        pendingReceiptPaymentDetails.value =
+          paymentDetails
 
-        if (
-          shouldPrintReceipt
-        ) {
+        pendingReceiptPrintWindow.value =
+          customerPrintWindow
 
-          printCustomerReceipt(
-            createdOrder,
-            paymentDetails,
-            customerPrintWindow
-          )
-
-        } else {
-
-          if (
-            customerPrintWindow &&
-            !customerPrintWindow.closed
-          ) {
-
-            customerPrintWindow.close()
-          }
-        }
+        isReceiptPromptOpen.value =
+          true
       }
-
 
       // =========================
       // RESET POS
@@ -3561,6 +3625,8 @@ const handlePayment =
         false
     }
   }
+
+
 
 
 // =========================
@@ -5846,6 +5912,105 @@ onMounted(
       handlePayment
     "
   />
+
+  <!-- Customer Receipt Prompt -->
+
+  <div
+    v-if="
+      isReceiptPromptOpen
+    "
+    class="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4"
+  >
+    <div
+      class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+    >
+
+      <!-- Header -->
+
+      <div
+        class="px-5 py-4 text-white"
+        :style="{
+          backgroundColor:
+            settingsStore.themeColor
+        }"
+      >
+
+        <h2
+          class="text-lg font-black"
+        >
+          Print Customer Receipt?
+        </h2>
+
+        <p
+          class="text-sm text-white/80 mt-1"
+        >
+          Payment successful. Gusto mo bang mag-print ng customer receipt?
+        </p>
+
+      </div>
+
+
+      <!-- Body -->
+
+      <div
+        class="p-5"
+      >
+
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 gap-3"
+        >
+
+          <!-- PRINT -->
+
+          <button
+            type="button"
+            @click="
+              confirmCustomerReceiptPrint
+            "
+            class="w-full py-4 rounded-xl font-bold text-white transition-all shadow-md"
+            :style="{
+              backgroundColor:
+                settingsStore.themeColor
+            }"
+          >
+
+            <span
+              class="text-2xl block mb-1"
+            >
+              🖨️
+            </span>
+
+            PRINT RECEIPT
+
+          </button>
+
+
+          <!-- SKIP -->
+
+          <button
+            type="button"
+            @click="
+              skipCustomerReceiptPrint
+            "
+            class="w-full py-4 rounded-xl font-bold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all"
+          >
+
+            <span
+              class="text-2xl block mb-1"
+            >
+              ✕
+            </span>
+
+            SKIP
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
 
   <!-- Add-on Modal -->
 
