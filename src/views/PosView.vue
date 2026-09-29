@@ -982,31 +982,40 @@ const finalTotal =
     )
   })
 
-// =========================
-// KITCHEN TICKET
-// =========================
+  // =========================
+  // KITCHEN TICKET
+  // =========================
 
   const printKitchenTicket =
-    order => {
+    (
+      order,
+      existingPrintWindow = null
+    ) => {
+
       const printWindow =
+        existingPrintWindow ||
         window.open(
           '',
           '_blank',
           'width=400,height=700'
         )
 
+
       if (!printWindow) {
+
         alert(
           'Hindi mabuksan ang KOT print window. I-check ang browser popup blocker.'
         )
 
-        return
+        return false
       }
+
 
       const orderNumber =
         order.orderNumber
           ? `#${order.orderNumber}`
           : 'DELIVERY'
+
 
       const itemsHtml =
         order.items
@@ -1058,6 +1067,7 @@ const finalTotal =
           )
           .join('')
 
+
       const customerSection =
         order.orderType ===
           'Delivery' &&
@@ -1077,6 +1087,9 @@ const finalTotal =
           `
           : ''
 
+
+      printWindow.document.open()
+
       printWindow.document.write(`
         <!DOCTYPE html>
 
@@ -1094,61 +1107,46 @@ const finalTotal =
                 box-sizing: border-box;
               }
 
-              @page {
-                size: 80mm auto;
-                margin: 0;
-              }
-
-              html,
               body {
                 margin: 0;
-                padding: 0;
+                padding: 12px;
                 width: 80mm;
                 background: #fff;
                 color: #000;
-              }
-
-              body {
-                padding: 4px;
                 font-family:
                   Arial,
                   Helvetica,
                   sans-serif;
-                font-size: 12px;
               }
 
               .header {
                 text-align: center;
-                border-bottom: 1px dashed #000;
-                padding-bottom: 5px;
-                margin-bottom: 6px;
+                border-bottom: 2px dashed #000;
+                padding-bottom: 10px;
+                margin-bottom: 10px;
               }
 
               .business {
-                font-size: 14px;
+                font-size: 16px;
                 font-weight: 900;
-                line-height: 1.1;
               }
 
               .title {
-                font-size: 15px;
+                font-size: 18px;
                 font-weight: 900;
-                margin-top: 3px;
-                line-height: 1.1;
+                margin-top: 5px;
               }
 
               .meta {
-                margin-bottom: 6px;
+                margin-bottom: 10px;
               }
 
               .meta-row {
                 display: flex;
                 justify-content: space-between;
-                align-items: flex-start;
-                gap: 6px;
-                margin-bottom: 2px;
-                font-size: 11px;
-                line-height: 1.15;
+                gap: 10px;
+                margin-bottom: 4px;
+                font-size: 13px;
               }
 
               .label {
@@ -1156,17 +1154,17 @@ const finalTotal =
               }
 
               .items {
-                border-top: 1px solid #000;
-                border-bottom: 1px solid #000;
-                padding: 6px 0;
+                border-top: 2px solid #000;
+                border-bottom: 2px solid #000;
+                padding: 10px 0;
               }
 
               .item {
                 display: flex;
-                gap: 5px;
-                margin-bottom: 6px;
-                font-size: 14px;
-                line-height: 1.15;
+                gap: 8px;
+                margin-bottom: 10px;
+                font-size: 16px;
+                line-height: 1.2;
               }
 
               .item:last-child {
@@ -1174,45 +1172,34 @@ const finalTotal =
               }
 
               .qty {
-                width: 28px;
+                width: 35px;
                 flex-shrink: 0;
                 font-weight: 900;
               }
 
               .name {
                 flex: 1;
-                min-width: 0;
                 font-weight: 700;
               }
 
               .instruction {
-                margin-top: 2px;
-                padding-left: 4px;
-                border-left: 2px solid #000;
-                font-size: 10px;
-                line-height: 1.15;
+                margin-top: 4px;
+                padding-left: 6px;
+                border-left: 3px solid #000;
+                font-size: 12px;
                 font-weight: 400;
               }
 
               .footer {
-                margin-top: 6px;
-                padding-bottom: 2px;
+                margin-top: 12px;
                 text-align: center;
-                font-size: 9px;
-                line-height: 1.1;
+                font-size: 11px;
               }
 
               @media print {
 
-                html,
                 body {
                   width: 80mm;
-                  margin: 0;
-                  padding: 0;
-                }
-
-                body {
-                  padding: 4px;
                 }
 
               }
@@ -1235,6 +1222,7 @@ const finalTotal =
 
             </div>
 
+
             <div class="meta">
 
               <div class="meta-row">
@@ -1249,6 +1237,7 @@ const finalTotal =
 
               </div>
 
+
               <div class="meta-row">
 
                 <span class="label">
@@ -1260,6 +1249,7 @@ const finalTotal =
                 </span>
 
               </div>
+
 
               <div class="meta-row">
 
@@ -1276,6 +1266,7 @@ const finalTotal =
                 </span>
 
               </div>
+
 
               <div class="meta-row">
 
@@ -1298,17 +1289,23 @@ const finalTotal =
 
               </div>
 
+
               ${customerSection}
 
             </div>
 
+
             <div class="items">
+
               ${itemsHtml}
+
             </div>
+
 
             <div class="footer">
               Please prepare the order carefully.
             </div>
+
 
             <script>
 
@@ -1327,7 +1324,10 @@ const finalTotal =
         </html>
       `)
 
+
       printWindow.document.close()
+
+      return true
     }
 
 // =========================
@@ -2113,412 +2113,238 @@ const printCustomerReceipt =
 // HANDLE PAYMENT
 // =========================
 
-const handlePayment =
-  async paymentDetails => {
-
-    // =========================
-    // FRONTEND DUPLICATE GUARD
-    // =========================
-
-    if (
-      isProcessingPayment.value
-    ) {
-      return
-    }
-
-    isProcessingPayment.value =
-      true
-
-    try {
+  const handlePayment =
+    async paymentDetails => {
 
       if (
-        !canProceedToCheckout.value
+        isProcessingPayment.value
       ) {
-        alert(
-          'Complete muna ang order details bago mag-checkout.'
-        )
-
         return
       }
 
+      isProcessingPayment.value =
+        true
 
-      const discount =
-        Number(
-          discountAmount.value ||
-            0
-        )
+      let kitchenPrintWindow =
+        null
 
-
-      if (
-        discount < 0
-      ) {
-        alert(
-          'Hindi puwedeng negative ang discount.'
-        )
-
-        return
-      }
-
-
-      if (
-        discount >
-        Number(
-          totalAmount.value ||
-            0
-        )
-      ) {
-        alert(
-          'Hindi puwedeng mas mataas ang discount kaysa Gross Sales.'
-        )
-
-        return
-      }
-
-
-      // =========================
-      // BUILD ORDER ITEMS
-      // =========================
-
-      const orderItems =
-        cartStore.cart.map(
-          item => ({
-            menuId:
-              item.menuId,
-
-            name:
-              item.name,
-
-            quantity:
-              item.quantity,
-
-            price:
-              item.price,
-
-            addOns:
-              (item.addOns || [])
-                .map(
-                  addOn => ({
-                    addOnId:
-                      addOn.addOnId,
-
-                    name:
-                      addOn.name,
-
-                    price:
-                      Number(
-                        addOn.price || 0
-                      )
-                  })
-                ),
-
-            subtotal:
-              cartStore.getItemUnitPrice(
-                item
-              ) *
-              item.quantity,
-
-            specialInstructions:
-              item.specialInstructions ||
-              ''
-          })
-        )
-
-
-      // =========================
-      // BUILD ORDER
-      // =========================
-
-      const orderData = {
-
-        cashier:
-          authStore.user._id,
-
-        items:
-          orderItems,
-
-        orderType:
-          orderType.value,
-
-        orderNumber:
-          orderType.value ===
-          'Delivery'
-            ? null
-            : selectedOrderNumber.value,
-
-        customer:
-          orderType.value ===
-          'Delivery'
-            ? {
-                name:
-                  delivery.value.customerName.trim(),
-
-                notes:
-                  delivery.value.notes.trim()
-              }
-            : {},
-
-        deliveryFee:
-          orderType.value ===
-          'Delivery'
-            ? Number(
-                delivery.value.deliveryFee ||
-                  0
-              )
-            : 0,
-
-        deliveryFeePaidBy:
-          orderType.value ===
-          'Delivery'
-            ? delivery.value
-                .deliveryFeePaidBy
-            : 'Customer',
-
-        discountAmount:
-          discount,
-
-        paymentStatus:
-          paymentDetails.paymentStatus,
-
-        notes:
-          orderType.value ===
-          'Delivery'
-            ? delivery.value.notes.trim()
-            : ''
-      }
-
-
-      // =========================
-      // CREATE ORDER
-      // =========================
-
-      const orderResponse =
-        await axios.post(
-          `${API}/orders`,
-          orderData,
-          {
-            ...getAuthConfig(),
-
-            timeout:
-              60000
-          }
-        )
-
-
-      const createdOrder =
-        orderResponse.data.order
-
-
-      // =========================
-      // PRINT KOT
-      // =========================
-
-      printKitchenTicket(
-        createdOrder
-      )
-
-
-      // =========================
-      // UNSETTLED DELIVERY
-      // =========================
-
-      if (
-        paymentDetails.paymentStatus ===
-        'Unsettled'
-      ) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | CLOSE CHECKOUT IMMEDIATELY
-        |--------------------------------------------------------------------------
-        |
-        | The order is already successfully saved.
-        | Do not keep the payment modal in Processing state
-        | while the page is doing refresh work.
-        |
-        |--------------------------------------------------------------------------
-        */
-
-        isCheckoutOpen.value =
-          false
-
-
-        alert(
-          `Unsettled delivery order saved!\nOrder ID: ${createdOrder._id}`
-        )
-
-      } else {
+      try {
 
         // =========================
-        // NORMALIZE PAYMENT LIST
-        // =========================
-
-        const paymentList =
-          Array.isArray(
-            paymentDetails.payments
-          ) &&
-          paymentDetails.payments.length >
-            0
-
-            ? paymentDetails.payments
-
-            : [
-                {
-                  paymentMethod:
-                    paymentDetails.paymentMethod,
-
-                  amount:
-                    Number(
-                      paymentDetails.amount ??
-                        createdOrder.storeAmountDue ??
-                        createdOrder.netAmount
-                    ),
-
-                  amountTendered:
-                    Number(
-                      paymentDetails.amountTendered ||
-                        0
-                    ),
-
-                  change:
-                    Number(
-                      paymentDetails.change ||
-                        0
-                    ),
-
-                  referenceNumber:
-                    paymentDetails.referenceNumber ||
-                    ''
-                }
-              ]
-
-
-        // =========================
-        // VALIDATE PAYMENT LIST
+        // VALIDATE CHECKOUT
         // =========================
 
         if (
-          paymentList.length ===
-          0
+          !canProceedToCheckout.value
         ) {
-          throw new Error(
-            'Walang payment information.'
+          alert(
+            'Complete muna ang order details bago mag-checkout.'
           )
+
+          return
         }
 
 
-        // =========================
-        // VALIDATE TOTAL
-        // =========================
-
-        const paymentTotal =
-          paymentList.reduce(
-            (
-              total,
-              payment
-            ) =>
-              total +
-              Number(
-                payment.amount ||
-                  0
-              ),
-            0
-          )
-
-
-        const orderTotal =
+        const discount =
           Number(
-            createdOrder.storeAmountDue ??
-              createdOrder.netAmount ??
+            discountAmount.value ||
               0
           )
 
 
         if (
-          Math.abs(
-            paymentTotal -
-              orderTotal
-          ) > 0.01
+          discount < 0
         ) {
-          throw new Error(
-            `Payment total (${paymentTotal.toFixed(2)}) does not match store amount due (${orderTotal.toFixed(2)}).`
+          alert(
+            'Hindi puwedeng negative ang discount.'
           )
+
+          return
         }
-
-
-        // =========================
-        // CREATE PAYMENT REQUEST ID
-        // =========================
-
-        let paymentRequestId =
-          ''
 
 
         if (
-          typeof crypto !==
-            'undefined' &&
-          typeof crypto.randomUUID ===
-            'function'
+          discount >
+          Number(
+            totalAmount.value ||
+              0
+          )
         ) {
+          alert(
+            'Hindi puwedeng mas mataas ang discount kaysa Gross Sales.'
+          )
 
-          paymentRequestId =
-            crypto.randomUUID()
-
-        } else {
-
-          paymentRequestId =
-            `${Date.now()}-${Math.random()
-              .toString(36)
-              .slice(2, 11)}`
+          return
         }
 
 
         // =========================
-        // CREATE ALL PAYMENTS
-        // ONE REQUEST
+        // PRE-OPEN KOT WINDOW
+        // =========================
+        //
+        // Binubuksan agad habang
+        // galing pa sa user click.
+        //
+        // Para hindi ma-block ng
+        // browser popup protection
+        // kapag mabagal ang server.
+        //
         // =========================
 
-        const paymentResponse =
-          await axios.post(
-            `${API}/payments`,
-            {
-              orderId:
-                createdOrder._id,
+        try {
 
-              receivedBy:
-                authStore.user._id,
+          kitchenPrintWindow =
+            window.open(
+              '',
+              '_blank',
+              'width=400,height=700'
+            )
 
-              paymentRequestId,
+          if (
+            !kitchenPrintWindow
+          ) {
 
-              payments:
-                paymentList.map(
-                  payment => ({
-                    paymentMethod:
-                      payment.paymentMethod,
+            console.warn(
+              'KOT popup was blocked by the browser.'
+            )
+          }
 
-                    amount:
-                      Number(
-                        payment.amount ||
-                          0
-                      ),
+        } catch (popupError) {
 
-                    amountTendered:
-                      Number(
-                        payment.amountTendered ||
-                          0
-                      ),
+          console.warn(
+            'Unable to pre-open KOT window:',
+            popupError
+          )
 
-                    change:
-                      Number(
-                        payment.change ||
-                          0
-                      ),
+          kitchenPrintWindow =
+            null
+        }
 
-                    referenceNumber:
-                      payment.referenceNumber ||
-                      ''
-                  })
+
+        // =========================
+        // BUILD ORDER ITEMS
+        // =========================
+
+        const orderItems =
+          cartStore.cart.map(
+            item => ({
+
+              menuId:
+                item.menuId,
+
+              name:
+                item.name,
+
+              quantity:
+                item.quantity,
+
+              price:
+                item.price,
+
+              addOns:
+                (item.addOns || [])
+                  .map(
+                    addOn => ({
+
+                      addOnId:
+                        addOn.addOnId,
+
+                      name:
+                        addOn.name,
+
+                      price:
+                        Number(
+                          addOn.price || 0
+                        )
+                    })
+                  ),
+
+              subtotal:
+                cartStore.getItemUnitPrice(
+                  item
+                ) *
+                item.quantity,
+
+              specialInstructions:
+                item.specialInstructions ||
+                ''
+            })
+          )
+
+
+        // =========================
+        // BUILD ORDER
+        // =========================
+
+        const orderData = {
+
+          cashier:
+            authStore.user._id,
+
+          items:
+            orderItems,
+
+          orderType:
+            orderType.value,
+
+          orderNumber:
+            orderType.value ===
+            'Delivery'
+              ? null
+              : selectedOrderNumber.value,
+
+          customer:
+            orderType.value ===
+            'Delivery'
+              ? {
+
+                  name:
+                    delivery.value.customerName.trim(),
+
+                  notes:
+                    delivery.value.notes.trim()
+
+                }
+              : {},
+
+          deliveryFee:
+            orderType.value ===
+            'Delivery'
+              ? Number(
+                  delivery.value.deliveryFee ||
+                    0
                 )
-            },
+              : 0,
+
+          deliveryFeePaidBy:
+            orderType.value ===
+            'Delivery'
+              ? delivery.value
+                  .deliveryFeePaidBy
+              : 'Customer',
+
+          discountAmount:
+            discount,
+
+          paymentStatus:
+            paymentDetails.paymentStatus,
+
+          notes:
+            orderType.value ===
+            'Delivery'
+              ? delivery.value.notes.trim()
+              : ''
+        }
+
+
+        // =========================
+        // CREATE ORDER
+        // =========================
+
+        const orderResponse =
+          await axios.post(
+            `${API}/orders`,
+            orderData,
             {
               ...getAuthConfig(),
 
@@ -2528,161 +2354,360 @@ const handlePayment =
           )
 
 
-        const createdPayments =
-          paymentResponse.data
-            ?.payments || []
+        const createdOrder =
+          orderResponse.data.order
 
 
         // =========================
-        // PAYMENT SUCCESS
+        // PRINT KOT
         // =========================
 
-        /*
-        |--------------------------------------------------------------------------
-        | IMPORTANT
-        |--------------------------------------------------------------------------
-        |
-        | Close the payment modal immediately after the
-        | payment API itself succeeds.
-        |
-        | This prevents "Processing..." from staying on screen
-        | while fetchData() or fetchOrderNumbers() is running.
-        |
-        |--------------------------------------------------------------------------
-        */
+        printKitchenTicket(
+          createdOrder,
+          kitchenPrintWindow
+        )
 
-        isCheckoutOpen.value =
+
+        // =========================
+        // UNSETTLED DELIVERY
+        // =========================
+
+        if (
+          paymentDetails.paymentStatus ===
+          'Unsettled'
+        ) {
+
+          isCheckoutOpen.value =
+            false
+
+
+          alert(
+            `Unsettled delivery order saved!\nOrder ID: ${createdOrder._id}`
+          )
+
+        } else {
+
+          // =========================
+          // NORMALIZE PAYMENT LIST
+          // =========================
+
+          const paymentList =
+            Array.isArray(
+              paymentDetails.payments
+            ) &&
+            paymentDetails.payments.length >
+              0
+
+              ? paymentDetails.payments
+
+              : [
+                  {
+
+                    paymentMethod:
+                      paymentDetails.paymentMethod,
+
+                    amount:
+                      Number(
+                        paymentDetails.amount ??
+                          createdOrder.storeAmountDue ??
+                          createdOrder.netAmount
+                      ),
+
+                    amountTendered:
+                      Number(
+                        paymentDetails.amountTendered ||
+                          0
+                      ),
+
+                    change:
+                      Number(
+                        paymentDetails.change ||
+                          0
+                      ),
+
+                    referenceNumber:
+                      paymentDetails.referenceNumber ||
+                      ''
+                  }
+                ]
+
+
+          // =========================
+          // VALIDATE PAYMENT LIST
+          // =========================
+
+          if (
+            paymentList.length ===
+            0
+          ) {
+            throw new Error(
+              'Walang payment information.'
+            )
+          }
+
+
+          // =========================
+          // VALIDATE TOTAL
+          // =========================
+
+          const paymentTotal =
+            paymentList.reduce(
+              (
+                total,
+                payment
+              ) =>
+                total +
+                Number(
+                  payment.amount ||
+                    0
+                ),
+              0
+            )
+
+
+          const orderTotal =
+            Number(
+              createdOrder.storeAmountDue ??
+                createdOrder.netAmount ??
+                0
+            )
+
+
+          if (
+            Math.abs(
+              paymentTotal -
+                orderTotal
+            ) > 0.01
+          ) {
+
+            throw new Error(
+              `Payment total (${paymentTotal.toFixed(2)}) does not match store amount due (${orderTotal.toFixed(2)}).`
+            )
+          }
+
+
+          // =========================
+          // CREATE PAYMENT REQUEST ID
+          // =========================
+
+          let paymentRequestId =
+            ''
+
+
+          if (
+            typeof crypto !==
+              'undefined' &&
+            typeof crypto.randomUUID ===
+              'function'
+          ) {
+
+            paymentRequestId =
+              crypto.randomUUID()
+
+          } else {
+
+            paymentRequestId =
+              `${Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2, 11)}`
+          }
+
+
+          // =========================
+          // CREATE ALL PAYMENTS
+          // ONE REQUEST
+          // =========================
+
+          const paymentResponse =
+            await axios.post(
+              `${API}/payments`,
+              {
+                orderId:
+                  createdOrder._id,
+
+                receivedBy:
+                  authStore.user._id,
+
+                paymentRequestId,
+
+                payments:
+                  paymentList.map(
+                    payment => ({
+
+                      paymentMethod:
+                        payment.paymentMethod,
+
+                      amount:
+                        Number(
+                          payment.amount ||
+                            0
+                        ),
+
+                      amountTendered:
+                        Number(
+                          payment.amountTendered ||
+                            0
+                        ),
+
+                      change:
+                        Number(
+                          payment.change ||
+                            0
+                        ),
+
+                      referenceNumber:
+                        payment.referenceNumber ||
+                        ''
+                    })
+                  )
+              },
+              {
+                ...getAuthConfig(),
+
+                timeout:
+                  60000
+              }
+            )
+
+
+          const createdPayments =
+            paymentResponse.data
+              ?.payments || []
+
+
+          // =========================
+          // PAYMENT SUCCESS
+          // =========================
+
+          isCheckoutOpen.value =
+            false
+
+
+          alert(
+            `Payment successful!\nOrder ID: ${createdOrder._id}\nPayments: ${createdPayments.length}`
+          )
+        }
+
+
+        // =========================
+        // PRINT RECEIPT
+        // =========================
+
+        if (
+          paymentDetails.paymentStatus !==
+          'Unsettled'
+        ) {
+
+          const shouldPrintReceipt =
+            window.confirm(
+              'Print customer receipt?'
+            )
+
+
+          if (
+            shouldPrintReceipt
+          ) {
+
+            printCustomerReceipt(
+              createdOrder,
+              paymentDetails
+            )
+          }
+        }
+
+
+        // =========================
+        // RESET POS
+        // =========================
+
+        cartStore.clearCart()
+
+        orderType.value =
+          ''
+
+        selectedOrderNumber.value =
+          null
+
+        deliverySetupConfirmed.value =
           false
 
+        discountAmount.value =
+          0
 
-        alert(
-          `Payment successful!\nOrder ID: ${createdOrder._id}\nPayments: ${createdPayments.length}`
-        )
-      }
+        resetDelivery()
 
 
-      // =========================
-      // PRINT RECEIPT
-      // =========================
+        // =========================
+        // REFRESH POS DATA
+        // =========================
 
-      if (
-        paymentDetails.paymentStatus !==
-        'Unsettled'
-      ) {
+        try {
 
-        const shouldPrintReceipt =
-          window.confirm(
-            'Print customer receipt?'
+          await fetchData()
+
+          await fetchOrderNumbers()
+
+        } catch (refreshError) {
+
+          console.error(
+            'POS refresh after payment failed:',
+            refreshError
           )
+
+          // Successful na ang payment/order.
+          // Refresh lang ang nag-fail.
+
+        }
+
+
+      } catch (error) {
+
+        // =========================
+        // CLOSE BLANK KOT WINDOW
+        // =========================
+
+        if (
+          kitchenPrintWindow &&
+          !kitchenPrintWindow.closed
+        ) {
+
+          kitchenPrintWindow.close()
+        }
+
+
+        console.error(
+          'Error processing order:',
+          error
+        )
 
 
         if (
-          shouldPrintReceipt
+          error.code ===
+          'ECONNABORTED'
         ) {
 
-          printCustomerReceipt(
-            createdOrder,
-            paymentDetails
+          alert(
+            'Hindi nakatanggap ng server response sa loob ng 60 seconds. I-check muna ang Server status bago ulitin ang payment.'
+          )
+
+        } else {
+
+          alert(
+            error.response?.data
+              ?.message ||
+              error.message ||
+              'May naging problema sa pag-process ng order.'
           )
         }
+
+      } finally {
+
+        // Always release frontend payment lock.
+
+        isProcessingPayment.value =
+          false
       }
-
-
-      // =========================
-      // RESET POS
-      // =========================
-
-      cartStore.clearCart()
-
-      orderType.value =
-        ''
-
-      selectedOrderNumber.value =
-        null
-
-      deliverySetupConfirmed.value =
-        false
-
-      discountAmount.value =
-        0
-
-      resetDelivery()
-
-
-      // =========================
-      // REFRESH POS DATA
-      // =========================
-      //
-      // Important:
-      // Hindi na naka-depend ang modal
-      // sa completion ng refresh.
-      //
-      // Kapag mabagal ang refresh,
-      // hindi na mukhang Processing ang
-      // payment button.
-      //
-      // =========================
-
-      try {
-
-        await fetchData()
-
-        await fetchOrderNumbers()
-
-      } catch (refreshError) {
-
-        console.error(
-          'POS refresh after payment failed:',
-          refreshError
-        )
-
-        /*
-        |--------------------------------------------------------------------
-        | Important:
-        | Hindi natin babawiin ang successful payment.
-        | Data refresh lang ang nag-fail.
-        |--------------------------------------------------------------------
-        */
-
-      }
-
-
-    } catch (error) {
-
-      console.error(
-        'Error processing order:',
-        error
-      )
-
-
-      if (
-        error.code ===
-        'ECONNABORTED'
-      ) {
-
-        alert(
-          'Hindi nakatanggap ng server response sa loob ng 60 seconds. I-check muna ang Server status bago ulitin ang payment.'
-        )
-
-      } else {
-
-        alert(
-          error.response?.data
-            ?.message ||
-            error.message ||
-            'May naging problema sa pag-process ng order.'
-        )
-      }
-
-
-    } finally {
-
-      // Always release frontend payment lock.
-
-      isProcessingPayment.value =
-        false
     }
-  }
 
 // =========================
 // FETCH DATA
