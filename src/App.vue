@@ -7,9 +7,6 @@ import SessionExpiredBanner from './components/SessionExpiredBanner.vue'
 import ServerConnectionBanner from './components/ServerConnectionBanner.vue'
 
 import { useSettingsStore } from './stores/settings'
-import {
-  initServerConnectionMonitor
-} from './services/serverConnectionMonitor'
 
 const route = useRoute()
 const settingsStore = useSettingsStore()
@@ -19,9 +16,6 @@ const hideNavbar = () => {
 }
 
 onMounted(() => {
-  // Start global API connection monitoring
-  initServerConnectionMonitor()
-
   // Existing settings loading
   settingsStore.fetchSettings()
 })
