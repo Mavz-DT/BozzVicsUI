@@ -735,20 +735,18 @@ const closeModal = () => {
 }
 </script>
 
-
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 sm:p-4"
+    class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-3"
   >
 
     <!-- =================================================== -->
-    <!-- DESKTOP / TABLET: WIDE PAYMENT WINDOW -->
-    <!-- MOBILE: STACKED -->
+    <!-- PAYMENT WINDOW -->
     <!-- =================================================== -->
 
     <div
-      class="bg-white rounded-2xl w-full max-w-5xl max-h-[94vh] md:max-h-[92vh] shadow-2xl border border-gray-200 overflow-hidden flex flex-col"
+      class="bg-white rounded-2xl w-full max-w-5xl max-h-[96vh] shadow-2xl border border-gray-200 overflow-hidden flex flex-col"
     >
 
       <!-- ================================================= -->
@@ -756,7 +754,7 @@ const closeModal = () => {
       <!-- ================================================= -->
 
       <div
-        class="px-5 py-4 sm:px-6 shrink-0 text-white flex items-center justify-between"
+        class="px-4 py-3 shrink-0 text-white flex items-center justify-between"
         :style="{
           backgroundColor:
             settingsStore.themeColor
@@ -766,13 +764,13 @@ const closeModal = () => {
         <div>
 
           <h2
-            class="text-xl sm:text-2xl font-black"
+            class="text-lg sm:text-xl font-black"
           >
             Process Payment
           </h2>
 
           <p
-            class="text-xs sm:text-sm text-white/70 mt-0.5"
+            class="text-[11px] sm:text-xs text-white/70 mt-0.5"
           >
             Complete the payment details.
           </p>
@@ -782,7 +780,7 @@ const closeModal = () => {
         <button
           @click="closeModal"
           type="button"
-          class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white text-2xl leading-none"
+          class="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xl leading-none"
           aria-label="Close"
         >
           &times;
@@ -796,7 +794,7 @@ const closeModal = () => {
       <!-- ================================================= -->
 
       <div
-        class="flex-1 min-h-0 overflow-y-auto md:overflow-hidden md:grid md:grid-cols-[minmax(0,1fr)_340px]"
+        class="flex-1 min-h-0 overflow-y-auto md:overflow-hidden md:grid md:grid-cols-[minmax(0,1fr)_300px]"
       >
 
         <!-- =============================================== -->
@@ -804,36 +802,37 @@ const closeModal = () => {
         <!-- =============================================== -->
 
         <div
-          class="p-4 sm:p-5 md:p-6 space-y-5 md:overflow-y-auto"
+          class="p-3 sm:p-4 space-y-3 md:overflow-y-auto"
         >
 
           <!-- TOTAL -->
 
           <div
-            class="bg-gray-50 border border-gray-200 rounded-2xl p-5"
+            class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3"
           >
 
             <div
-              class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+              class="flex items-center justify-between gap-3"
             >
 
-              <div>
+              <div class="min-w-0">
+
                 <p
-                  class="text-sm font-medium text-gray-500"
+                  class="text-xs font-medium text-gray-500"
                 >
                   Total Amount Due
                 </p>
 
                 <p
-                  class="text-xs text-gray-400 mt-1"
+                  class="text-[11px] text-gray-400 mt-0.5"
                 >
-                  Order Type:
                   {{ orderType || '—' }}
                 </p>
+
               </div>
 
               <p
-                class="text-3xl sm:text-4xl font-black text-gray-800 tracking-tight"
+                class="text-2xl sm:text-3xl font-black text-gray-800 tracking-tight whitespace-nowrap"
               >
                 ₱{{ payableAmount.toFixed(2) }}
               </p>
@@ -850,13 +849,13 @@ const closeModal = () => {
           >
 
             <label
-              class="block text-gray-700 font-bold mb-2"
+              class="block text-sm text-gray-700 font-bold mb-1.5"
             >
               Payment Status
             </label>
 
             <div
-              class="flex p-1 bg-gray-100 rounded-xl border border-gray-200"
+              class="flex p-1 bg-gray-100 rounded-lg border border-gray-200"
             >
 
               <button
@@ -866,7 +865,7 @@ const closeModal = () => {
                 "
                 :disabled="isSubmitting"
                 :class="[
-                  'flex-1 min-h-[48px] rounded-lg font-bold transition-all',
+                  'flex-1 min-h-[42px] rounded-md text-sm font-bold transition-all',
                   paymentStatus === 'Paid'
                     ? 'bg-white shadow-sm text-gray-800'
                     : 'text-gray-500 hover:text-gray-700',
@@ -885,7 +884,7 @@ const closeModal = () => {
                 "
                 :disabled="isSubmitting"
                 :class="[
-                  'flex-1 min-h-[48px] rounded-lg font-bold transition-all',
+                  'flex-1 min-h-[42px] rounded-md text-sm font-bold transition-all',
                   paymentStatus === 'Unsettled'
                     ? 'bg-white shadow-sm text-gray-800'
                     : 'text-gray-500 hover:text-gray-700',
@@ -900,7 +899,7 @@ const closeModal = () => {
             </div>
 
             <p
-              class="text-xs text-gray-500 mt-2"
+              class="text-[11px] text-gray-500 mt-1.5"
             >
               Unsettled orders can be paid later from the Unsettled Orders page.
             </p>
@@ -915,7 +914,7 @@ const closeModal = () => {
           >
 
             <label
-              class="block text-gray-700 font-bold mb-2"
+              class="block text-sm text-gray-700 font-bold mb-1.5"
             >
               Payment Method
             </label>
@@ -933,7 +932,7 @@ const closeModal = () => {
                 "
                 :disabled="isSubmitting"
                 :class="[
-                  'min-h-[54px] rounded-xl border font-bold transition-all',
+                  'min-h-[44px] rounded-lg border text-sm font-bold transition-all',
                   paymentMethod === 'Cash'
                     ? 'bg-green-600 text-white border-green-600'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
@@ -955,7 +954,7 @@ const closeModal = () => {
                 "
                 :disabled="isSubmitting"
                 :class="[
-                  'min-h-[54px] rounded-xl border font-bold transition-all',
+                  'min-h-[44px] rounded-lg border text-sm font-bold transition-all',
                   paymentMethod === 'GCash'
                     ? 'bg-purple-600 text-white border-purple-600'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
@@ -977,7 +976,7 @@ const closeModal = () => {
                 "
                 :disabled="isSubmitting"
                 :class="[
-                  'min-h-[54px] rounded-xl border font-bold transition-all',
+                  'min-h-[44px] rounded-lg border text-sm font-bold transition-all',
                   paymentMethod === 'Split'
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
@@ -1003,13 +1002,13 @@ const closeModal = () => {
               !isUnsettled &&
               paymentMethod === 'Cash'
             "
-            class="space-y-4"
+            class="space-y-3"
           >
 
             <div>
 
               <label
-                class="block text-gray-700 font-bold mb-2"
+                class="block text-sm text-gray-700 font-bold mb-1.5"
               >
                 Amount Tendered
               </label>
@@ -1020,7 +1019,7 @@ const closeModal = () => {
                   setKeypadTarget('amountTendered')
                 "
                 :disabled="isSubmitting"
-                class="w-full p-4 border rounded-xl text-3xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                class="w-full p-3 border rounded-lg text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 :class="
                   keypadTarget ===
                   'amountTendered'
@@ -1037,17 +1036,17 @@ const closeModal = () => {
             <!-- CHANGE -->
 
             <div
-              class="flex justify-between items-center bg-green-50 border border-green-200 rounded-xl px-4 py-3"
+              class="flex justify-between items-center bg-green-50 border border-green-200 rounded-lg px-4 py-2.5"
             >
 
               <span
-                class="text-gray-600 font-bold"
+                class="text-sm text-gray-600 font-bold"
               >
                 Change
               </span>
 
               <span
-                class="text-2xl font-black"
+                class="text-xl font-black"
                 :class="
                   change > 0
                     ? 'text-green-600'
@@ -1071,13 +1070,13 @@ const closeModal = () => {
               !isUnsettled &&
               paymentMethod === 'GCash'
             "
-            class="space-y-4"
+            class="space-y-3"
           >
 
             <div>
 
               <label
-                class="block text-gray-700 font-bold mb-2"
+                class="block text-sm text-gray-700 font-bold mb-1.5"
               >
                 GCash Reference Number
               </label>
@@ -1088,7 +1087,7 @@ const closeModal = () => {
                   setKeypadTarget('referenceNumber')
                 "
                 :disabled="isSubmitting"
-                class="w-full p-4 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                class="w-full p-3 border rounded-lg text-xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60 break-all"
                 :class="
                   keypadTarget ===
                   'referenceNumber'
@@ -1096,15 +1095,18 @@ const closeModal = () => {
                     : 'border-gray-300 bg-gray-50'
                 "
               >
-                {{ referenceNumber || 'Enter reference number' }}
+                {{
+                  referenceNumber ||
+                  'Enter reference number'
+                }}
               </button>
 
             </div>
 
             <p
-              class="text-xs text-gray-500"
+              class="text-[11px] text-gray-500"
             >
-              Tap the field above, then use the touchscreen keypad on the right.
+              Tap the field above, then use the touchscreen keypad.
             </p>
 
           </div>
@@ -1119,218 +1121,234 @@ const closeModal = () => {
               !isUnsettled &&
               paymentMethod === 'Split'
             "
-            class="space-y-4"
+            class="space-y-3"
           >
 
             <!-- SUMMARY -->
 
             <div
-              class="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2"
+              class="bg-blue-50 border border-blue-200 rounded-lg p-3"
             >
 
               <div
-                class="flex justify-between"
+                class="grid grid-cols-3 gap-2 text-xs"
               >
 
-                <span
-                  class="text-sm text-gray-600"
-                >
-                  Order Total
-                </span>
+                <div>
 
-                <span
-                  class="font-black text-gray-800"
-                >
-                  ₱{{ payableAmount.toFixed(2) }}
-                </span>
+                  <p class="text-gray-500">
+                    Order Total
+                  </p>
+
+                  <p
+                    class="font-black text-gray-800 mt-0.5"
+                  >
+                    ₱{{ payableAmount.toFixed(2) }}
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p class="text-gray-500">
+                    Paid
+                  </p>
+
+                  <p
+                    class="font-black text-blue-700 mt-0.5"
+                  >
+                    ₱{{ splitTotal.toFixed(2) }}
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p class="text-gray-500">
+                    Remaining
+                  </p>
+
+                  <p
+                    class="font-black mt-0.5"
+                    :class="
+                      splitRemaining > 0
+                        ? 'text-orange-600'
+                        : 'text-green-600'
+                    "
+                  >
+                    ₱{{ splitRemaining.toFixed(2) }}
+                  </p>
+
+                </div>
 
               </div>
 
-              <div
-                class="flex justify-between"
-              >
+            </div>
 
-                <span
-                  class="text-sm text-gray-600"
-                >
-                  Cash + GCash
-                </span>
 
-                <span
-                  class="font-black text-blue-700"
-                >
-                  ₱{{ splitTotal.toFixed(2) }}
-                </span>
+            <!-- SPLIT INPUTS -->
 
-              </div>
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 gap-2"
+            >
+
+              <!-- CASH AMOUNT -->
 
               <div
-                class="pt-2 border-t border-blue-200 flex justify-between"
+                class="border border-gray-200 rounded-lg p-2.5"
               >
 
-                <span
-                  class="text-sm font-bold text-gray-600"
+                <label
+                  class="block text-xs font-bold text-gray-700 mb-1"
                 >
-                  Remaining
-                </span>
+                  Cash Amount
+                </label>
 
-                <span
-                  class="font-black"
+                <button
+                  type="button"
+                  @click="
+                    setKeypadTarget(
+                      'splitCashAmount'
+                    )
+                  "
+                  :disabled="isSubmitting"
+                  class="w-full p-2.5 border rounded-lg text-xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   :class="
-                    splitRemaining > 0
-                      ? 'text-orange-600'
-                      : 'text-green-600'
+                    keypadTarget ===
+                    'splitCashAmount'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 bg-gray-50'
                   "
                 >
-                  ₱{{ splitRemaining.toFixed(2) }}
-                </span>
+                  ₱{{ splitCashAmount || '0' }}
+                </button>
 
               </div>
 
-            </div>
 
-
-            <!-- CASH AMOUNT -->
-
-            <div>
-
-              <label
-                class="block text-sm font-bold text-gray-700 mb-2"
-              >
-                Cash Amount
-              </label>
-
-              <button
-                type="button"
-                @click="
-                  setKeypadTarget('splitCashAmount')
-                "
-                :disabled="isSubmitting"
-                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                :class="
-                  keypadTarget ===
-                  'splitCashAmount'
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 bg-gray-50'
-                "
-              >
-                ₱{{ splitCashAmount || '0' }}
-              </button>
-
-            </div>
-
-
-            <!-- GCASH AMOUNT -->
-
-            <div>
-
-              <label
-                class="block text-sm font-bold text-gray-700 mb-2"
-              >
-                GCash Amount
-              </label>
-
-              <button
-                type="button"
-                @click="
-                  setKeypadTarget('splitGCashAmount')
-                "
-                :disabled="isSubmitting"
-                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                :class="
-                  keypadTarget ===
-                  'splitGCashAmount'
-                    ? 'border-purple-500 bg-purple-50'
-                    : 'border-gray-300 bg-gray-50'
-                "
-              >
-                ₱{{ splitGCashAmount || '0' }}
-              </button>
-
-            </div>
-
-
-            <!-- CASH TENDERED -->
-
-            <div
-              v-if="splitCash > 0"
-            >
-
-              <label
-                class="block text-sm font-bold text-gray-700 mb-2"
-              >
-                Cash Amount Tendered
-              </label>
-
-              <button
-                type="button"
-                @click="
-                  setKeypadTarget('splitCashTendered')
-                "
-                :disabled="isSubmitting"
-                class="w-full p-3.5 border rounded-xl text-2xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                :class="
-                  keypadTarget ===
-                  'splitCashTendered'
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-300 bg-gray-50'
-                "
-              >
-                ₱{{ splitCashTendered || '0' }}
-              </button>
+              <!-- GCASH AMOUNT -->
 
               <div
-                class="mt-2 flex justify-between text-sm"
+                class="border border-gray-200 rounded-lg p-2.5"
               >
 
-                <span
-                  class="text-gray-500"
+                <label
+                  class="block text-xs font-bold text-gray-700 mb-1"
                 >
-                  Cash Change
-                </span>
+                  GCash Amount
+                </label>
 
-                <span
-                  class="font-black text-green-600"
+                <button
+                  type="button"
+                  @click="
+                    setKeypadTarget(
+                      'splitGCashAmount'
+                    )
+                  "
+                  :disabled="isSubmitting"
+                  class="w-full p-2.5 border rounded-lg text-xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  :class="
+                    keypadTarget ===
+                    'splitGCashAmount'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-300 bg-gray-50'
+                  "
                 >
-                  ₱{{ splitChange.toFixed(2) }}
-                </span>
+                  ₱{{ splitGCashAmount || '0' }}
+                </button>
 
               </div>
 
-            </div>
 
+              <!-- CASH TENDERED -->
 
-            <!-- GCASH REFERENCE -->
-
-            <div
-              v-if="splitGCash > 0"
-            >
-
-              <label
-                class="block text-sm font-bold text-gray-700 mb-2"
+              <div
+                v-if="splitCash > 0"
+                class="border border-gray-200 rounded-lg p-2.5"
               >
-                GCash Reference Number
-              </label>
 
-              <button
-                type="button"
-                @click="
-                  setKeypadTarget('splitGCashReference')
-                "
-                :disabled="isSubmitting"
-                class="w-full p-3.5 border rounded-xl text-xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                :class="
-                  keypadTarget ===
-                  'splitGCashReference'
-                    ? 'border-purple-500 bg-purple-50'
-                    : 'border-gray-300 bg-gray-50'
-                "
+                <label
+                  class="block text-xs font-bold text-gray-700 mb-1"
+                >
+                  Cash Tendered
+                </label>
+
+                <button
+                  type="button"
+                  @click="
+                    setKeypadTarget(
+                      'splitCashTendered'
+                    )
+                  "
+                  :disabled="isSubmitting"
+                  class="w-full p-2.5 border rounded-lg text-xl font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  :class="
+                    keypadTarget ===
+                    'splitCashTendered'
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-gray-300 bg-gray-50'
+                  "
+                >
+                  ₱{{ splitCashTendered || '0' }}
+                </button>
+
+                <div
+                  class="mt-1.5 flex justify-between text-xs"
+                >
+
+                  <span
+                    class="text-gray-500"
+                  >
+                    Change
+                  </span>
+
+                  <span
+                    class="font-black text-green-600"
+                  >
+                    ₱{{ splitChange.toFixed(2) }}
+                  </span>
+
+                </div>
+
+              </div>
+
+
+              <!-- GCASH REFERENCE -->
+
+              <div
+                v-if="splitGCash > 0"
+                class="border border-gray-200 rounded-lg p-2.5"
               >
-                {{
-                  splitGCashReference ||
-                  'Enter reference number'
-                }}
-              </button>
+
+                <label
+                  class="block text-xs font-bold text-gray-700 mb-1"
+                >
+                  GCash Reference
+                </label>
+
+                <button
+                  type="button"
+                  @click="
+                    setKeypadTarget(
+                      'splitGCashReference'
+                    )
+                  "
+                  :disabled="isSubmitting"
+                  class="w-full p-2.5 border rounded-lg text-lg font-black text-right transition-colors disabled:cursor-not-allowed disabled:opacity-60 break-all"
+                  :class="
+                    keypadTarget ===
+                    'splitGCashReference'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-300 bg-gray-50'
+                  "
+                >
+                  {{
+                    splitGCashReference ||
+                    'Enter reference'
+                  }}
+                </button>
+
+              </div>
 
             </div>
 
@@ -1342,7 +1360,7 @@ const closeModal = () => {
                 splitTotal <
                 payableAmount
               "
-              class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700 font-bold"
+              class="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-700 font-bold"
             >
               Kulang pa ng
               ₱{{ splitRemaining.toFixed(2) }}
@@ -1354,7 +1372,7 @@ const closeModal = () => {
                 splitTotal >
                 payableAmount
               "
-              class="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 font-bold"
+              class="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700 font-bold"
             >
               Sobra ng
               ₱{{
@@ -1365,7 +1383,7 @@ const closeModal = () => {
 
             <div
               v-else
-              class="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700 font-bold"
+              class="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700 font-bold"
             >
               Cash + GCash = exact order total.
             </div>
@@ -1379,17 +1397,17 @@ const closeModal = () => {
 
           <div
             v-if="isUnsettled"
-            class="bg-yellow-50 border border-yellow-200 rounded-xl p-4"
+            class="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2.5"
           >
 
             <p
-              class="font-bold text-yellow-800"
+              class="text-sm font-bold text-yellow-800"
             >
               Payment will be collected later.
             </p>
 
             <p
-              class="text-sm text-yellow-700 mt-1"
+              class="text-xs text-yellow-700 mt-0.5"
             >
               This delivery order will be saved as Unsettled.
             </p>
@@ -1404,24 +1422,25 @@ const closeModal = () => {
         <!-- =============================================== -->
 
         <div
-          class="bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 p-4 sm:p-5 flex flex-col"
+          class="bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 p-3 sm:p-4 flex flex-col min-h-0"
         >
 
           <!-- KEYPAD DISPLAY -->
 
           <div
-            class="bg-white border border-gray-200 rounded-2xl p-4 mb-4"
+            class="bg-white border border-gray-200 rounded-xl p-3 mb-3"
           >
 
             <p
-              class="text-xs font-black uppercase tracking-wide text-gray-400"
+              class="text-[10px] font-black uppercase tracking-wide text-gray-400"
             >
               {{ keypadTargetLabel }}
             </p>
 
             <div
-              class="mt-2 text-right text-3xl font-black text-gray-800 break-all min-h-[44px]"
+              class="mt-1.5 text-right text-2xl font-black text-gray-800 break-all min-h-[36px]"
             >
+
               <template
                 v-if="
                   keypadTarget ===
@@ -1444,6 +1463,7 @@ const closeModal = () => {
                   '0'
                 }}
               </template>
+
             </div>
 
           </div>
@@ -1452,18 +1472,18 @@ const closeModal = () => {
           <!-- KEYPAD -->
 
           <div
-            class="bg-gray-100 rounded-2xl p-3"
+            class="bg-gray-100 rounded-xl p-2"
           >
 
             <div
-              class="grid grid-cols-3 gap-2"
+              class="grid grid-cols-3 gap-1.5"
             >
 
               <button
                 type="button"
                 @click="appendKey('1')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 1
               </button>
@@ -1472,7 +1492,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('2')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 2
               </button>
@@ -1481,7 +1501,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('3')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 3
               </button>
@@ -1490,7 +1510,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('4')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 4
               </button>
@@ -1499,7 +1519,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('5')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 5
               </button>
@@ -1508,7 +1528,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('6')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 6
               </button>
@@ -1517,7 +1537,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('7')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 7
               </button>
@@ -1526,7 +1546,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('8')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 8
               </button>
@@ -1535,7 +1555,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('9')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 9
               </button>
@@ -1544,7 +1564,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('clear')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 text-lg font-black text-red-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 text-base font-black text-red-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 C
               </button>
@@ -1553,7 +1573,7 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('0')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-2xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 0
               </button>
@@ -1562,12 +1582,13 @@ const closeModal = () => {
                 type="button"
                 @click="appendKey('backspace')"
                 :disabled="isSubmitting"
-                class="h-16 sm:h-[68px] rounded-xl bg-gray-200 hover:bg-gray-300 active:bg-gray-400 border border-gray-300 text-2xl font-black text-gray-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-12 sm:h-14 rounded-lg bg-gray-200 hover:bg-gray-300 active:bg-gray-400 border border-gray-300 text-xl font-black text-gray-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 ←
               </button>
 
             </div>
+
 
             <!-- DECIMAL -->
 
@@ -1576,7 +1597,7 @@ const closeModal = () => {
               type="button"
               @click="appendKey('.')"
               :disabled="isSubmitting"
-              class="w-full h-14 mt-2 rounded-xl bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-xl font-black text-gray-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+              class="w-full h-10 mt-1.5 rounded-lg bg-white hover:bg-gray-50 active:bg-gray-200 border border-gray-200 text-lg font-black text-gray-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               .
             </button>
@@ -1587,7 +1608,7 @@ const closeModal = () => {
           <!-- PAYMENT SUMMARY -->
 
           <div
-            class="mt-4 bg-white border border-gray-200 rounded-2xl p-4"
+            class="mt-3 bg-white border border-gray-200 rounded-xl p-3"
           >
 
             <div
@@ -1595,7 +1616,7 @@ const closeModal = () => {
             >
 
               <span
-                class="text-sm font-bold text-gray-500"
+                class="text-xs font-bold text-gray-500"
               >
                 Amount Due
               </span>
@@ -1619,17 +1640,17 @@ const closeModal = () => {
             >
 
               <div
-                class="flex justify-between items-center mt-2"
+                class="flex justify-between items-center mt-1.5"
               >
 
                 <span
-                  class="text-sm font-bold text-gray-500"
+                  class="text-xs font-bold text-gray-500"
                 >
                   Tendered
                 </span>
 
                 <span
-                  class="text-lg font-black"
+                  class="text-base font-black"
                 >
                   ₱{{
                     Number(
@@ -1641,17 +1662,17 @@ const closeModal = () => {
               </div>
 
               <div
-                class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100"
+                class="flex justify-between items-center mt-1.5 pt-1.5 border-t border-gray-100"
               >
 
                 <span
-                  class="text-sm font-bold text-gray-500"
+                  class="text-xs font-bold text-gray-500"
                 >
                   Change
                 </span>
 
                 <span
-                  class="text-xl font-black text-green-600"
+                  class="text-lg font-black text-green-600"
                 >
                   ₱{{ change.toFixed(2) }}
                 </span>
@@ -1671,17 +1692,17 @@ const closeModal = () => {
             >
 
               <div
-                class="flex justify-between items-center mt-2"
+                class="flex justify-between items-center mt-1.5"
               >
 
                 <span
-                  class="text-sm font-bold text-gray-500"
+                  class="text-xs font-bold text-gray-500"
                 >
                   Paid
                 </span>
 
                 <span
-                  class="text-lg font-black"
+                  class="text-base font-black"
                 >
                   ₱{{ splitTotal.toFixed(2) }}
                 </span>
@@ -1689,17 +1710,17 @@ const closeModal = () => {
               </div>
 
               <div
-                class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100"
+                class="flex justify-between items-center mt-1.5 pt-1.5 border-t border-gray-100"
               >
 
                 <span
-                  class="text-sm font-bold text-gray-500"
+                  class="text-xs font-bold text-gray-500"
                 >
                   Remaining
                 </span>
 
                 <span
-                  class="text-lg font-black"
+                  class="text-base font-black"
                   :class="
                     splitRemaining > 0
                       ? 'text-orange-600'
@@ -1721,14 +1742,14 @@ const closeModal = () => {
           <!-- ACTIONS -->
 
           <div
-            class="mt-auto pt-4 grid grid-cols-2 gap-2"
+            class="mt-auto pt-3 grid grid-cols-2 gap-2"
           >
 
             <button
               @click="closeModal"
               type="button"
               :disabled="isSubmitting"
-              class="min-h-[54px] rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-black disabled:cursor-not-allowed disabled:opacity-60"
+              class="min-h-[44px] rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancel
             </button>
@@ -1740,7 +1761,7 @@ const closeModal = () => {
                 !isFormValid ||
                 isSubmitting
               "
-              class="min-h-[54px] rounded-xl text-white font-black shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+              class="min-h-[44px] rounded-lg text-sm text-white font-black shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
               :style="
                 isFormValid &&
                 !isSubmitting
