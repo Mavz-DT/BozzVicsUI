@@ -23,61 +23,68 @@ import { storeToRefs } from 'pinia'
 
 import CheckoutModal from '../components/CheckoutModal.vue'
 
+
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+
 const {
   isOffline
 } = useNetworkStatus()
 
-const { cart, totalAmount } =
-  storeToRefs(cartStore)
+const {
+  cart,
+  totalAmount
+} = storeToRefs(cartStore)
 
 const isCheckoutOpen =
   ref(false)
 
+
 // =========================
 // PAYMENT SUBMISSION GUARD
-// =========================
-//
-// Prevents accidental double-click
-// or duplicate confirm events from
-// creating more than one payment
-// request.
-//
 // =========================
 
 const isProcessingPayment =
   ref(false)
 
+
 const orderType =
   ref('')
+
 
 const selectedOrderNumber =
   ref(null)
 
+
 const deliverySetupConfirmed =
   ref(false)
+
 
 const discountAmount =
   ref(0)
 
+
 const orderNumbers =
   ref([])
+
 
 const categories =
   ref([])
 
+
 const menus =
   ref([])
+
 
 const selectedCategory =
   ref('')
 
+
 /*
-|--------------------------------------------------------------------------
+|-------------------------------------------------------------------------- 
 | API
-|--------------------------------------------------------------------------
+|-------------------------------------------------------------------------- 
 */
 
 const API_BASE_URL = (
@@ -87,6 +94,7 @@ const API_BASE_URL = (
 
 const API =
   `${API_BASE_URL}/api`
+
 
 // =========================
 // ADMIN
@@ -100,6 +108,7 @@ const isAdmin =
     )
   })
 
+
 // =========================
 // LAYOUT EDITOR
 // =========================
@@ -107,24 +116,30 @@ const isAdmin =
 const editLayoutMode =
   ref(false)
 
+
 const layoutSaving =
   ref(false)
+
 
 const layoutMessage =
   ref('')
 
+
 const layoutMessageType =
   ref('success')
+
 
 let dragOriginalItems = {
   categories: [],
   menus: []
 }
 
+
 const showLayoutMessage = (
   message,
   type = 'success'
 ) => {
+
   layoutMessage.value =
     message
 
@@ -132,14 +147,18 @@ const showLayoutMessage = (
     type
 }
 
+
 const clearLayoutMessage =
   () => {
+
     layoutMessage.value =
       ''
   }
 
+
 const startLayoutEditor =
   () => {
+
     if (!isAdmin.value) {
       return
     }
@@ -154,16 +173,20 @@ const startLayoutEditor =
     )
   }
 
+
 const stopLayoutEditor =
   () => {
+
     editLayoutMode.value =
       false
 
     clearLayoutMessage()
   }
 
+
 const toggleEditLayoutMode =
   () => {
+
     if (!isAdmin.value) {
       return
     }
@@ -171,11 +194,15 @@ const toggleEditLayoutMode =
     if (
       editLayoutMode.value
     ) {
+
       stopLayoutEditor()
+
     } else {
+
       startLayoutEditor()
     }
   }
+
 
 // =========================
 // DRAG START / END
@@ -183,6 +210,7 @@ const toggleEditLayoutMode =
 
 const beginLayoutDrag =
   kind => {
+
     if (
       !editLayoutMode.value ||
       !isAdmin.value
@@ -215,11 +243,13 @@ const beginLayoutDrag =
     )
   }
 
+
 const finishLayoutDrag =
   async (
     kind,
     event
   ) => {
+
     if (
       !editLayoutMode.value ||
       !isAdmin.value
@@ -249,7 +279,9 @@ const finishLayoutDrag =
       kind ===
       'category'
     ) {
+
       await saveCategoryOrder()
+
       return
     }
 
@@ -257,9 +289,11 @@ const finishLayoutDrag =
       kind ===
       'menu'
     ) {
+
       await saveMenuOrder()
     }
   }
+
 
 // =========================
 // AUTH CONFIG
@@ -267,6 +301,7 @@ const finishLayoutDrag =
 
 const getAuthConfig =
   () => {
+
     const token =
       authStore.getToken()
 
@@ -282,125 +317,172 @@ const getAuthConfig =
     }
   }
 
-const loadOfflinePosData = async () => {
-  try {
-    const [
-      cachedCategories,
-      cachedMenus,
-      cachedOrderNumbers
-    ] = await Promise.all([
-      getCachedCategories(),
-      getCachedMenus(),
-      getCachedOrderNumbers()
-    ])
 
-    categories.value =
-      Array.isArray(cachedCategories)
-        ? cachedCategories
-        : []
+// =========================
+// OFFLINE POS DATA
+// =========================
 
-    menus.value =
-      Array.isArray(cachedMenus)
-        ? cachedMenus.map(menu => {
+const loadOfflinePosData =
+  async () => {
 
-            if (menu.category) {
-              return menu
-            }
+    try {
 
-            const categoryId =
-              String(
-                menu.categoryId ||
-                ''
-              )
+      const [
+        cachedCategories,
+        cachedMenus,
+        cachedOrderNumbers
+      ] = await Promise.all([
 
-            const category =
-              categories.value.find(
-                item =>
-                  String(
-                    item._id ||
-                    item.id ||
-                    ''
-                  ) === categoryId
-              )
+        getCachedCategories(),
 
-            return category
-              ? {
-                  ...menu,
-                  category
-                }
-              : menu
-          })
-        : []
+        getCachedMenus(),
 
-    orderNumbers.value =
-      Array.isArray(cachedOrderNumbers)
-        ? cachedOrderNumbers
-        : []
+        getCachedOrderNumbers()
 
-    if (
-      categories.value.length > 0
-    ) {
-      const categoryStillExists =
-        categories.value.some(
-          category =>
-            category.name ===
-            selectedCategory.value
+      ])
+
+
+      categories.value =
+        Array.isArray(
+          cachedCategories
+        )
+          ? cachedCategories
+          : []
+
+
+      menus.value =
+        Array.isArray(
+          cachedMenus
         )
 
+          ? cachedMenus.map(
+              menu => {
+
+                if (
+                  menu.category
+                ) {
+                  return menu
+                }
+
+                const categoryId =
+                  String(
+                    menu.categoryId ||
+                    ''
+                  )
+
+                const category =
+                  categories.value.find(
+                    item =>
+                      String(
+                        item._id ||
+                        item.id ||
+                        ''
+                      ) === categoryId
+                  )
+
+                return category
+                  ? {
+                      ...menu,
+                      category
+                    }
+                  : menu
+              }
+            )
+
+          : []
+
+
+      orderNumbers.value =
+        Array.isArray(
+          cachedOrderNumbers
+        )
+          ? cachedOrderNumbers
+          : []
+
+
       if (
-        !categoryStillExists
+        categories.value.length >
+        0
       ) {
+
+        const categoryStillExists =
+          categories.value.some(
+            category =>
+              category.name ===
+              selectedCategory.value
+          )
+
+        if (
+          !categoryStillExists
+        ) {
+
+          selectedCategory.value =
+            categories.value[0].name
+        }
+
+      } else {
+
         selectedCategory.value =
-          categories.value[0].name
+          ''
       }
-    } else {
-      selectedCategory.value = ''
+
+
+      console.log(
+        'POS offline data loaded:',
+        {
+          categories:
+            categories.value.length,
+
+          menus:
+            menus.value.length,
+
+          orderNumbers:
+            orderNumbers.value.length,
+
+          selectedCategory:
+            selectedCategory.value
+        }
+      )
+
+    } catch (error) {
+
+      console.error(
+        'Error loading POS offline data:',
+        error
+      )
+
+      categories.value = []
+
+      menus.value = []
+
+      orderNumbers.value = []
+
+      selectedCategory.value =
+        ''
     }
-
-    console.log(
-      'POS offline data loaded:',
-      {
-        categories:
-          categories.value.length,
-        menus:
-          menus.value.length,
-        orderNumbers:
-          orderNumbers.value.length,
-        selectedCategory:
-          selectedCategory.value
-      }
-    )
-
-  } catch (error) {
-    console.error(
-      'Error loading POS offline data:',
-      error
-    )
-
-    categories.value = []
-    menus.value = []
-    orderNumbers.value = []
-    selectedCategory.value = ''
   }
-}
+
 
 // =========================
 // DELIVERY INFORMATION
 // =========================
-//
-// Customer = customer pays rider directly
-// Store    = customer pays store,
-//            then store pays rider
-// =========================
 
 const delivery =
   ref({
-    customerName: '',
-    deliveryFee: 0,
+
+    customerName:
+      '',
+
+    deliveryFee:
+      0,
+
     deliveryFeePaidBy:
       'Customer',
-    notes: ''
+
+    notes:
+      ''
   })
+
 
 // =========================
 // ADD-ONS
@@ -409,21 +491,28 @@ const delivery =
 const isAddOnModalOpen =
   ref(false)
 
+
 const selectedMenuItem =
   ref(null)
+
 
 const availableAddOns =
   ref([])
 
+
 const selectedAddOnIds =
   ref([])
+
 
 const addOnSpecialInstructions =
   ref('')
 
+
 const fetchAddOns =
   async () => {
+
     try {
+
       const res =
         await axios.get(
           `${API}/add-ons`,
@@ -442,7 +531,9 @@ const fetchAddOns =
           addOn =>
             addOn.isAvailable
         )
+
     } catch (error) {
+
       console.error(
         'Error fetching add-ons:',
         error
@@ -450,8 +541,10 @@ const fetchAddOns =
     }
   }
 
+
 const openAddOnModal =
   item => {
+
     if (
       editLayoutMode.value
     ) {
@@ -477,11 +570,14 @@ const openAddOnModal =
       true
   }
 
+
 const closeAddOnModal =
   () => {
+
     if (
       isAddOnModalOpen.value
     ) {
+
       isAddOnModalOpen.value =
         false
 
@@ -496,18 +592,25 @@ const closeAddOnModal =
     }
   }
 
+
 const toggleAddOn =
   addOnId => {
+
     const index =
       selectedAddOnIds.value.indexOf(
         addOnId
       )
 
-    if (index === -1) {
+    if (
+      index === -1
+    ) {
+
       selectedAddOnIds.value.push(
         addOnId
       )
+
     } else {
+
       selectedAddOnIds.value.splice(
         index,
         1
@@ -515,8 +618,10 @@ const toggleAddOn =
     }
   }
 
+
 const selectedAddOns =
   computed(() => {
+
     return availableAddOns.value.filter(
       addOn =>
         selectedAddOnIds.value.includes(
@@ -525,8 +630,10 @@ const selectedAddOns =
     )
   })
 
+
 const selectedAddOnTotal =
   computed(() => {
+
     return selectedAddOns.value.reduce(
       (
         total,
@@ -540,8 +647,10 @@ const selectedAddOnTotal =
     )
   })
 
+
 const addOnItemTotal =
   computed(() => {
+
     if (
       !selectedMenuItem.value
     ) {
@@ -557,8 +666,10 @@ const addOnItemTotal =
     )
   })
 
+
 const confirmAddToCart =
   () => {
+
     if (
       !selectedMenuItem.value
     ) {
@@ -568,6 +679,7 @@ const confirmAddToCart =
     const menuItem =
       selectedMenuItem.value
 
+
     if (
       !isMenuOrderable(
         menuItem
@@ -576,16 +688,21 @@ const confirmAddToCart =
       return
     }
 
+
     const effectiveCartStock =
       menuItem.stockMonitoring ===
       true
+
         ? Number(
             menuItem.stock || 0
           )
+
         : Number.MAX_SAFE_INTEGER
+
 
     cartStore.addToCart(
       {
+
         id:
           menuItem._id,
 
@@ -606,6 +723,7 @@ const confirmAddToCart =
         stockMonitoring:
           menuItem.stockMonitoring ===
           true
+
       },
 
       selectedAddOns.value,
@@ -614,101 +732,111 @@ const confirmAddToCart =
         .trim()
     )
 
+
     closeAddOnModal()
   }
+
 
 // =========================
 // ORDER NUMBERS
 // =========================
 
-  const fetchOrderNumbers =
-    async () => {
+const fetchOrderNumbers =
+  async () => {
 
-      /*
-      |----------------------------------------------------------------------
-      | OFFLINE
-      |----------------------------------------------------------------------
-      |
-      | Kapag enabled ang Offline Caching at disconnected,
-      | gamitin ang order numbers mula sa IndexedDB.
-      |
-      |----------------------------------------------------------------------
-      */
-
-      if (
-        settingsStore.offlineCachingEnabled === true &&
-        isOffline.value === true
-      ) {
-        try {
-          const cachedOrderNumbers =
-            await getCachedOrderNumbers()
-
-          orderNumbers.value =
-            Array.isArray(
-              cachedOrderNumbers
-            )
-              ? cachedOrderNumbers
-              : []
-
-          console.log(
-            'POS using offline order numbers:',
-            orderNumbers.value
-          )
-
-          return
-        } catch (error) {
-          console.error(
-            'Error loading offline order numbers:',
-            error
-          )
-
-          orderNumbers.value = []
-
-          return
-        }
-      }
-
-      /*
-      |----------------------------------------------------------------------
-      | ONLINE
-      |----------------------------------------------------------------------
-      |
-      | Existing online behavior remains unchanged.
-      |
-      |----------------------------------------------------------------------
-      */
+    if (
+      settingsStore.offlineCachingEnabled ===
+        true &&
+      isOffline.value ===
+        true
+    ) {
 
       try {
-        const res =
-          await axios.get(
-            `${API}/order-numbers`,
-            getAuthConfig()
-          )
+
+        const cachedOrderNumbers =
+          await getCachedOrderNumbers()
 
         orderNumbers.value =
           Array.isArray(
-            res.data
+            cachedOrderNumbers
           )
-            ? res.data
+            ? cachedOrderNumbers
             : []
+
+        console.log(
+          'POS using offline order numbers:',
+          orderNumbers.value
+        )
+
+        return
+
       } catch (error) {
+
         console.error(
-          'Error fetching order numbers:',
+          'Error loading offline order numbers:',
           error
         )
+
+        orderNumbers.value =
+          []
+
+        return
       }
     }
 
-const resetDelivery =
-  () => {
-    delivery.value = {
-      customerName: '',
-      deliveryFee: 0,
-      deliveryFeePaidBy:
-        'Customer',
-      notes: ''
+
+    try {
+
+      const res =
+        await axios.get(
+          `${API}/order-numbers`,
+          getAuthConfig()
+        )
+
+      orderNumbers.value =
+        Array.isArray(
+          res.data
+        )
+          ? res.data
+          : []
+
+    } catch (error) {
+
+      console.error(
+        'Error fetching order numbers:',
+        error
+      )
     }
   }
+
+
+// =========================
+// RESET DELIVERY
+// =========================
+
+const resetDelivery =
+  () => {
+
+    delivery.value = {
+
+      customerName:
+        '',
+
+      deliveryFee:
+        0,
+
+      deliveryFeePaidBy:
+        'Customer',
+
+      notes:
+        ''
+    }
+  }
+
+
+// =========================
+// CONFIRM DELIVERY SETUP
+// =========================
 
 const confirmDeliverySetup =
   () => {
@@ -719,17 +847,20 @@ const confirmDeliverySetup =
       return
     }
 
+
     if (
       Number(
         delivery.value.deliveryFee
       ) < 0
     ) {
+
       alert(
         'Hindi puwedeng negative ang delivery fee.'
       )
 
       return
     }
+
 
     if (
       ![
@@ -739,6 +870,7 @@ const confirmDeliverySetup =
         delivery.value.deliveryFeePaidBy
       )
     ) {
+
       alert(
         'Piliin kung Customer o Store ang magbabayad ng delivery fee.'
       )
@@ -746,9 +878,15 @@ const confirmDeliverySetup =
       return
     }
 
+
     deliverySetupConfirmed.value =
       true
   }
+
+
+// =========================
+// ORDER TYPE CHANGE
+// =========================
 
 const handleOrderTypeChange =
   async type => {
@@ -767,77 +905,112 @@ const handleOrderTypeChange =
     discountAmount.value =
       0
 
+
     if (
       type === 'Dine-In' ||
       type === 'Take-Out'
     ) {
+
       resetDelivery()
 
+
       if (
-        settingsStore.offlineCachingEnabled === true &&
-        isOffline.value === true
+        settingsStore.offlineCachingEnabled ===
+          true &&
+        isOffline.value ===
+          true
       ) {
+
         await loadOfflinePosData()
+
       } else {
+
         await fetchOrderNumbers()
       }
 
+
       return
     }
+
 
     if (
       type === 'Delivery'
     ) {
-      orderNumbers.value = []
+
+      orderNumbers.value =
+        []
+
 
       if (
-        settingsStore.offlineCachingEnabled === true &&
-        isOffline.value === true
+        settingsStore.offlineCachingEnabled ===
+          true &&
+        isOffline.value ===
+          true
       ) {
+
         await loadOfflinePosData()
       }
 
+
       return
     }
 
-    orderNumbers.value = []
+
+    orderNumbers.value =
+      []
   }
+
+
+// =========================
+// RELEASE ORDER NUMBER
+// =========================
 
 const releaseOrderNumber =
   async number => {
+
     if (!number) {
       return
     }
+
 
     const confirmed =
       window.confirm(
         `Release Order #${number}?`
       )
 
+
     if (!confirmed) {
       return
     }
 
+
     try {
+
       await axios.put(
         `${API}/order-numbers/${number}/release`,
         {},
         getAuthConfig()
       )
 
+
       selectedOrderNumber.value =
         null
 
+
       await fetchOrderNumbers()
+
 
       alert(
         `Order #${number} is now available.`
       )
+
     } catch (error) {
+
       console.error(
         'Error releasing order number:',
         error
       )
+
 
       alert(
         error.response?.data?.message ||
@@ -846,15 +1019,20 @@ const releaseOrderNumber =
     }
   }
 
+
 // =========================
 // ORDER SETUP
 // =========================
 
 const isOrderSetupComplete =
   computed(() => {
-    if (!orderType.value) {
+
+    if (
+      !orderType.value
+    ) {
       return false
     }
+
 
     if (
       orderType.value ===
@@ -862,25 +1040,31 @@ const isOrderSetupComplete =
       orderType.value ===
         'Take-Out'
     ) {
+
       return Boolean(
         selectedOrderNumber.value
       )
     }
 
+
     if (
       orderType.value ===
       'Delivery'
     ) {
+
       return (
         deliverySetupConfirmed.value
       )
     }
 
+
     return false
   })
 
+
 const canProceedToCheckout =
   computed(() => {
+
     if (
       cart.value.length ===
       0
@@ -888,16 +1072,19 @@ const canProceedToCheckout =
       return false
     }
 
+
     if (
       !isOrderSetupComplete.value
     ) {
       return false
     }
 
+
     if (
       orderType.value ===
       'Delivery'
     ) {
+
       if (
         Number(
           delivery.value.deliveryFee
@@ -905,6 +1092,7 @@ const canProceedToCheckout =
       ) {
         return false
       }
+
 
       if (
         ![
@@ -918,44 +1106,35 @@ const canProceedToCheckout =
       }
     }
 
+
     return true
   })
 
+
 // =========================
-// ACTUAL STORE AMOUNT DUE
-// =========================
-//
-// Customer -> Rider:
-//   Food net only
-//
-// Store -> Rider:
-//   Food net + delivery fee
-//
-// This matches the backend
-// calculateStoreAmountDue()
-// logic.
-//
+// FINAL TOTAL
 // =========================
 
 const finalTotal =
   computed(() => {
+
     const grossAmount =
       Number(
         totalAmount.value || 0
       )
 
+
     const discount =
       Number(
-        discountAmount.value ||
-          0
+        discountAmount.value || 0
       )
+
 
     const deliveryFee =
       Number(
-        delivery.value
-          .deliveryFee ||
-          0
+        delivery.value.deliveryFee || 0
       )
+
 
     const foodNetAmount =
       Math.max(
@@ -964,12 +1143,14 @@ const finalTotal =
           discount
       )
 
+
     const deliveryCollectedByStore =
       orderType.value ===
         'Delivery' &&
       delivery.value
         .deliveryFeePaidBy ===
         'Store'
+
 
     return Math.max(
       0,
@@ -982,792 +1163,135 @@ const finalTotal =
     )
   })
 
-  // =========================
-  // KITCHEN TICKET
-  // =========================
 
-  const printKitchenTicket =
-    (
-      order,
-      existingPrintWindow = null
-    ) => {
+// ==========================================================================
+// KITCHEN TICKET
+// ==========================================================================
 
-      const printWindow =
-        existingPrintWindow ||
-        window.open(
-          '',
-          '_blank',
-          'width=400,height=700'
-        )
-
-
-      if (!printWindow) {
-
-        alert(
-          'Hindi mabuksan ang KOT print window. I-check ang browser popup blocker.'
-        )
-
-        return false
-      }
-
-
-      const orderNumber =
-        order.orderNumber
-          ? `#${order.orderNumber}`
-          : 'DELIVERY'
-
-
-      const itemsHtml =
-        order.items
-          .map(
-            item => `
-              <div class="item">
-
-                <div class="qty">
-                  ${item.quantity}x
-                </div>
-
-                <div class="name">
-
-                  ${item.name}
-
-                  ${
-                    item.addOns?.length
-                      ? `
-                        <div class="instruction">
-                          Add-ons:
-                          ${item.addOns
-                            .map(
-                              addOn =>
-                                `${addOn.name} (+₱${Number(
-                                  addOn.price
-                                ).toFixed(2)})`
-                            )
-                            .join(', ')}
-                        </div>
-                      `
-                      : ''
-                  }
-
-                  ${
-                    item.specialInstructions
-                      ? `
-                        <div class="instruction">
-                          Note:
-                          ${item.specialInstructions}
-                        </div>
-                      `
-                      : ''
-                  }
-
-                </div>
-
-              </div>
-            `
-          )
-          .join('')
-
-
-      const customerSection =
-        order.orderType ===
-          'Delivery' &&
-        order.customer?.name
-          ? `
-            <div class="meta-row">
-
-              <span class="label">
-                Customer
-              </span>
-
-              <span>
-                ${order.customer.name}
-              </span>
-
-            </div>
-          `
-          : ''
-
-
-      printWindow.document.open()
-
-      printWindow.document.write(`
-        <!DOCTYPE html>
-
-        <html>
-
-          <head>
-
-            <title>
-              Kitchen Order Ticket
-            </title>
-
-            <style>
-
-              * {
-                box-sizing: border-box;
-              }
-
-              body {
-                margin: 0;
-                padding: 12px;
-                width: 80mm;
-                background: #fff;
-                color: #000;
-                font-family:
-                  Arial,
-                  Helvetica,
-                  sans-serif;
-              }
-
-              .header {
-                text-align: center;
-                border-bottom: 2px dashed #000;
-                padding-bottom: 10px;
-                margin-bottom: 10px;
-              }
-
-              .business {
-                font-size: 16px;
-                font-weight: 900;
-              }
-
-              .title {
-                font-size: 18px;
-                font-weight: 900;
-                margin-top: 5px;
-              }
-
-              .meta {
-                margin-bottom: 10px;
-              }
-
-              .meta-row {
-                display: flex;
-                justify-content: space-between;
-                gap: 10px;
-                margin-bottom: 4px;
-                font-size: 13px;
-              }
-
-              .label {
-                font-weight: 700;
-              }
-
-              .items {
-                border-top: 2px solid #000;
-                border-bottom: 2px solid #000;
-                padding: 10px 0;
-              }
-
-              .item {
-                display: flex;
-                gap: 8px;
-                margin-bottom: 10px;
-                font-size: 16px;
-                line-height: 1.2;
-              }
-
-              .item:last-child {
-                margin-bottom: 0;
-              }
-
-              .qty {
-                width: 35px;
-                flex-shrink: 0;
-                font-weight: 900;
-              }
-
-              .name {
-                flex: 1;
-                font-weight: 700;
-              }
-
-              .instruction {
-                margin-top: 4px;
-                padding-left: 6px;
-                border-left: 3px solid #000;
-                font-size: 12px;
-                font-weight: 400;
-              }
-
-              .footer {
-                margin-top: 12px;
-                text-align: center;
-                font-size: 11px;
-              }
-
-              @media print {
-
-                body {
-                  width: 80mm;
-                }
-
-              }
-
-            </style>
-
-          </head>
-
-          <body>
-
-            <div class="header">
-
-              <div class="business">
-                ${settingsStore.businessName}
-              </div>
-
-              <div class="title">
-                KITCHEN ORDER TICKET
-              </div>
-
-            </div>
-
-
-            <div class="meta">
-
-              <div class="meta-row">
-
-                <span class="label">
-                  Order
-                </span>
-
-                <span>
-                  ${orderNumber}
-                </span>
-
-              </div>
-
-
-              <div class="meta-row">
-
-                <span class="label">
-                  Type
-                </span>
-
-                <span>
-                  ${order.orderType}
-                </span>
-
-              </div>
-
-
-              <div class="meta-row">
-
-                <span class="label">
-                  Date
-                </span>
-
-                <span>
-                  ${new Date(
-                    order.createdAt
-                  ).toLocaleDateString(
-                    'en-PH'
-                  )}
-                </span>
-
-              </div>
-
-
-              <div class="meta-row">
-
-                <span class="label">
-                  Time
-                </span>
-
-                <span>
-                  ${new Date(
-                    order.createdAt
-                  ).toLocaleTimeString(
-                    'en-PH',
-                    {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      second: '2-digit'
-                    }
-                  )}
-                </span>
-
-              </div>
-
-
-              ${customerSection}
-
-            </div>
-
-
-            <div class="items">
-
-              ${itemsHtml}
-
-            </div>
-
-
-            <div class="footer">
-              Please prepare the order carefully.
-            </div>
-
-
-            <script>
-
-              window.onload = function () {
-                window.print()
-              }
-
-              window.onafterprint = function () {
-                window.close()
-              }
-
-            <\\/script>
-
-          </body>
-
-        </html>
-      `)
-
-
-      printWindow.document.close()
-
-      return true
-    }
-
-// =========================
-// CUSTOMER RECEIPT
-// =========================
-
-const printCustomerReceipt =
+const printKitchenTicket =
   (
     order,
-    paymentDetails = null
+    existingPrintWindow = null
   ) => {
+
     const printWindow =
+      existingPrintWindow ||
       window.open(
         '',
         '_blank',
         'width=400,height=700'
       )
 
-    if (!printWindow) {
+
+    if (
+      !printWindow
+    ) {
+
       alert(
-        'Hindi mabuksan ang receipt print window. I-check ang browser popup blocker.'
+        'Hindi mabuksan ang KOT print window. I-check ang browser popup blocker.'
       )
 
-      return
+      return false
     }
+
 
     const orderNumber =
       order.orderNumber
         ? `#${order.orderNumber}`
         : 'DELIVERY'
 
+
     const itemsHtml =
       order.items
-        .map(item => {
-          const addOnTotal =
-            (item.addOns || [])
-              .reduce(
-                (
-                  total,
-                  addOn
-                ) =>
-                  total +
-                  Number(
-                    addOn.price ||
-                      0
-                  ),
-                0
-              )
+        .map(
+          item => `
 
-          const unitPrice =
-            Number(
-              item.price || 0
-            ) +
-            addOnTotal
-
-          const addOnsHtml =
-            item.addOns?.length
-              ? `
-                <div class="sub-item">
-                  + ${item.addOns
-                    .map(
-                      addOn =>
-                        `${addOn.name} (${Number(
-                          addOn.price
-                        ).toFixed(2)})`
-                    )
-                    .join(', ')}
-                </div>
-              `
-              : ''
-
-          const instructionHtml =
-            item.specialInstructions
-              ? `
-                <div class="instruction">
-                  Note:
-                  ${item.specialInstructions}
-                </div>
-              `
-              : ''
-
-          return `
             <div class="item">
 
-              <div class="item-main">
-
-                <span>
-                  ${item.quantity}x
-                  ${item.name}
-                </span>
-
-                <span>
-                  ₱${Number(
-                    item.subtotal
-                  ).toFixed(2)}
-                </span>
-
+              <div class="qty">
+                ${item.quantity}x
               </div>
 
-              <div class="unit-price">
-                ₱${unitPrice.toFixed(2)}
-                each
-              </div>
 
-              ${addOnsHtml}
-              ${instructionHtml}
+              <div class="name">
+
+                ${item.name}
+
+
+                ${
+                  item.addOns?.length
+                    ? `
+
+                      <div class="instruction">
+
+                        Add-ons:
+
+                        ${item.addOns
+                          .map(
+                            addOn =>
+                              `${addOn.name} (+₱${Number(
+                                addOn.price
+                              ).toFixed(2)})`
+                          )
+                          .join(', ')}
+
+                      </div>
+
+                    `
+                    : ''
+                }
+
+
+                ${
+                  item.specialInstructions
+                    ? `
+
+                      <div class="instruction">
+
+                        Note:
+                        ${item.specialInstructions}
+
+                      </div>
+
+                    `
+                    : ''
+                }
+
+              </div>
 
             </div>
+
           `
-        })
+        )
         .join('')
 
-    let paymentHtml =
-      ''
 
-    if (!paymentDetails) {
-      paymentHtml = `
-        <div class="summary-row">
-
-          <span>
-            Payment Status
-          </span>
-
-          <span>
-            UNSETTLED
-          </span>
-
-        </div>
-      `
-    } else if (
-      paymentDetails.payments?.length >
-      1
-    ) {
-      paymentHtml = `
-        <div class="section-title">
-          PAYMENT DETAILS
-        </div>
-      `
-
-      paymentHtml +=
-        paymentDetails.payments
-          .map(
-            (
-              payment,
-              index
-            ) => `
-              <div class="payment-block">
-
-                <div class="summary-row">
-
-                  <span>
-                    Payment
-                    ${index + 1}
-                  </span>
-
-                  <span>
-                    ${payment.paymentMethod}
-                  </span>
-
-                </div>
-
-                <div class="summary-row">
-
-                  <span>
-                    Amount
-                  </span>
-
-                  <span>
-                    ₱${Number(
-                      payment.amount ||
-                        0
-                    ).toFixed(2)}
-                  </span>
-
-                </div>
-
-                ${
-                  payment.paymentMethod ===
-                  'Cash'
-                    ? `
-                      <div class="summary-row">
-
-                        <span>
-                          Tendered
-                        </span>
-
-                        <span>
-                          ₱${Number(
-                            payment.amountTendered ||
-                              0
-                          ).toFixed(2)}
-                        </span>
-
-                      </div>
-
-                      <div class="summary-row">
-
-                        <span>
-                          Change
-                        </span>
-
-                        <span>
-                          ₱${Number(
-                            payment.change ||
-                              0
-                          ).toFixed(2)}
-                        </span>
-
-                      </div>
-                    `
-                    : ''
-                }
-
-                ${
-                  payment.paymentMethod ===
-                    'GCash' &&
-                  payment.referenceNumber
-                    ? `
-                      <div class="summary-row">
-
-                        <span>
-                          Reference
-                        </span>
-
-                        <span class="reference">
-                          ${payment.referenceNumber}
-                        </span>
-
-                      </div>
-                    `
-                    : ''
-                }
-
-              </div>
-            `
-          )
-          .join('')
-    } else {
-      const payment =
-        paymentDetails
-          .payments?.[0] ||
-        paymentDetails
-
-      paymentHtml = `
-        <div class="summary-row">
-
-          <span>
-            Payment
-          </span>
-
-          <span>
-            ${payment.paymentMethod}
-          </span>
-
-        </div>
-
-        ${
-          payment.paymentMethod ===
-          'Cash'
-            ? `
-              <div class="summary-row">
-
-                <span>
-                  Amount
-                </span>
-
-                <span>
-                  ₱${Number(
-                    payment.amount ??
-                      order.storeAmountDue ??
-                      order.netAmount ??
-                      0
-                  ).toFixed(2)}
-                </span>
-
-              </div>
-
-              <div class="summary-row">
-
-                <span>
-                  Amount Tendered
-                </span>
-
-                <span>
-                  ₱${Number(
-                    payment.amountTendered ||
-                      0
-                  ).toFixed(2)}
-                </span>
-
-              </div>
-
-              <div class="summary-row">
-
-                <span>
-                  Change
-                </span>
-
-                <span>
-                  ₱${Number(
-                    payment.change ||
-                      0
-                  ).toFixed(2)}
-                </span>
-
-              </div>
-            `
-            : ''
-        }
-
-        ${
-          payment.paymentMethod ===
-            'GCash' &&
-          payment.referenceNumber
-            ? `
-              <div class="summary-row">
-
-                <span>
-                  Reference
-                </span>
-
-                <span class="reference">
-                  ${payment.referenceNumber}
-                </span>
-
-              </div>
-            `
-            : ''
-        }
-      `
-    }
-
-    const deliveryHtml =
+    const customerSection =
       order.orderType ===
-      'Delivery'
+        'Delivery' &&
+      order.customer?.name
+
         ? `
-          <div class="section">
 
-            <div class="section-title">
-              DELIVERY DETAILS
-            </div>
+          <div class="meta-row">
 
-            ${
-              order.customer?.name
-                ? `
-                  <div class="info-row">
+            <span class="label">
+              Customer
+            </span>
 
-                    <span>
-                      Customer
-                    </span>
-
-                    <span>
-                      ${order.customer.name}
-                    </span>
-
-                  </div>
-                `
-                : ''
-            }
-
-            ${
-              order.customer?.contactNumber
-                ? `
-                  <div class="info-row">
-
-                    <span>
-                      Contact
-                    </span>
-
-                    <span>
-                      ${order.customer.contactNumber}
-                    </span>
-
-                  </div>
-                `
-                : ''
-            }
-
-            ${
-              order.customer?.address
-                ? `
-                  <div class="info-row">
-
-                    <span>
-                      Address
-                    </span>
-
-                    <span>
-                      ${order.customer.address}
-                    </span>
-
-                  </div>
-                `
-                : ''
-            }
-
-            ${
-              Number(
-                order.deliveryFee ||
-                  0
-              ) > 0
-                ? `
-                  <div class="info-row">
-
-                    <span>
-                      Delivery Fee
-                    </span>
-
-                    <span>
-                      ₱${Number(
-                        order.deliveryFee ||
-                          0
-                      ).toFixed(2)}
-                    </span>
-
-                  </div>
-
-                  <div class="info-row">
-
-                    <span>
-                      Fee Paid By
-                    </span>
-
-                    <span>
-                      ${
-                        order.deliveryFeePaidBy ===
-                        'Store'
-                          ? 'Store'
-                          : 'Customer'
-                      }
-                    </span>
-
-                  </div>
-                `
-                : ''
-            }
+            <span>
+              ${order.customer.name}
+            </span>
 
           </div>
+
         `
+
         : ''
+
+
+    printWindow.document.open()
+
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -1777,8 +1301,9 @@ const printCustomerReceipt =
         <head>
 
           <title>
-            Customer Receipt
+            Kitchen Order Ticket
           </title>
+
 
           <style>
 
@@ -1786,154 +1311,224 @@ const printCustomerReceipt =
               box-sizing: border-box;
             }
 
-            body {
+
+            @page {
+              size: 80mm auto;
               margin: 0;
-              padding: 12px;
-              width: 80mm;
-              background: #fff;
-              color: #000;
+            }
+
+
+            body {
+
+              margin:
+                0;
+
+              padding:
+                4px;
+
+              width:
+                80mm;
+
+              background:
+                #fff;
+
+              color:
+                #000;
+
               font-family:
                 Arial,
                 Helvetica,
                 sans-serif;
-              font-size: 12px;
             }
+
 
             .header {
-              text-align: center;
-              border-bottom: 2px dashed #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
+
+              text-align:
+                center;
+
+              border-bottom:
+                2px dashed #000;
+
+              padding-bottom:
+                6px;
+
+              margin-bottom:
+                6px;
             }
+
 
             .business {
-              font-size: 17px;
-              font-weight: 900;
+
+              font-size:
+                15px;
+
+              font-weight:
+                900;
             }
 
-            .subtitle {
-              margin-top: 3px;
-              font-size: 11px;
+
+            .title {
+
+              font-size:
+                17px;
+
+              font-weight:
+                900;
+
+              margin-top:
+                3px;
             }
 
-            .receipt-title {
-              margin-top: 7px;
-              font-size: 15px;
-              font-weight: 900;
-            }
 
             .meta {
-              margin-bottom: 10px;
+
+              margin-bottom:
+                6px;
             }
 
-            .meta-row,
-            .summary-row,
-            .info-row {
-              display: flex;
-              justify-content: space-between;
-              gap: 10px;
-              margin-bottom: 4px;
+
+            .meta-row {
+
+              display:
+                flex;
+
+              justify-content:
+                space-between;
+
+              gap:
+                8px;
+
+              margin-bottom:
+                3px;
+
+              font-size:
+                12px;
             }
 
-            .summary-row span:last-child,
-            .info-row span:last-child {
-              text-align: right;
-              word-break: break-word;
-            }
 
             .label {
-              font-weight: 700;
+
+              font-weight:
+                700;
             }
+
 
             .items {
-              border-top: 2px solid #000;
-              border-bottom: 2px solid #000;
-              padding: 9px 0;
+
+              border-top:
+                2px solid #000;
+
+              border-bottom:
+                2px solid #000;
+
+              padding:
+                7px 0;
             }
+
 
             .item {
-              margin-bottom: 9px;
+
+              display:
+                flex;
+
+              gap:
+                6px;
+
+              margin-bottom:
+                8px;
+
+              font-size:
+                15px;
+
+              line-height:
+                1.15;
             }
+
 
             .item:last-child {
-              margin-bottom: 0;
+
+              margin-bottom:
+                0;
             }
 
-            .item-main {
-              display: flex;
-              justify-content: space-between;
-              gap: 8px;
-              font-size: 13px;
-              font-weight: 700;
+
+            .qty {
+
+              width:
+                32px;
+
+              flex-shrink:
+                0;
+
+              font-weight:
+                900;
             }
 
-            .unit-price,
-            .sub-item,
+
+            .name {
+
+              flex:
+                1;
+
+              font-weight:
+                700;
+            }
+
+
             .instruction {
-              font-size: 10px;
-              color: #333;
-              margin-top: 2px;
+
+              margin-top:
+                3px;
+
+              padding-left:
+                5px;
+
+              border-left:
+                3px solid #000;
+
+              font-size:
+                11px;
+
+              font-weight:
+                400;
             }
 
-            .instruction {
-              font-style: italic;
-            }
-
-            .summary {
-              margin-top: 10px;
-              padding-top: 8px;
-              border-top: 1px dashed #000;
-            }
-
-            .payment-block {
-              margin-top: 7px;
-              padding-top: 7px;
-              border-top: 1px dotted #000;
-            }
-
-            .reference {
-              text-align: right;
-              word-break: break-all;
-            }
-
-            .net-total {
-              font-size: 15px;
-              font-weight: 900;
-              margin-top: 6px;
-              padding-top: 6px;
-              border-top: 1px solid #000;
-            }
-
-            .section {
-              margin-top: 10px;
-              padding-top: 8px;
-              border-top: 1px dashed #000;
-            }
-
-            .section-title {
-              font-weight: 900;
-              margin-bottom: 6px;
-            }
 
             .footer {
-              text-align: center;
-              border-top: 2px dashed #000;
-              margin-top: 12px;
-              padding-top: 10px;
-              font-size: 11px;
+
+              margin-top:
+                8px;
+
+              text-align:
+                center;
+
+              font-size:
+                10px;
             }
 
+
             @media print {
+
+              html,
               body {
-                width: 80mm;
+
+                width:
+                  80mm;
+
+                margin:
+                  0;
               }
+
             }
 
           </style>
 
         </head>
 
+
         <body>
+
 
           <div class="header">
 
@@ -1941,17 +1536,16 @@ const printCustomerReceipt =
               ${settingsStore.businessName}
             </div>
 
-            <div class="subtitle">
-              ${settingsStore.businessSubtitle}
-            </div>
 
-            <div class="receipt-title">
-              CUSTOMER RECEIPT
+            <div class="title">
+              KITCHEN ORDER TICKET
             </div>
 
           </div>
 
+
           <div class="meta">
+
 
             <div class="meta-row">
 
@@ -1965,6 +1559,7 @@ const printCustomerReceipt =
 
             </div>
 
+
             <div class="meta-row">
 
               <span class="label">
@@ -1977,6 +1572,7 @@ const printCustomerReceipt =
 
             </div>
 
+
             <div class="meta-row">
 
               <span class="label">
@@ -1986,22 +1582,1141 @@ const printCustomerReceipt =
               <span>
                 ${new Date(
                   order.createdAt
-                ).toLocaleString(
+                ).toLocaleDateString(
                   'en-PH'
                 )}
               </span>
 
             </div>
 
+
+            <div class="meta-row">
+
+              <span class="label">
+                Time
+              </span>
+
+              <span>
+                ${new Date(
+                  order.createdAt
+                ).toLocaleTimeString(
+                  'en-PH',
+                  {
+                    hour:
+                      'numeric',
+
+                    minute:
+                      '2-digit',
+
+                    second:
+                      '2-digit'
+                  }
+                )}
+              </span>
+
+            </div>
+
+
+            ${customerSection}
+
           </div>
+
+
+          <div class="items">
+
+            ${itemsHtml}
+
+          </div>
+
+
+          <div class="footer">
+            Please prepare the order carefully.
+          </div>
+
+
+        </body>
+
+      </html>
+    `)
+
+
+    printWindow.document.close()
+
+
+    printWindow.focus()
+
+
+    setTimeout(() => {
+
+      try {
+
+        if (
+          !printWindow.closed
+        ) {
+
+          printWindow.print()
+        }
+
+      } catch (error) {
+
+        console.error(
+          'KOT print error:',
+          error
+        )
+
+      }
+
+    }, 500)
+
+
+    printWindow.onafterprint =
+      () => {
+
+        setTimeout(() => {
+
+          try {
+
+            if (
+              !printWindow.closed
+            ) {
+
+              printWindow.close()
+            }
+
+          } catch (error) {
+
+            console.warn(
+              'Unable to close KOT window:',
+              error
+            )
+          }
+
+        }, 300)
+      }
+
+
+    return true
+  }
+
+
+// ==========================================================================
+// CUSTOMER RECEIPT
+// ==========================================================================
+
+const printCustomerReceipt =
+  (
+    order,
+    paymentDetails = null,
+    existingPrintWindow = null
+  ) => {
+
+    const printWindow =
+      existingPrintWindow ||
+      window.open(
+        '',
+        '_blank',
+        'width=400,height=700'
+      )
+
+
+    if (
+      !printWindow
+    ) {
+
+      alert(
+        'Hindi mabuksan ang receipt print window. I-check ang browser popup blocker.'
+      )
+
+      return false
+    }
+
+
+    const orderNumber =
+      order.orderNumber
+        ? `#${order.orderNumber}`
+        : 'DELIVERY'
+
+
+    const itemsHtml =
+      order.items
+        .map(
+          item => {
+
+            const addOnTotal =
+              (item.addOns || [])
+                .reduce(
+                  (
+                    total,
+                    addOn
+                  ) =>
+                    total +
+                    Number(
+                      addOn.price ||
+                        0
+                    ),
+                  0
+                )
+
+
+            const unitPrice =
+              Number(
+                item.price || 0
+              ) +
+              addOnTotal
+
+
+            const addOnsHtml =
+              item.addOns?.length
+                ? `
+
+                  <div class="sub-item">
+
+                    +
+                    ${item.addOns
+                      .map(
+                        addOn =>
+                          `${addOn.name} (${Number(
+                            addOn.price
+                          ).toFixed(2)})`
+                      )
+                      .join(', ')}
+
+                  </div>
+
+                `
+                : ''
+
+
+            const instructionHtml =
+              item.specialInstructions
+                ? `
+
+                  <div class="instruction">
+
+                    Note:
+                    ${item.specialInstructions}
+
+                  </div>
+
+                `
+                : ''
+
+
+            return `
+
+              <div class="item">
+
+
+                <div class="item-main">
+
+                  <span>
+
+                    ${item.quantity}x
+                    ${item.name}
+
+                  </span>
+
+
+                  <span>
+
+                    ₱${Number(
+                      item.subtotal
+                    ).toFixed(2)}
+
+                  </span>
+
+                </div>
+
+
+                <div class="unit-price">
+
+                  ₱${unitPrice.toFixed(2)}
+                  each
+
+                </div>
+
+
+                ${addOnsHtml}
+
+                ${instructionHtml}
+
+
+              </div>
+
+            `
+          }
+        )
+        .join('')
+
+
+    let paymentHtml =
+      ''
+
+
+    if (
+      !paymentDetails
+    ) {
+
+      paymentHtml = `
+
+        <div class="summary-row">
+
+          <span>
+            Payment Status
+          </span>
+
+          <span>
+            UNSETTLED
+          </span>
+
+        </div>
+
+      `
+
+    } else if (
+      paymentDetails.payments?.length >
+      1
+    ) {
+
+      paymentHtml = `
+
+        <div class="section-title">
+          PAYMENT DETAILS
+        </div>
+
+      `
+
+
+      paymentHtml +=
+        paymentDetails.payments
+          .map(
+            (
+              payment,
+              index
+            ) => `
+
+              <div class="payment-block">
+
+
+                <div class="summary-row">
+
+                  <span>
+
+                    Payment
+                    ${index + 1}
+
+                  </span>
+
+
+                  <span>
+
+                    ${payment.paymentMethod}
+
+                  </span>
+
+                </div>
+
+
+                <div class="summary-row">
+
+                  <span>
+                    Amount
+                  </span>
+
+
+                  <span>
+
+                    ₱${Number(
+                      payment.amount ||
+                        0
+                    ).toFixed(2)}
+
+                  </span>
+
+                </div>
+
+
+                ${
+                  payment.paymentMethod ===
+                  'Cash'
+
+                    ? `
+
+                      <div class="summary-row">
+
+                        <span>
+                          Tendered
+                        </span>
+
+                        <span>
+
+                          ₱${Number(
+                            payment.amountTendered ||
+                              0
+                          ).toFixed(2)}
+
+                        </span>
+
+                      </div>
+
+
+                      <div class="summary-row">
+
+                        <span>
+                          Change
+                        </span>
+
+                        <span>
+
+                          ₱${Number(
+                            payment.change ||
+                              0
+                          ).toFixed(2)}
+
+                        </span>
+
+                      </div>
+
+                    `
+
+                    : ''
+                }
+
+
+                ${
+                  payment.paymentMethod ===
+                    'GCash' &&
+                  payment.referenceNumber
+
+                    ? `
+
+                      <div class="summary-row">
+
+                        <span>
+                          Reference
+                        </span>
+
+
+                        <span class="reference">
+
+                          ${payment.referenceNumber}
+
+                        </span>
+
+                      </div>
+
+                    `
+
+                    : ''
+                }
+
+
+              </div>
+
+            `
+          )
+          .join('')
+
+    } else {
+
+      const payment =
+        paymentDetails
+          .payments?.[0] ||
+        paymentDetails
+
+
+      paymentHtml = `
+
+        <div class="summary-row">
+
+          <span>
+            Payment
+          </span>
+
+
+          <span>
+
+            ${payment.paymentMethod}
+
+          </span>
+
+        </div>
+
+
+        ${
+          payment.paymentMethod ===
+          'Cash'
+
+            ? `
+
+              <div class="summary-row">
+
+                <span>
+                  Amount
+                </span>
+
+
+                <span>
+
+                  ₱${Number(
+                    payment.amount ??
+                      order.storeAmountDue ??
+                      order.netAmount ??
+                      0
+                  ).toFixed(2)}
+
+                </span>
+
+              </div>
+
+
+              <div class="summary-row">
+
+                <span>
+                  Amount Tendered
+                </span>
+
+
+                <span>
+
+                  ₱${Number(
+                    payment.amountTendered ||
+                      0
+                  ).toFixed(2)}
+
+                </span>
+
+              </div>
+
+
+              <div class="summary-row">
+
+                <span>
+                  Change
+                </span>
+
+
+                <span>
+
+                  ₱${Number(
+                    payment.change ||
+                      0
+                  ).toFixed(2)}
+
+                </span>
+
+              </div>
+
+            `
+
+            : ''
+        }
+
+
+        ${
+          payment.paymentMethod ===
+            'GCash' &&
+          payment.referenceNumber
+
+            ? `
+
+              <div class="summary-row">
+
+                <span>
+                  Reference
+                </span>
+
+
+                <span class="reference">
+
+                  ${payment.referenceNumber}
+
+                </span>
+
+              </div>
+
+            `
+
+            : ''
+        }
+
+      `
+    }
+
+
+    const deliveryHtml =
+      order.orderType ===
+      'Delivery'
+
+        ? `
+
+          <div class="section">
+
+
+            <div class="section-title">
+              DELIVERY DETAILS
+            </div>
+
+
+            ${
+              order.customer?.name
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Customer
+                    </span>
+
+
+                    <span>
+                      ${order.customer.name}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
+              order.customer?.contactNumber
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Contact
+                    </span>
+
+
+                    <span>
+                      ${order.customer.contactNumber}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
+              order.customer?.address
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Address
+                    </span>
+
+
+                    <span>
+                      ${order.customer.address}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
+              Number(
+                order.deliveryFee ||
+                  0
+              ) > 0
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Delivery Fee
+                    </span>
+
+
+                    <span>
+
+                      ₱${Number(
+                        order.deliveryFee ||
+                          0
+                      ).toFixed(2)}
+
+                    </span>
+
+                  </div>
+
+
+                  <div class="info-row">
+
+                    <span>
+                      Fee Paid By
+                    </span>
+
+
+                    <span>
+
+                      ${
+                        order.deliveryFeePaidBy ===
+                        'Store'
+
+                          ? 'Store'
+
+                          : 'Customer'
+                      }
+
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+          </div>
+
+        `
+
+        : ''
+
+
+    printWindow.document.open()
+
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+
+      <html>
+
+        <head>
+
+          <title>
+            Customer Receipt
+          </title>
+
+
+          <style>
+
+            * {
+              box-sizing: border-box;
+            }
+
+
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+
+
+            body {
+
+              margin:
+                0;
+
+              padding:
+                4px;
+
+              width:
+                80mm;
+
+              background:
+                #fff;
+
+              color:
+                #000;
+
+              font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+              font-size:
+                12px;
+            }
+
+
+            .header {
+
+              text-align:
+                center;
+
+              border-bottom:
+                2px dashed #000;
+
+              padding-bottom:
+                6px;
+
+              margin-bottom:
+                6px;
+            }
+
+
+            .business {
+
+              font-size:
+                16px;
+
+              font-weight:
+                900;
+            }
+
+
+            .subtitle {
+
+              margin-top:
+                2px;
+
+              font-size:
+                10px;
+            }
+
+
+            .receipt-title {
+
+              margin-top:
+                5px;
+
+              font-size:
+                14px;
+
+              font-weight:
+                900;
+            }
+
+
+            .meta {
+
+              margin-bottom:
+                7px;
+            }
+
+
+            .meta-row,
+            .summary-row,
+            .info-row {
+
+              display:
+                flex;
+
+              justify-content:
+                space-between;
+
+              gap:
+                8px;
+
+              margin-bottom:
+                3px;
+            }
+
+
+            .summary-row span:last-child,
+            .info-row span:last-child {
+
+              text-align:
+                right;
+
+              word-break:
+                break-word;
+            }
+
+
+            .label {
+
+              font-weight:
+                700;
+            }
+
+
+            .items {
+
+              border-top:
+                2px solid #000;
+
+              border-bottom:
+                2px solid #000;
+
+              padding:
+                7px 0;
+            }
+
+
+            .item {
+
+              margin-bottom:
+                7px;
+            }
+
+
+            .item:last-child {
+
+              margin-bottom:
+                0;
+            }
+
+
+            .item-main {
+
+              display:
+                flex;
+
+              justify-content:
+                space-between;
+
+              gap:
+                7px;
+
+              font-size:
+                12px;
+
+              font-weight:
+                700;
+            }
+
+
+            .unit-price,
+            .sub-item,
+            .instruction {
+
+              font-size:
+                9px;
+
+              color:
+                #333;
+
+              margin-top:
+                2px;
+            }
+
+
+            .instruction {
+
+              font-style:
+                italic;
+            }
+
+
+            .summary {
+
+              margin-top:
+                7px;
+
+              padding-top:
+                6px;
+
+              border-top:
+                1px dashed #000;
+            }
+
+
+            .payment-block {
+
+              margin-top:
+                5px;
+
+              padding-top:
+                5px;
+
+              border-top:
+                1px dotted #000;
+            }
+
+
+            .reference {
+
+              text-align:
+                right;
+
+              word-break:
+                break-all;
+            }
+
+
+            .net-total {
+
+              font-size:
+                14px;
+
+              font-weight:
+                900;
+
+              margin-top:
+                5px;
+
+              padding-top:
+                5px;
+
+              border-top:
+                1px solid #000;
+            }
+
+
+            .section {
+
+              margin-top:
+                7px;
+
+              padding-top:
+                6px;
+
+              border-top:
+                1px dashed #000;
+            }
+
+
+            .section-title {
+
+              font-weight:
+                900;
+
+              margin-bottom:
+                4px;
+            }
+
+
+            .footer {
+
+              text-align:
+                center;
+
+              border-top:
+                2px dashed #000;
+
+              margin-top:
+                8px;
+
+              padding-top:
+                7px;
+
+              font-size:
+                10px;
+            }
+
+
+            @media print {
+
+              html,
+              body {
+
+                width:
+                  80mm;
+
+                margin:
+                  0;
+              }
+
+            }
+
+          </style>
+
+        </head>
+
+
+        <body>
+
+
+          <div class="header">
+
+            <div class="business">
+
+              ${settingsStore.businessName}
+
+            </div>
+
+
+            <div class="subtitle">
+
+              ${settingsStore.businessSubtitle}
+
+            </div>
+
+
+            <div class="receipt-title">
+
+              CUSTOMER RECEIPT
+
+            </div>
+
+          </div>
+
+
+          <div class="meta">
+
+
+            <div class="meta-row">
+
+              <span class="label">
+                Order
+              </span>
+
+
+              <span>
+                ${orderNumber}
+              </span>
+
+            </div>
+
+
+            <div class="meta-row">
+
+              <span class="label">
+                Type
+              </span>
+
+
+              <span>
+                ${order.orderType}
+              </span>
+
+            </div>
+
+
+            <div class="meta-row">
+
+              <span class="label">
+                Date
+              </span>
+
+
+              <span>
+
+                ${new Date(
+                  order.createdAt
+                ).toLocaleString(
+                  'en-PH'
+                )}
+
+              </span>
+
+            </div>
+
+
+          </div>
+
 
           ${deliveryHtml}
 
+
           <div class="items">
+
             ${itemsHtml}
+
           </div>
 
+
           <div class="summary">
+
 
             <div class="summary-row">
 
@@ -2009,62 +2724,82 @@ const printCustomerReceipt =
                 Gross Sales
               </span>
 
+
               <span>
+
                 ₱${Number(
                   order.grossAmount ||
                     0
                 ).toFixed(2)}
+
               </span>
 
             </div>
+
 
             ${
               Number(
                 order.discountAmount ||
                   0
               ) > 0
+
                 ? `
+
                   <div class="summary-row">
 
                     <span>
                       Discount
                     </span>
 
+
                     <span>
+
                       -₱${Number(
                         order.discountAmount ||
                           0
                       ).toFixed(2)}
+
                     </span>
 
                   </div>
+
                 `
+
                 : ''
             }
+
 
             ${
               Number(
                 order.deliveryFee ||
                   0
               ) > 0
+
                 ? `
+
                   <div class="summary-row">
 
                     <span>
                       Delivery Fee
                     </span>
 
+
                     <span>
+
                       ₱${Number(
                         order.deliveryFee ||
                           0
                       ).toFixed(2)}
+
                     </span>
 
                   </div>
+
                 `
+
                 : ''
             }
+
 
             <div class="summary-row net-total">
 
@@ -2072,280 +2807,589 @@ const printCustomerReceipt =
                 NET TOTAL
               </span>
 
+
               <span>
+
                 ₱${Number(
                   order.netAmount ||
                     0
                 ).toFixed(2)}
+
               </span>
 
             </div>
 
+
             ${paymentHtml}
 
+
           </div>
+
 
           <div class="footer">
+
             Thank you for dining with us!
+
           </div>
 
-          <script>
-
-            window.onload = function () {
-              window.print()
-            }
-
-            window.onafterprint = function () {
-              window.close()
-            }
-
-          <\/script>
 
         </body>
 
       </html>
     `)
 
+
     printWindow.document.close()
-  }
 
-// =========================
-// HANDLE PAYMENT
-// =========================
 
-  const handlePayment =
-    async paymentDetails => {
+    printWindow.focus()
 
-      if (
-        isProcessingPayment.value
-      ) {
-        return
-      }
 
-      isProcessingPayment.value =
-        true
-
-      let kitchenPrintWindow =
-        null
+    setTimeout(() => {
 
       try {
 
-        // =========================
-        // VALIDATE CHECKOUT
-        // =========================
-
         if (
-          !canProceedToCheckout.value
+          !printWindow.closed
         ) {
-          alert(
-            'Complete muna ang order details bago mag-checkout.'
-          )
 
-          return
+          printWindow.print()
         }
 
+      } catch (error) {
 
-        const discount =
-          Number(
-            discountAmount.value ||
-              0
-          )
+        console.error(
+          'Receipt print error:',
+          error
+        )
 
+      }
 
-        if (
-          discount < 0
-        ) {
-          alert(
-            'Hindi puwedeng negative ang discount.'
-          )
-
-          return
-        }
+    }, 500)
 
 
-        if (
-          discount >
-          Number(
-            totalAmount.value ||
-              0
-          )
-        ) {
-          alert(
-            'Hindi puwedeng mas mataas ang discount kaysa Gross Sales.'
-          )
+    printWindow.onafterprint =
+      () => {
 
-          return
-        }
+        setTimeout(() => {
 
+          try {
 
-        // =========================
-        // PRE-OPEN KOT WINDOW
-        // =========================
-        //
-        // Binubuksan agad habang
-        // galing pa sa user click.
-        //
-        // Para hindi ma-block ng
-        // browser popup protection
-        // kapag mabagal ang server.
-        //
-        // =========================
+            if (
+              !printWindow.closed
+            ) {
 
-        try {
+              printWindow.close()
+            }
 
-          kitchenPrintWindow =
-            window.open(
-              '',
-              '_blank',
-              'width=400,height=700'
-            )
-
-          if (
-            !kitchenPrintWindow
-          ) {
+          } catch (error) {
 
             console.warn(
-              'KOT popup was blocked by the browser.'
+              'Unable to close receipt window:',
+              error
             )
           }
 
-        } catch (popupError) {
+        }, 300)
+      }
+
+
+    return true
+  }
+
+
+// ==========================================================================
+// HANDLE PAYMENT
+// ==========================================================================
+
+const handlePayment =
+  async paymentDetails => {
+
+    if (
+      isProcessingPayment.value
+    ) {
+      return
+    }
+
+
+    isProcessingPayment.value =
+      true
+
+
+    let kitchenPrintWindow =
+      null
+
+
+    let customerPrintWindow =
+      null
+
+
+    try {
+
+
+      // =========================
+      // VALIDATE CHECKOUT
+      // =========================
+
+      if (
+        !canProceedToCheckout.value
+      ) {
+
+        alert(
+          'Complete muna ang order details bago mag-checkout.'
+        )
+
+        return
+      }
+
+
+      const discount =
+        Number(
+          discountAmount.value ||
+            0
+        )
+
+
+      if (
+        discount < 0
+      ) {
+
+        alert(
+          'Hindi puwedeng negative ang discount.'
+        )
+
+        return
+      }
+
+
+      if (
+        discount >
+        Number(
+          totalAmount.value ||
+            0
+        )
+      ) {
+
+        alert(
+          'Hindi puwedeng mas mataas ang discount kaysa Gross Sales.'
+        )
+
+        return
+      }
+
+
+      // =========================
+      // PRE-OPEN PRINT WINDOWS
+      // =========================
+
+      try {
+
+
+        // =========================
+        // KOT
+        // =========================
+
+        kitchenPrintWindow =
+          window.open(
+            '',
+            '_blank',
+            'width=400,height=700'
+          )
+
+
+        if (
+          !kitchenPrintWindow
+        ) {
 
           console.warn(
-            'Unable to pre-open KOT window:',
-            popupError
+            'KOT popup was blocked by the browser.'
           )
-
-          kitchenPrintWindow =
-            null
         }
 
 
         // =========================
-        // BUILD ORDER ITEMS
+        // CUSTOMER RECEIPT
         // =========================
 
-        const orderItems =
-          cartStore.cart.map(
-            item => ({
-
-              menuId:
-                item.menuId,
-
-              name:
-                item.name,
-
-              quantity:
-                item.quantity,
-
-              price:
-                item.price,
-
-              addOns:
-                (item.addOns || [])
-                  .map(
-                    addOn => ({
-
-                      addOnId:
-                        addOn.addOnId,
-
-                      name:
-                        addOn.name,
-
-                      price:
-                        Number(
-                          addOn.price || 0
-                        )
-                    })
-                  ),
-
-              subtotal:
-                cartStore.getItemUnitPrice(
-                  item
-                ) *
-                item.quantity,
-
-              specialInstructions:
-                item.specialInstructions ||
-                ''
-            })
+        customerPrintWindow =
+          window.open(
+            '',
+            '_blank',
+            'width=400,height=700'
           )
 
 
+        if (
+          !customerPrintWindow
+        ) {
+
+          console.warn(
+            'Receipt popup was blocked by the browser.'
+          )
+        }
+
+
+      } catch (popupError) {
+
+        console.warn(
+          'Unable to pre-open print windows:',
+          popupError
+        )
+
+        kitchenPrintWindow =
+          null
+
+        customerPrintWindow =
+          null
+      }
+
+
+      // =========================
+      // BUILD ORDER ITEMS
+      // =========================
+
+      const orderItems =
+        cartStore.cart.map(
+          item => ({
+
+            menuId:
+              item.menuId,
+
+            name:
+              item.name,
+
+            quantity:
+              item.quantity,
+
+            price:
+              item.price,
+
+            addOns:
+              (item.addOns || [])
+                .map(
+                  addOn => ({
+
+                    addOnId:
+                      addOn.addOnId,
+
+                    name:
+                      addOn.name,
+
+                    price:
+                      Number(
+                        addOn.price || 0
+                      )
+                  })
+                ),
+
+            subtotal:
+              cartStore.getItemUnitPrice(
+                item
+              ) *
+              item.quantity,
+
+            specialInstructions:
+              item.specialInstructions ||
+              ''
+          })
+        )
+
+
+      // =========================
+      // BUILD ORDER
+      // =========================
+
+      const orderData = {
+
+        cashier:
+          authStore.user._id,
+
+        items:
+          orderItems,
+
+        orderType:
+          orderType.value,
+
+        orderNumber:
+          orderType.value ===
+          'Delivery'
+            ? null
+            : selectedOrderNumber.value,
+
+        customer:
+          orderType.value ===
+          'Delivery'
+            ? {
+
+                name:
+                  delivery.value.customerName.trim(),
+
+                notes:
+                  delivery.value.notes.trim()
+
+              }
+            : {},
+
+        deliveryFee:
+          orderType.value ===
+          'Delivery'
+            ? Number(
+                delivery.value.deliveryFee ||
+                  0
+              )
+            : 0,
+
+        deliveryFeePaidBy:
+          orderType.value ===
+          'Delivery'
+            ? delivery.value
+                .deliveryFeePaidBy
+            : 'Customer',
+
+        discountAmount:
+          discount,
+
+        paymentStatus:
+          paymentDetails.paymentStatus,
+
+        notes:
+          orderType.value ===
+          'Delivery'
+            ? delivery.value.notes.trim()
+            : ''
+      }
+
+
+      // =========================
+      // CREATE ORDER
+      // =========================
+
+      const orderResponse =
+        await axios.post(
+          `${API}/orders`,
+          orderData,
+          {
+            ...getAuthConfig(),
+
+            timeout:
+              60000
+          }
+        )
+
+
+      const createdOrder =
+        orderResponse.data.order
+
+
+      // =========================
+      // PRINT KOT
+      // =========================
+
+      printKitchenTicket(
+        createdOrder,
+        kitchenPrintWindow
+      )
+
+
+      // =========================
+      // UNSETTLED DELIVERY
+      // =========================
+
+      if (
+        paymentDetails.paymentStatus ===
+        'Unsettled'
+      ) {
+
+        isCheckoutOpen.value =
+          false
+
+
+        alert(
+          `Unsettled delivery order saved!\nOrder ID: ${createdOrder._id}`
+        )
+
+      } else {
+
+
         // =========================
-        // BUILD ORDER
+        // NORMALIZE PAYMENT LIST
         // =========================
 
-        const orderData = {
+        const paymentList =
+          Array.isArray(
+            paymentDetails.payments
+          ) &&
+          paymentDetails.payments.length >
+            0
 
-          cashier:
-            authStore.user._id,
+            ? paymentDetails.payments
 
-          items:
-            orderItems,
+            : [
 
-          orderType:
-            orderType.value,
+                {
 
-          orderNumber:
-            orderType.value ===
-            'Delivery'
-              ? null
-              : selectedOrderNumber.value,
+                  paymentMethod:
+                    paymentDetails.paymentMethod,
 
-          customer:
-            orderType.value ===
-            'Delivery'
-              ? {
+                  amount:
+                    Number(
+                      paymentDetails.amount ??
+                        createdOrder.storeAmountDue ??
+                        createdOrder.netAmount
+                    ),
 
-                  name:
-                    delivery.value.customerName.trim(),
+                  amountTendered:
+                    Number(
+                      paymentDetails.amountTendered ||
+                        0
+                    ),
 
-                  notes:
-                    delivery.value.notes.trim()
+                  change:
+                    Number(
+                      paymentDetails.change ||
+                        0
+                    ),
 
+                  referenceNumber:
+                    paymentDetails.referenceNumber ||
+                    ''
                 }
-              : {},
 
-          deliveryFee:
-            orderType.value ===
-            'Delivery'
-              ? Number(
-                  delivery.value.deliveryFee ||
-                    0
-                )
-              : 0,
+              ]
 
-          deliveryFeePaidBy:
-            orderType.value ===
-            'Delivery'
-              ? delivery.value
-                  .deliveryFeePaidBy
-              : 'Customer',
 
-          discountAmount:
-            discount,
+        // =========================
+        // VALIDATE PAYMENT LIST
+        // =========================
 
-          paymentStatus:
-            paymentDetails.paymentStatus,
+        if (
+          paymentList.length ===
+          0
+        ) {
 
-          notes:
-            orderType.value ===
-            'Delivery'
-              ? delivery.value.notes.trim()
-              : ''
+          throw new Error(
+            'Walang payment information.'
+          )
         }
 
 
         // =========================
-        // CREATE ORDER
+        // VALIDATE TOTAL
         // =========================
 
-        const orderResponse =
+        const paymentTotal =
+          paymentList.reduce(
+            (
+              total,
+              payment
+            ) =>
+              total +
+              Number(
+                payment.amount ||
+                  0
+              ),
+            0
+          )
+
+
+        const orderTotal =
+          Number(
+            createdOrder.storeAmountDue ??
+              createdOrder.netAmount ??
+              0
+          )
+
+
+        if (
+          Math.abs(
+            paymentTotal -
+              orderTotal
+          ) > 0.01
+        ) {
+
+          throw new Error(
+            `Payment total (${paymentTotal.toFixed(2)}) does not match store amount due (${orderTotal.toFixed(2)}).`
+          )
+        }
+
+
+        // =========================
+        // CREATE PAYMENT REQUEST ID
+        // =========================
+
+        let paymentRequestId =
+          ''
+
+
+        if (
+          typeof crypto !==
+            'undefined' &&
+          typeof crypto.randomUUID ===
+            'function'
+        ) {
+
+          paymentRequestId =
+            crypto.randomUUID()
+
+        } else {
+
+          paymentRequestId =
+            `${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 11)}`
+        }
+
+
+        // =========================
+        // CREATE ALL PAYMENTS
+        // =========================
+
+        const paymentResponse =
           await axios.post(
-            `${API}/orders`,
-            orderData,
+            `${API}/payments`,
             {
+
+              orderId:
+                createdOrder._id,
+
+              receivedBy:
+                authStore.user._id,
+
+              paymentRequestId,
+
+              payments:
+                paymentList.map(
+                  payment => ({
+
+                    paymentMethod:
+                      payment.paymentMethod,
+
+                    amount:
+                      Number(
+                        payment.amount ||
+                          0
+                      ),
+
+                    amountTendered:
+                      Number(
+                        payment.amountTendered ||
+                          0
+                      ),
+
+                    change:
+                      Number(
+                        payment.change ||
+                          0
+                      ),
+
+                    referenceNumber:
+                      payment.referenceNumber ||
+                      ''
+                  })
+                )
+            },
+            {
+
               ...getAuthConfig(),
 
               timeout:
@@ -2354,360 +3398,170 @@ const printCustomerReceipt =
           )
 
 
-        const createdOrder =
-          orderResponse.data.order
+        const createdPayments =
+          paymentResponse.data
+            ?.payments || []
 
 
         // =========================
-        // PRINT KOT
+        // PAYMENT SUCCESS
         // =========================
 
-        printKitchenTicket(
-          createdOrder,
-          kitchenPrintWindow
+        isCheckoutOpen.value =
+          false
+
+
+        alert(
+          `Payment successful!\nOrder ID: ${createdOrder._id}\nPayments: ${createdPayments.length}`
         )
+      }
 
 
-        // =========================
-        // UNSETTLED DELIVERY
-        // =========================
+      // =========================
+      // PRINT RECEIPT
+      // =========================
+
+      if (
+        paymentDetails.paymentStatus !==
+        'Unsettled'
+      ) {
+
+        const shouldPrintReceipt =
+          window.confirm(
+            'Print customer receipt?'
+          )
+
 
         if (
-          paymentDetails.paymentStatus ===
-          'Unsettled'
+          shouldPrintReceipt
         ) {
 
-          isCheckoutOpen.value =
-            false
-
-
-          alert(
-            `Unsettled delivery order saved!\nOrder ID: ${createdOrder._id}`
+          printCustomerReceipt(
+            createdOrder,
+            paymentDetails,
+            customerPrintWindow
           )
 
         } else {
 
-          // =========================
-          // NORMALIZE PAYMENT LIST
-          // =========================
-
-          const paymentList =
-            Array.isArray(
-              paymentDetails.payments
-            ) &&
-            paymentDetails.payments.length >
-              0
-
-              ? paymentDetails.payments
-
-              : [
-                  {
-
-                    paymentMethod:
-                      paymentDetails.paymentMethod,
-
-                    amount:
-                      Number(
-                        paymentDetails.amount ??
-                          createdOrder.storeAmountDue ??
-                          createdOrder.netAmount
-                      ),
-
-                    amountTendered:
-                      Number(
-                        paymentDetails.amountTendered ||
-                          0
-                      ),
-
-                    change:
-                      Number(
-                        paymentDetails.change ||
-                          0
-                      ),
-
-                    referenceNumber:
-                      paymentDetails.referenceNumber ||
-                      ''
-                  }
-                ]
-
-
-          // =========================
-          // VALIDATE PAYMENT LIST
-          // =========================
-
           if (
-            paymentList.length ===
-            0
-          ) {
-            throw new Error(
-              'Walang payment information.'
-            )
-          }
-
-
-          // =========================
-          // VALIDATE TOTAL
-          // =========================
-
-          const paymentTotal =
-            paymentList.reduce(
-              (
-                total,
-                payment
-              ) =>
-                total +
-                Number(
-                  payment.amount ||
-                    0
-                ),
-              0
-            )
-
-
-          const orderTotal =
-            Number(
-              createdOrder.storeAmountDue ??
-                createdOrder.netAmount ??
-                0
-            )
-
-
-          if (
-            Math.abs(
-              paymentTotal -
-                orderTotal
-            ) > 0.01
+            customerPrintWindow &&
+            !customerPrintWindow.closed
           ) {
 
-            throw new Error(
-              `Payment total (${paymentTotal.toFixed(2)}) does not match store amount due (${orderTotal.toFixed(2)}).`
-            )
-          }
-
-
-          // =========================
-          // CREATE PAYMENT REQUEST ID
-          // =========================
-
-          let paymentRequestId =
-            ''
-
-
-          if (
-            typeof crypto !==
-              'undefined' &&
-            typeof crypto.randomUUID ===
-              'function'
-          ) {
-
-            paymentRequestId =
-              crypto.randomUUID()
-
-          } else {
-
-            paymentRequestId =
-              `${Date.now()}-${Math.random()
-                .toString(36)
-                .slice(2, 11)}`
-          }
-
-
-          // =========================
-          // CREATE ALL PAYMENTS
-          // ONE REQUEST
-          // =========================
-
-          const paymentResponse =
-            await axios.post(
-              `${API}/payments`,
-              {
-                orderId:
-                  createdOrder._id,
-
-                receivedBy:
-                  authStore.user._id,
-
-                paymentRequestId,
-
-                payments:
-                  paymentList.map(
-                    payment => ({
-
-                      paymentMethod:
-                        payment.paymentMethod,
-
-                      amount:
-                        Number(
-                          payment.amount ||
-                            0
-                        ),
-
-                      amountTendered:
-                        Number(
-                          payment.amountTendered ||
-                            0
-                        ),
-
-                      change:
-                        Number(
-                          payment.change ||
-                            0
-                        ),
-
-                      referenceNumber:
-                        payment.referenceNumber ||
-                        ''
-                    })
-                  )
-              },
-              {
-                ...getAuthConfig(),
-
-                timeout:
-                  60000
-              }
-            )
-
-
-          const createdPayments =
-            paymentResponse.data
-              ?.payments || []
-
-
-          // =========================
-          // PAYMENT SUCCESS
-          // =========================
-
-          isCheckoutOpen.value =
-            false
-
-
-          alert(
-            `Payment successful!\nOrder ID: ${createdOrder._id}\nPayments: ${createdPayments.length}`
-          )
-        }
-
-
-        // =========================
-        // PRINT RECEIPT
-        // =========================
-
-        if (
-          paymentDetails.paymentStatus !==
-          'Unsettled'
-        ) {
-
-          const shouldPrintReceipt =
-            window.confirm(
-              'Print customer receipt?'
-            )
-
-
-          if (
-            shouldPrintReceipt
-          ) {
-
-            printCustomerReceipt(
-              createdOrder,
-              paymentDetails
-            )
+            customerPrintWindow.close()
           }
         }
+      }
 
 
-        // =========================
-        // RESET POS
-        // =========================
+      // =========================
+      // RESET POS
+      // =========================
 
-        cartStore.clearCart()
-
-        orderType.value =
-          ''
-
-        selectedOrderNumber.value =
-          null
-
-        deliverySetupConfirmed.value =
-          false
-
-        discountAmount.value =
-          0
-
-        resetDelivery()
+      cartStore.clearCart()
 
 
-        // =========================
-        // REFRESH POS DATA
-        // =========================
-
-        try {
-
-          await fetchData()
-
-          await fetchOrderNumbers()
-
-        } catch (refreshError) {
-
-          console.error(
-            'POS refresh after payment failed:',
-            refreshError
-          )
-
-          // Successful na ang payment/order.
-          // Refresh lang ang nag-fail.
-
-        }
+      orderType.value =
+        ''
 
 
-      } catch (error) {
+      selectedOrderNumber.value =
+        null
 
-        // =========================
-        // CLOSE BLANK KOT WINDOW
-        // =========================
 
-        if (
-          kitchenPrintWindow &&
-          !kitchenPrintWindow.closed
-        ) {
+      deliverySetupConfirmed.value =
+        false
 
-          kitchenPrintWindow.close()
-        }
 
+      discountAmount.value =
+        0
+
+
+      resetDelivery()
+
+
+      // =========================
+      // REFRESH POS DATA
+      // =========================
+
+      try {
+
+        await fetchData()
+
+        await fetchOrderNumbers()
+
+      } catch (refreshError) {
 
         console.error(
-          'Error processing order:',
-          error
+          'POS refresh after payment failed:',
+          refreshError
         )
 
+        // Successful na ang order/payment.
+        // Refresh lang ang nag-fail.
 
-        if (
-          error.code ===
-          'ECONNABORTED'
-        ) {
-
-          alert(
-            'Hindi nakatanggap ng server response sa loob ng 60 seconds. I-check muna ang Server status bago ulitin ang payment.'
-          )
-
-        } else {
-
-          alert(
-            error.response?.data
-              ?.message ||
-              error.message ||
-              'May naging problema sa pag-process ng order.'
-          )
-        }
-
-      } finally {
-
-        // Always release frontend payment lock.
-
-        isProcessingPayment.value =
-          false
       }
+
+
+    } catch (error) {
+
+
+      // =========================
+      // CLOSE BLANK PRINT WINDOWS
+      // =========================
+
+      if (
+        kitchenPrintWindow &&
+        !kitchenPrintWindow.closed
+      ) {
+
+        kitchenPrintWindow.close()
+      }
+
+
+      if (
+        customerPrintWindow &&
+        !customerPrintWindow.closed
+      ) {
+
+        customerPrintWindow.close()
+      }
+
+
+      console.error(
+        'Error processing order:',
+        error
+      )
+
+
+      if (
+        error.code ===
+        'ECONNABORTED'
+      ) {
+
+        alert(
+          'Hindi nakatanggap ng server response sa loob ng 60 seconds. I-check muna ang Server status bago ulitin ang payment.'
+        )
+
+      } else {
+
+        alert(
+          error.response?.data
+            ?.message ||
+            error.message ||
+            'May naging problema sa pag-process ng order.'
+        )
+      }
+
+
+    } finally {
+
+      isProcessingPayment.value =
+        false
     }
+  }
+
 
 // =========================
 // FETCH DATA
@@ -2715,18 +3569,22 @@ const printCustomerReceipt =
 
 const fetchData =
   async () => {
+
     try {
+
       const catRes =
         await axios.get(
           `${API}/categories`,
           getAuthConfig()
         )
 
+
       const menuRes =
         await axios.get(
           `${API}/menus`,
           getAuthConfig()
         )
+
 
       const categoryData =
         Array.isArray(
@@ -2735,6 +3593,7 @@ const fetchData =
           ? catRes.data
           : []
 
+
       const menuData =
         Array.isArray(
           menuRes.data
@@ -2742,16 +3601,20 @@ const fetchData =
           ? menuRes.data
           : []
 
+
       categories.value =
         categoryData
+
 
       menus.value =
         menuData
 
+
       if (
-        categories.value
-          .length > 0
+        categories.value.length >
+        0
       ) {
+
         const categoryStillExists =
           categories.value.some(
             category =>
@@ -2759,70 +3622,79 @@ const fetchData =
               selectedCategory.value
           )
 
+
         if (
           !categoryStillExists
         ) {
+
           selectedCategory.value =
             categories.value[0].name
         }
+
       } else {
+
         selectedCategory.value =
           ''
       }
+
 
       console.log(
         'POS categories:',
         categories.value
       )
 
+
       console.log(
         'POS menus:',
         menus.value
       )
 
-      /*
-      |--------------------------------------------------------------------------
-      | BACKGROUND OFFLINE CACHE
-      |--------------------------------------------------------------------------
-      |
-      | Important:
-      | The POS UI already has its data from the API above.
-      | Caching happens separately and must never block
-      | or replace the live POS data.
-      |--------------------------------------------------------------------------
-      */
+
+      // =========================
+      // BACKGROUND OFFLINE CACHE
+      // =========================
 
       if (
-        settingsStore.offlineCachingEnabled === true
+        settingsStore.offlineCachingEnabled ===
+        true
       ) {
+
         refreshAllOfflineCache()
           .then(
             result => {
+
               console.log(
                 'POS offline cache refreshed:',
                 result
               )
+
             }
           )
           .catch(
             error => {
+
               console.error(
                 'POS offline cache failed:',
                 error
               )
+
             }
           )
       }
+
     } catch (error) {
+
       console.error(
         'Error fetching data:',
         error
       )
 
+
       console.error(
         'Status:',
         error.response?.status
       )
+
 
       console.error(
         'Response:',
@@ -2831,21 +3703,25 @@ const fetchData =
     }
   }
 
+
 // =========================
 // CATEGORY CLICK
 // =========================
 
 const handleCategoryClick =
   categoryName => {
+
     if (
       editLayoutMode.value
     ) {
       return
     }
 
+
     selectedCategory.value =
       categoryName
   }
+
 
 // =========================
 // SAVE CATEGORY ORDER
@@ -2853,6 +3729,7 @@ const handleCategoryClick =
 
 const saveCategoryOrder =
   async () => {
+
     if (
       !isAdmin.value ||
       categories.value.length ===
@@ -2861,17 +3738,22 @@ const saveCategoryOrder =
       return
     }
 
+
     layoutSaving.value =
       true
 
+
     clearLayoutMessage()
 
+
     try {
+
       const categoryIds =
         categories.value.map(
           category =>
             category._id
         )
+
 
       const response =
         await axios.put(
@@ -2882,23 +3764,29 @@ const saveCategoryOrder =
           getAuthConfig()
         )
 
+
       if (
         Array.isArray(
           response.data?.categories
         )
       ) {
+
         categories.value =
           response.data.categories
       }
 
+
       showLayoutMessage(
         'Category layout saved.'
       )
+
     } catch (error) {
+
       console.error(
         'Error saving category layout:',
         error
       )
+
 
       categories.value =
         dragOriginalItems.categories.map(
@@ -2907,16 +3795,20 @@ const saveCategoryOrder =
           })
         )
 
+
       showLayoutMessage(
         error.response?.data?.message ||
           'Hindi na-save ang category layout.',
         'error'
       )
+
     } finally {
+
       layoutSaving.value =
         false
     }
   }
+
 
 // =========================
 // SAVE MENU ORDER
@@ -2924,6 +3816,7 @@ const saveCategoryOrder =
 
 const getCurrentCategoryId =
   () => {
+
     const category =
       categories.value.find(
         item =>
@@ -2931,22 +3824,32 @@ const getCurrentCategoryId =
           selectedCategory.value
       )
 
+
     return category?._id ||
       null
   }
 
+
 const saveMenuOrder =
   async () => {
-    if (!isAdmin.value) {
+
+    if (
+      !isAdmin.value
+    ) {
       return
     }
+
 
     const categoryId =
       getCurrentCategoryId()
 
-    if (!categoryId) {
+
+    if (
+      !categoryId
+    ) {
       return
     }
+
 
     const menuIds =
       filteredMenus.value.map(
@@ -2954,18 +3857,24 @@ const saveMenuOrder =
           menu._id
       )
 
+
     if (
-      menuIds.length === 0
+      menuIds.length ===
+      0
     ) {
       return
     }
 
+
     layoutSaving.value =
       true
 
+
     clearLayoutMessage()
 
+
     try {
+
       const response =
         await axios.put(
           `${API}/menus/reorder`,
@@ -2976,23 +3885,29 @@ const saveMenuOrder =
           getAuthConfig()
         )
 
+
       if (
         Array.isArray(
           response.data?.menus
         )
       ) {
+
         menus.value =
           response.data.menus
       }
 
+
       showLayoutMessage(
         'Menu item layout saved.'
       )
+
     } catch (error) {
+
       console.error(
         'Error saving menu layout:',
         error
       )
+
 
       menus.value =
         dragOriginalItems.menus.map(
@@ -3001,67 +3916,62 @@ const saveMenuOrder =
           })
         )
 
+
       showLayoutMessage(
         error.response?.data?.message ||
           'Hindi na-save ang menu item layout.',
         'error'
       )
+
     } finally {
+
       layoutSaving.value =
         false
     }
   }
+
 
 // =========================
 // FILTERED MENU
 // Writable computed
 // =========================
 
-  // =========================
-  // FILTERED MENU
-  // Writable computed
-  // =========================
+const filteredMenus =
+  computed({
 
-  const filteredMenus =
-    computed({
-      get() {
-        if (
-          !selectedCategory.value
-        ) {
-          return []
-        }
+    get() {
 
-        const selectedCategoryObject =
-          categories.value.find(
-            category =>
-              category.name ===
-              selectedCategory.value
-          )
+      if (
+        !selectedCategory.value
+      ) {
+        return []
+      }
 
-        const selectedCategoryId =
-          String(
-            selectedCategoryObject?._id ||
-            selectedCategoryObject?.id ||
-            ''
-          )
 
-        return menus.value
-          .filter(menu => {
+      const selectedCategoryObject =
+        categories.value.find(
+          category =>
+            category.name ===
+            selectedCategory.value
+        )
 
-            /*
-            |------------------------------------------------------------------
-            | ONLINE DATA
-            |------------------------------------------------------------------
-            |
-            | Online menus normally have:
-            | menu.category.name
-            |
-            |------------------------------------------------------------------
-            */
+
+      const selectedCategoryId =
+        String(
+          selectedCategoryObject?._id ||
+          selectedCategoryObject?.id ||
+          ''
+        )
+
+
+      return menus.value
+        .filter(
+          menu => {
 
             const menuCategoryName =
               menu.category?.name ||
               null
+
 
             if (
               menuCategoryName ===
@@ -3070,19 +3980,6 @@ const saveMenuOrder =
               return true
             }
 
-            /*
-            |------------------------------------------------------------------
-            | OFFLINE CACHE
-            |------------------------------------------------------------------
-            |
-            | Cached menus may only have:
-            | menu.categoryId
-            |
-            | So compare the cached categoryId with
-            | the selected category ID.
-            |
-            |------------------------------------------------------------------
-            */
 
             const menuCategoryId =
               String(
@@ -3097,6 +3994,7 @@ const saveMenuOrder =
                 )
               )
 
+
             if (
               selectedCategoryId &&
               menuCategoryId ===
@@ -3105,54 +4003,66 @@ const saveMenuOrder =
               return true
             }
 
+
             return false
-          })
-          .slice()
-          .sort(
-            (a, b) =>
-              Number(
-                a.sortOrder ?? 0
-              ) -
-              Number(
-                b.sortOrder ?? 0
-              )
-          )
-      },
-
-      set(
-        reorderedList
-      ) {
-        const reorderedMenus =
-          reorderedList.map(
-            (
-              menu,
-              index
-            ) => ({
-              ...menu,
-              sortOrder:
-                index
-            })
-          )
-
-        const reorderMap =
-          new Map(
-            reorderedMenus.map(
-              menu => [
-                menu._id,
-                menu
-              ]
+          }
+        )
+        .slice()
+        .sort(
+          (
+            a,
+            b
+          ) =>
+            Number(
+              a.sortOrder ?? 0
+            ) -
+            Number(
+              b.sortOrder ?? 0
             )
-          )
+        )
+    },
 
-        menus.value =
-          menus.value.map(
-            menu =>
-              reorderMap.get(
-                menu._id
-              ) || menu
+
+    set(
+      reorderedList
+    ) {
+
+      const reorderedMenus =
+        reorderedList.map(
+          (
+            menu,
+            index
+          ) => ({
+
+            ...menu,
+
+            sortOrder:
+              index
+          })
+        )
+
+
+      const reorderMap =
+        new Map(
+          reorderedMenus.map(
+            menu => [
+              menu._id,
+              menu
+            ]
           )
-      }
-    })
+        )
+
+
+      menus.value =
+        menus.value.map(
+          menu =>
+            reorderMap.get(
+              menu._id
+            ) || menu
+        )
+    }
+  })
+
 
 // =========================
 // MENU STOCK / AVAILABILITY
@@ -3160,9 +4070,11 @@ const saveMenuOrder =
 
 const isMenuOrderable =
   item => {
+
     if (!item) {
       return false
     }
+
 
     if (
       item.isAvailable ===
@@ -3171,8 +4083,10 @@ const isMenuOrderable =
       return false
     }
 
+
     if (
-      item.stockMonitoring === true &&
+      item.stockMonitoring ===
+        true &&
       Number(
         item.stock || 0
       ) <= 0
@@ -3180,25 +4094,31 @@ const isMenuOrderable =
       return false
     }
 
+
     return true
   }
 
+
 const isMenuStockMonitored =
   item => {
+
     return (
       item?.stockMonitoring ===
       true
     )
   }
 
+
 const menuStockLabel =
   item => {
+
     if (
       item?.isAvailable ===
       false
     ) {
       return 'Unavailable'
     }
+
 
     if (
       !isMenuStockMonitored(
@@ -3208,6 +4128,7 @@ const menuStockLabel =
       return 'Not Monitored'
     }
 
+
     if (
       Number(
         item.stock || 0
@@ -3216,8 +4137,10 @@ const menuStockLabel =
       return 'Out of Stock'
     }
 
+
     return `${item.stock} in stock`
   }
+
 
 // =========================
 // MENU CARD CLICK
@@ -3225,11 +4148,13 @@ const menuStockLabel =
 
 const handleMenuCardClick =
   item => {
+
     if (
       editLayoutMode.value
     ) {
       return
     }
+
 
     if (
       !isMenuOrderable(item)
@@ -3237,36 +4162,38 @@ const handleMenuCardClick =
       return
     }
 
+
     openAddOnModal(item)
   }
+
 
 // =========================
 // INITIAL LOAD
 // =========================
 
-  onMounted(async () => {
-    /*
-    |--------------------------------------------------------------------------
-    | LOAD SYSTEM SETTINGS FIRST
-    |--------------------------------------------------------------------------
-    |
-    | This ensures offlineCachingEnabled is available
-    | before fetchData() decides whether to refresh
-    | the IndexedDB cache.
-    |--------------------------------------------------------------------------
-    */
+onMounted(
+  async () => {
+
+    // =========================
+    // LOAD SYSTEM SETTINGS FIRST
+    // =========================
 
     await settingsStore.fetchSettings()
+
 
     console.log(
       'POS offline caching enabled:',
       settingsStore.offlineCachingEnabled
     )
 
+
     fetchData()
+
     fetchAddOns()
+
     fetchOrderNumbers()
-  })
+  }
+)
 </script>
 
 <template>
