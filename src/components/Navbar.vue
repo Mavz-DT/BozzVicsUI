@@ -36,6 +36,13 @@ const isOnline = ref(
     : true
 )
 
+const isCheckingServer = ref(false)
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
 const isAdmin = computed(() => {
   return auth.user?.role === 'Admin'
 })
@@ -142,6 +149,107 @@ const serverStatusTextClass = computed(() => {
       return 'text-white/70'
   }
 })
+
+
+/*
+|--------------------------------------------------------------------------
+| Manual Server Connection Check
+|--------------------------------------------------------------------------
+*/
+
+const checkServerConnection = async () => {
+
+  if (
+    isCheckingServer.value
+  ) {
+    return
+  }
+
+  isCheckingServer.value =
+    true
+
+  serverConnectionState.value =
+    'connecting'
+
+  serverConnectionMessage.value =
+    'Connecting to server...'
+
+  const controller =
+    new AbortController()
+
+  const timeoutId =
+    setTimeout(() => {
+      controller.abort()
+    }, 60000)
+
+  try {
+
+    const response =
+      await fetch(
+        `${API_BASE_URL}/api/health`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          signal:
+            controller.signal
+        }
+      )
+
+    if (
+      response.ok
+    ) {
+
+      serverConnectionState.value =
+        'connected'
+
+      serverConnectionMessage.value =
+        'Connected to server.'
+
+    } else {
+
+      serverConnectionState.value =
+        'error'
+
+      serverConnectionMessage.value =
+        `Server responded with HTTP ${response.status}.`
+    }
+
+  } catch (error) {
+
+    console.error(
+      'Navbar server connection check error:',
+      error
+    )
+
+    if (
+      navigator.onLine === false
+    ) {
+
+      serverConnectionState.value =
+        'offline'
+
+      serverConnectionMessage.value =
+        'No internet connection.'
+
+    } else {
+
+      serverConnectionState.value =
+        'error'
+
+      serverConnectionMessage.value =
+        'Unable to connect to server.'
+    }
+
+  } finally {
+
+    clearTimeout(
+      timeoutId
+    )
+
+    isCheckingServer.value =
+      false
+  }
+}
 
 
 /*
@@ -269,12 +377,14 @@ const closeAllMenus = () => {
 
 const toggleMoreMenu = () => {
   adminMenuOpen.value = false
+
   moreMenuOpen.value =
     !moreMenuOpen.value
 }
 
 const toggleAdminMenu = () => {
   moreMenuOpen.value = false
+
   adminMenuOpen.value =
     !adminMenuOpen.value
 }
@@ -299,16 +409,21 @@ const toggleMobileMenu = () => {
 */
 
 const handleLogout = async () => {
+
   closeMobileMenu()
 
   try {
+
     if (
       typeof auth.logout ===
       'function'
     ) {
+
       await auth.logout()
     }
+
   } catch (error) {
+
     console.error(
       'Logout error:',
       error
@@ -356,6 +471,7 @@ const handleDocumentClick = () => {
 */
 
 onMounted(() => {
+
   window.addEventListener(
     'online',
     updateInternetStatus
@@ -373,6 +489,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+
   window.removeEventListener(
     'online',
     updateInternetStatus
@@ -392,10 +509,12 @@ onBeforeUnmount(() => {
 
 
 <template>
+
   <nav
     class="relative z-40 w-full text-white shadow-md"
     :style="{
-      backgroundColor: settingsStore.themeColor
+      backgroundColor:
+        settingsStore.themeColor
     }"
   >
 
@@ -409,10 +528,12 @@ onBeforeUnmount(() => {
     >
 
       <!-- Brand -->
+
       <router-link
         to="/pos"
         class="mr-1 flex min-w-0 shrink-0 items-center gap-2"
       >
+
         <div
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 text-lg"
         >
@@ -422,6 +543,7 @@ onBeforeUnmount(() => {
         <div
           class="min-w-0 max-w-[170px] lg:max-w-[230px]"
         >
+
           <div
             class="truncate text-sm font-black leading-tight lg:text-base"
           >
@@ -433,14 +555,18 @@ onBeforeUnmount(() => {
           >
             {{ businessSubtitle }}
           </div>
+
         </div>
+
       </router-link>
 
 
       <!-- Primary menus -->
+
       <div
         class="flex shrink-0 items-center gap-1"
       >
+
         <router-link
           v-for="item in primaryMenuItems"
           :key="item.to"
@@ -450,20 +576,26 @@ onBeforeUnmount(() => {
         >
           {{ item.label }}
         </router-link>
+
       </div>
 
 
       <!-- More dropdown -->
+
       <div
         class="relative shrink-0"
         @click.stop
       >
+
         <button
           type="button"
           class="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white/85 hover:bg-white/10 hover:text-white"
           @click="toggleMoreMenu"
         >
-          <span>More</span>
+
+          <span>
+            More
+          </span>
 
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -478,19 +610,27 @@ onBeforeUnmount(() => {
             stroke="currentColor"
             stroke-width="2"
           >
+
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               d="M19 9l-7 7-7-7"
             />
+
           </svg>
+
         </button>
 
-        <transition name="dropdown">
+
+        <transition
+          name="dropdown"
+        >
+
           <div
             v-if="moreMenuOpen"
             class="absolute left-0 top-full z-[100] mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 text-gray-700 shadow-2xl"
           >
+
             <div
               class="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-400"
             >
@@ -517,6 +657,7 @@ onBeforeUnmount(() => {
               "
               @click="closeAllMenus"
             >
+
               <span
                 class="w-7 text-center text-base"
               >
@@ -526,24 +667,33 @@ onBeforeUnmount(() => {
               <span>
                 {{ item.label }}
               </span>
+
             </router-link>
+
           </div>
+
         </transition>
+
       </div>
 
 
       <!-- Admin dropdown -->
+
       <div
         v-if="isAdmin"
         class="relative shrink-0"
         @click.stop
       >
+
         <button
           type="button"
           class="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white/85 hover:bg-white/10 hover:text-white"
           @click="toggleAdminMenu"
         >
-          <span>Admin</span>
+
+          <span>
+            Admin
+          </span>
 
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -558,19 +708,27 @@ onBeforeUnmount(() => {
             stroke="currentColor"
             stroke-width="2"
           >
+
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               d="M19 9l-7 7-7-7"
             />
+
           </svg>
+
         </button>
 
-        <transition name="dropdown">
+
+        <transition
+          name="dropdown"
+        >
+
           <div
             v-if="adminMenuOpen"
             class="absolute left-0 top-full z-[100] mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 text-gray-700 shadow-2xl"
           >
+
             <div
               class="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-400"
             >
@@ -597,6 +755,7 @@ onBeforeUnmount(() => {
               "
               @click="closeAllMenus"
             >
+
               <span
                 class="w-7 text-center text-base"
               >
@@ -606,14 +765,21 @@ onBeforeUnmount(() => {
               <span>
                 {{ item.label }}
               </span>
+
             </router-link>
+
           </div>
+
         </transition>
+
       </div>
 
 
       <!-- Spacer -->
-      <div class="min-w-1 flex-1"></div>
+
+      <div
+        class="min-w-1 flex-1"
+      ></div>
 
 
       <!-- =================================================== -->
@@ -626,9 +792,11 @@ onBeforeUnmount(() => {
       >
 
         <!-- Internet -->
+
         <div
           class="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-bold"
         >
+
           <span
             class="h-2 w-2 rounded-full"
             :class="
@@ -638,7 +806,9 @@ onBeforeUnmount(() => {
             "
           ></span>
 
-          <span class="text-white/70">
+          <span
+            class="text-white/70"
+          >
             Internet
           </span>
 
@@ -651,19 +821,26 @@ onBeforeUnmount(() => {
           >
             {{ internetStatusLabel }}
           </span>
+
         </div>
 
 
         <!-- Server -->
+
         <div
           class="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-bold"
         >
+
           <span
             class="h-2 w-2 rounded-full"
-            :class="serverStatusDotClass"
+            :class="
+              serverStatusDotClass
+            "
           ></span>
 
-          <span class="text-white/70">
+          <span
+            class="text-white/70"
+          >
             Server
           </span>
 
@@ -672,30 +849,53 @@ onBeforeUnmount(() => {
               serverStatusTextClass
             "
           >
-            {{ serverStatusLabel }}
+            {{
+              serverStatusLabel
+            }}
           </span>
+
         </div>
+
+
+        <!-- Connect to Server -->
+
+        <button
+          type="button"
+          @click="checkServerConnection"
+          :disabled="isCheckingServer"
+          class="rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-bold hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          :title="
+            isCheckingServer
+              ? 'Connecting to server...'
+              : 'Test server connection'
+          "
+        >
+          {{
+            isCheckingServer
+              ? 'Connecting...'
+              : 'Connect to Server'
+          }}
+        </button>
 
       </div>
 
 
       <!-- Compact connection status for smaller desktop/tablet -->
+
       <div
         class="hidden md:flex xl:hidden shrink-0 items-center gap-1"
         :title="serverStatusTitle"
       >
 
+        <!-- Internet -->
+
         <span
           class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10"
-          :class="
-            isOnline
-              ? 'text-emerald-100'
-              : 'text-red-100'
-          "
           :title="
             `Internet: ${internetStatusLabel}`
           "
         >
+
           <span
             class="h-2 w-2 rounded-full"
             :class="
@@ -704,7 +904,11 @@ onBeforeUnmount(() => {
                 : 'bg-red-400'
             "
           ></span>
+
         </span>
+
+
+        <!-- Server -->
 
         <span
           class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10"
@@ -712,21 +916,53 @@ onBeforeUnmount(() => {
             `Server: ${serverStatusLabel}`
           "
         >
+
           <span
             class="h-2 w-2 rounded-full"
             :class="
               serverStatusDotClass
             "
           ></span>
+
         </span>
+
+
+        <!-- Compact Connect Button -->
+
+        <button
+          type="button"
+          @click="checkServerConnection"
+          :disabled="isCheckingServer"
+          class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-black hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+          :title="
+            isCheckingServer
+              ? 'Connecting to server...'
+              : 'Connect to Server'
+          "
+        >
+
+          <span
+            v-if="isCheckingServer"
+            class="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin"
+          ></span>
+
+          <span
+            v-else
+          >
+            ↻
+          </span>
+
+        </button>
 
       </div>
 
 
       <!-- Logged-in user -->
+
       <div
         class="flex shrink-0 items-center gap-2 pl-2"
       >
+
         <div
           class="hidden h-8 w-8 items-center justify-center rounded-full bg-white/15 text-xs font-black lg:flex"
         >
@@ -740,6 +976,7 @@ onBeforeUnmount(() => {
         <div
           class="max-w-[100px] text-right leading-tight lg:max-w-[130px]"
         >
+
           <div
             class="truncate text-xs font-black"
           >
@@ -751,6 +988,7 @@ onBeforeUnmount(() => {
           >
             {{ auth.user?.role }}
           </div>
+
         </div>
 
         <button
@@ -760,7 +998,9 @@ onBeforeUnmount(() => {
         >
           Logout
         </button>
+
       </div>
+
     </div>
 
 
@@ -773,17 +1013,22 @@ onBeforeUnmount(() => {
     >
 
       <!-- Brand -->
+
       <router-link
         to="/pos"
         class="flex min-w-0 items-center gap-2"
       >
+
         <div
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 text-lg"
         >
           🍽️
         </div>
 
-        <div class="min-w-0">
+        <div
+          class="min-w-0"
+        >
+
           <div
             class="truncate text-sm font-black leading-tight"
           >
@@ -795,22 +1040,27 @@ onBeforeUnmount(() => {
           >
             {{ businessSubtitle }}
           </div>
+
         </div>
+
       </router-link>
 
 
       <!-- Mobile connection status -->
+
       <div
         class="flex shrink-0 items-center gap-1"
       >
 
         <!-- Internet -->
+
         <div
           class="flex h-8 items-center gap-1 rounded-lg bg-white/10 px-1.5"
           :title="
             `Internet: ${internetStatusLabel}`
           "
         >
+
           <span
             class="h-2 w-2 rounded-full"
             :class="
@@ -830,39 +1080,79 @@ onBeforeUnmount(() => {
           >
             {{ internetStatusLabel }}
           </span>
+
         </div>
 
 
         <!-- Server -->
+
         <div
           class="flex h-8 items-center gap-1 rounded-lg bg-white/10 px-1.5"
           :title="serverStatusTitle"
         >
+
           <span
             class="h-2 w-2 rounded-full"
-            :class="serverStatusDotClass"
+            :class="
+              serverStatusDotClass
+            "
           ></span>
 
           <span
             class="hidden sm:inline text-[9px] font-bold"
-            :class="serverStatusTextClass"
+            :class="
+              serverStatusTextClass
+            "
           >
             {{
               serverStatusLabel
             }}
           </span>
+
         </div>
+
+
+        <!-- Mobile Connect Button -->
+
+        <button
+          type="button"
+          @click="checkServerConnection"
+          :disabled="isCheckingServer"
+          class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+          :title="
+            isCheckingServer
+              ? 'Connecting to server...'
+              : 'Connect to Server'
+          "
+        >
+
+          <span
+            v-if="isCheckingServer"
+            class="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin"
+          ></span>
+
+          <span
+            v-else
+            class="text-sm font-black"
+          >
+            ↻
+          </span>
+
+        </button>
 
       </div>
 
 
       <!-- User + hamburger -->
+
       <div
         class="flex shrink-0 items-center gap-2"
       >
+
         <div
           class="hidden sm:block max-w-[95px] text-right leading-tight"
         >
+
           <div
             class="truncate text-xs font-black"
           >
@@ -874,15 +1164,20 @@ onBeforeUnmount(() => {
           >
             {{ auth.user?.role }}
           </div>
+
         </div>
+
 
         <button
           type="button"
           class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
           aria-label="Open menu"
-          :aria-expanded="mobileMenuOpen"
+          :aria-expanded="
+            mobileMenuOpen
+          "
           @click="toggleMobileMenu"
         >
+
           <svg
             v-if="!mobileMenuOpen"
             xmlns="http://www.w3.org/2000/svg"
@@ -892,12 +1187,15 @@ onBeforeUnmount(() => {
             stroke="currentColor"
             stroke-width="2"
           >
+
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               d="M4 6h16M4 12h16M4 18h16"
             />
+
           </svg>
+
 
           <svg
             v-else
@@ -908,14 +1206,19 @@ onBeforeUnmount(() => {
             stroke="currentColor"
             stroke-width="2"
           >
+
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               d="M6 18L18 6M6 6l12 12"
             />
+
           </svg>
+
         </button>
+
       </div>
+
     </div>
 
 
@@ -923,12 +1226,16 @@ onBeforeUnmount(() => {
     <!-- MOBILE OVERLAY -->
     <!-- ===================================================== -->
 
-    <transition name="fade">
+    <transition
+      name="fade"
+    >
+
       <div
         v-if="mobileMenuOpen"
         class="fixed inset-0 z-40 bg-black/50 md:hidden"
         @click="closeMobileMenu"
       ></div>
+
     </transition>
 
 
@@ -936,13 +1243,17 @@ onBeforeUnmount(() => {
     <!-- MOBILE DRAWER -->
     <!-- ===================================================== -->
 
-    <transition name="drawer">
+    <transition
+      name="drawer"
+    >
+
       <aside
         v-if="mobileMenuOpen"
         class="fixed left-0 top-0 z-50 flex h-full w-[84vw] max-w-sm flex-col bg-white text-gray-800 shadow-2xl md:hidden"
       >
 
         <!-- Drawer header -->
+
         <div
           class="flex shrink-0 items-center justify-between p-4 text-white"
           :style="{
@@ -950,16 +1261,21 @@ onBeforeUnmount(() => {
               settingsStore.themeColor
           }"
         >
+
           <div
             class="flex min-w-0 items-center gap-3"
           >
+
             <div
               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-xl"
             >
               🍽️
             </div>
 
-            <div class="min-w-0">
+            <div
+              class="min-w-0"
+            >
+
               <div
                 class="truncate font-black"
               >
@@ -971,8 +1287,11 @@ onBeforeUnmount(() => {
               >
                 {{ businessSubtitle }}
               </div>
+
             </div>
+
           </div>
+
 
           <button
             type="button"
@@ -980,6 +1299,7 @@ onBeforeUnmount(() => {
             aria-label="Close menu"
             @click="closeMobileMenu"
           >
+
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-6 w-6"
@@ -988,20 +1308,26 @@ onBeforeUnmount(() => {
               stroke="currentColor"
               stroke-width="2"
             >
+
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 d="M6 18L18 6M6 6l12 12"
               />
+
             </svg>
+
           </button>
+
         </div>
 
 
         <!-- User -->
+
         <div
           class="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-4"
         >
+
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-black"
             :style="{
@@ -1016,7 +1342,10 @@ onBeforeUnmount(() => {
             }}
           </div>
 
-          <div class="min-w-0">
+          <div
+            class="min-w-0"
+          >
+
             <div
               class="truncate font-black text-gray-800"
             >
@@ -1028,21 +1357,28 @@ onBeforeUnmount(() => {
             >
               {{ auth.user?.role }}
             </div>
+
           </div>
+
         </div>
 
 
         <!-- Mobile server status -->
+
         <div
           class="border-b border-gray-200 bg-white px-4 py-3"
         >
+
           <div
             class="flex items-center justify-between gap-3"
           >
 
+            <!-- Internet -->
+
             <div
               class="flex items-center gap-2"
             >
+
               <span
                 class="h-2.5 w-2.5 rounded-full"
                 :class="
@@ -1066,15 +1402,21 @@ onBeforeUnmount(() => {
                     : 'text-red-600'
                 "
               >
-                {{ internetStatusLabel }}
+                {{
+                  internetStatusLabel
+                }}
               </span>
+
             </div>
 
+
+            <!-- Server -->
 
             <div
               class="flex items-center gap-2"
               :title="serverStatusTitle"
             >
+
               <span
                 class="h-2.5 w-2.5 rounded-full"
                 :class="
@@ -1124,28 +1466,73 @@ onBeforeUnmount(() => {
                   serverStatusLabel
                 }}
               </span>
+
             </div>
 
           </div>
+
+
+          <!-- Server message -->
 
           <p
             v-if="
               serverConnectionState ===
                 'connecting' ||
               serverConnectionState ===
-                'waking'
+                'waking' ||
+              serverConnectionState ===
+                'error' ||
+              serverConnectionState ===
+                'offline'
             "
-            class="mt-2 text-[10px] font-semibold text-amber-600"
+            class="mt-2 text-[10px] font-semibold"
+            :class="
+              serverConnectionState ===
+                'offline' ||
+              serverConnectionState ===
+                'error'
+                ? 'text-red-600'
+                : 'text-amber-600'
+            "
           >
             {{
               serverConnectionMessage
             }}
           </p>
+
+
+          <!-- Connect to Server -->
+
+          <button
+            type="button"
+            @click="checkServerConnection"
+            :disabled="isCheckingServer"
+            class="mt-3 flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-black text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+
+            <span
+              v-if="isCheckingServer"
+              class="h-3.5 w-3.5 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin"
+            ></span>
+
+            <span>
+              {{
+                isCheckingServer
+                  ? 'Connecting...'
+                  : 'Connect to Server'
+              }}
+            </span>
+
+          </button>
+
         </div>
 
 
         <!-- Mobile menu content -->
-        <div class="flex-1 overflow-y-auto p-3">
+
+        <div
+          class="flex-1 overflow-y-auto p-3"
+        >
 
           <div
             class="px-3 py-2 text-[11px] font-black uppercase tracking-wider text-gray-400"
@@ -1155,6 +1542,7 @@ onBeforeUnmount(() => {
 
 
           <!-- Primary -->
+
           <router-link
             v-for="item in primaryMenuItems"
             :key="
@@ -1178,6 +1566,7 @@ onBeforeUnmount(() => {
 
 
           <!-- More menus -->
+
           <router-link
             v-for="item in moreMenuItems"
             :key="
@@ -1196,6 +1585,7 @@ onBeforeUnmount(() => {
             "
             @click="closeMobileMenu"
           >
+
             <span
               class="w-7 text-center text-lg"
             >
@@ -1205,11 +1595,15 @@ onBeforeUnmount(() => {
             <span>
               {{ item.label }}
             </span>
+
           </router-link>
 
 
           <!-- Admin -->
-          <template v-if="isAdmin">
+
+          <template
+            v-if="isAdmin"
+          >
 
             <div
               class="mt-4 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-gray-400"
@@ -1235,6 +1629,7 @@ onBeforeUnmount(() => {
               "
               @click="closeMobileMenu"
             >
+
               <span
                 class="w-7 text-center text-lg"
               >
@@ -1244,21 +1639,26 @@ onBeforeUnmount(() => {
               <span>
                 {{ item.label }}
               </span>
+
             </router-link>
 
           </template>
+
         </div>
 
 
         <!-- Logout -->
+
         <div
           class="shrink-0 border-t border-gray-200 p-3"
         >
+
           <button
             type="button"
             class="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 font-black text-red-600 hover:bg-red-100"
             @click="handleLogout"
           >
+
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-5 w-5"
@@ -1267,18 +1667,23 @@ onBeforeUnmount(() => {
               stroke="currentColor"
               stroke-width="2"
             >
+
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H3"
               />
+
             </svg>
 
             Logout
+
           </button>
+
         </div>
 
       </aside>
+
     </transition>
 
   </nav>
