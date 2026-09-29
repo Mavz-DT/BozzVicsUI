@@ -711,6 +711,46 @@ const resetDelivery =
     }
   }
 
+const confirmDeliverySetup =
+  () => {
+
+    if (
+      !delivery.value.customerName.trim()
+    ) {
+      return
+    }
+
+    if (
+      Number(
+        delivery.value.deliveryFee
+      ) < 0
+    ) {
+      alert(
+        'Hindi puwedeng negative ang delivery fee.'
+      )
+
+      return
+    }
+
+    if (
+      ![
+        'Customer',
+        'Store'
+      ].includes(
+        delivery.value.deliveryFeePaidBy
+      )
+    ) {
+      alert(
+        'Piliin kung Customer o Store ang magbabayad ng delivery fee.'
+      )
+
+      return
+    }
+
+    deliverySetupConfirmed.value =
+      true
+  }
+
 const handleOrderTypeChange =
   async type => {
 

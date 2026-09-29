@@ -3,6 +3,8 @@ import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 import Navbar from './components/Navbar.vue'
+import SessionExpiredBanner from './components/SessionExpiredBanner.vue'
+
 import { useSettingsStore } from './stores/settings'
 
 const route = useRoute()
@@ -22,6 +24,11 @@ onMounted(() => {
     class="min-h-screen flex flex-col bg-gray-100"
   >
     <Navbar
+      v-if="!hideNavbar()"
+    />
+
+    <!-- Session Expired Banner -->
+    <SessionExpiredBanner
       v-if="!hideNavbar()"
     />
 
