@@ -245,7 +245,7 @@ const cashierCategoryOptions = [
   },
   {
     value: 'Labor',
-    label: 'Ulam / Meal Subsidy'
+    label: 'Ulam'
   }
 ]
 
@@ -390,7 +390,7 @@ const getCategoryLabel =
         expense?.laborType
       )
     ) {
-      return 'Ulam / Meal Subsidy'
+      return 'Ulam'
     }
 
     return (
@@ -2436,7 +2436,7 @@ const changeCategory =
         isCashier.value
       ) {
         form.value.item =
-          'Ulam / Meal Subsidy'
+          'Ulam'
 
         form.value.laborType =
           'Ulam'
@@ -3177,7 +3177,7 @@ const submitExpense =
         )
       ) {
         error.value =
-          'Cashier can only record Ulam / Meal Subsidy.'
+          'Cashier can only record Ulam.'
 
         return
       }
@@ -5407,7 +5407,7 @@ onMounted(async () => {
               "
               :value="
                 form.item ||
-                'Ulam / Meal Subsidy'
+                'Ulam'
               "
               type="text"
               readonly
@@ -6150,7 +6150,7 @@ onMounted(async () => {
           <div
             class="font-black text-orange-800"
           >
-            Ulam / Meal Subsidy
+            Ulam
           </div>
 
           <div
