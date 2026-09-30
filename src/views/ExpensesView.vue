@@ -23,6 +23,19 @@ const API_BASE_URL = (
 
 const API = `${API_BASE_URL}/api`
 
+const getAuthHeaders = () => {
+  const token =
+    authStore.getToken?.() ||
+    localStorage.getItem('token') ||
+    ''
+
+  return token
+    ? {
+        Authorization: `Bearer ${token}`
+      }
+    : {}
+}
+
 // =====================================================
 // API HELPERS
 // =====================================================
@@ -138,37 +151,43 @@ const billMonthLoading =
 const billMonthExpenses =
   ref([])
 
-// =====================================================
-// DAILY EXPENSE RECORDS
-// =====================================================
-
 const dailyExpenses =
   ref([])
 
 // =====================================================
-// EXPENSE SECTIONS
+// AUTH / ROLE
+// =====================================================
+
+const isAdmin =
+  computed(() => {
+    return (
+      authStore.user?.role ===
+      'Admin'
+    )
+  })
+
+const isCashier =
+  computed(() => {
+    return (
+      authStore.user?.role ===
+      'Cashier'
+    )
+  })
+
+// =====================================================
+// EXPENSE TABS
 // =====================================================
 
 const expenseSections = [
   {
     key: 'Ingredient',
-    label: 'Ingredients & Materials',
-    icon: '🥩'
-  },
-  {
-    key: 'Maintenance',
-    label: 'Maintenance Expenses',
-    icon: '🔧'
+    label: 'Operating Expenses',
+    icon: '💼'
   },
   {
     key: 'Bill',
     label: 'Bills',
     icon: '🧾'
-  },
-  {
-    key: 'Miscellaneous',
-    label: 'Miscellaneous',
-    icon: '📋'
   },
   {
     key: 'Labor',
@@ -177,24 +196,96 @@ const expenseSections = [
   }
 ]
 
-const activeSection = ref(
-  'Ingredient'
-)
+const activeSection =
+  ref('Ingredient')
 
-const searchExpense = ref('')
+const searchExpense =
+  ref('')
 
 // =====================================================
-// INGREDIENT / MATERIAL CATEGORY FILTER
+// CATEGORY OPTIONS
 // =====================================================
 
-const inventoryCategoryFilter =
-  ref('All')
+const operatingCategoryOptions = [
+  'Ingredient',
+  'Material',
+  'Maintenance',
+  'Miscellaneous'
+]
+
+const adminCategoryOptions = [
+  'Ingredient',
+  'Material',
+  'Maintenance',
+  'Miscellaneous',
+  'Bill',
+  'Labor'
+]
+
+const cashierCategoryOptions = [
+  {
+    value: 'Ingredient',
+    label: 'Ingredient'
+  },
+  {
+    value: 'Material',
+    label: 'Material'
+  },
+  {
+    value: 'Maintenance',
+    label: 'Maintenance'
+  },
+  {
+    value: 'Miscellaneous',
+    label: 'Miscellaneous'
+  },
+  {
+    value: 'Bill',
+    label: 'Bill'
+  },
+  {
+    value: 'Labor',
+    label: 'Ulam / Meal Subsidy'
+  }
+]
 
 const inventoryCategoryOptions = [
   'All',
   'Ingredient',
   'Material'
 ]
+
+const CASHIER_ALLOWED_BILLS = [
+  'Electricity Bill',
+  'Pest Control',
+  'Water Bill',
+  'WiFi Bill'
+]
+
+const getCategoryOptions =
+  computed(() => {
+    if (
+      isCashier.value
+    ) {
+      return cashierCategoryOptions
+    }
+
+    return adminCategoryOptions.map(
+      category => ({
+        value: category,
+        label: category
+      })
+    )
+  })
+
+const normalizeExpenseName =
+  name => {
+    return String(
+      name || ''
+    )
+      .trim()
+      .toLowerCase()
+  }
 
 const isInventoryCategory =
   category => {
@@ -204,15 +295,199 @@ const isInventoryCategory =
     )
   }
 
+const isOperatingCategory =
+  category => {
+    return operatingCategoryOptions.includes(
+      category
+    )
+  }
+
+const isCashierAllowedBill =
+  name => {
+    const normalizedName =
+      normalizeExpenseName(
+        name
+      )
+
+    return CASHIER_ALLOWED_BILLS.some(
+      bill =>
+        normalizeExpenseName(
+          bill
+        ) === normalizedName
+    )
+  }
+
+const isUlamLabor =
+  (
+    name,
+    laborType
+  ) => {
+    const normalizedName =
+      normalizeExpenseName(
+        name
+      )
+
+    const normalizedLaborType =
+      normalizeExpenseName(
+        laborType
+      )
+
+    return (
+      normalizedName ===
+        'ulam' ||
+      normalizedName ===
+        'ulam / meal subsidy' ||
+      normalizedLaborType ===
+        'ulam' ||
+      normalizedLaborType ===
+        'meal subsidy'
+    )
+  }
+
+const isCashierAllowedRecord =
+  expense => {
+    if (!expense) {
+      return false
+    }
+
+    if (
+      isOperatingCategory(
+        expense.category
+      )
+    ) {
+      return true
+    }
+
+    if (
+      expense.category ===
+      'Bill'
+    ) {
+      return isCashierAllowedBill(
+        expense.name
+      )
+    }
+
+    if (
+      expense.category ===
+      'Labor'
+    ) {
+      return isUlamLabor(
+        expense.name,
+        expense.laborType
+      )
+    }
+
+    return false
+  }
+
+const getCategoryLabel =
+  expense => {
+    if (
+      expense?.category ===
+        'Labor' &&
+      isUlamLabor(
+        expense?.name,
+        expense?.laborType
+      )
+    ) {
+      return 'Ulam / Meal Subsidy'
+    }
+
+    return (
+      expense?.category ||
+      '—'
+    )
+  }
+
 // =====================================================
-// INITIAL INVENTORY MASTER FALLBACK
+// FORM
+// =====================================================
+
+const form = ref({
+  item: '',
+  expenseItemId: null,
+
+  price: '',
+  qty: 1,
+  unit: 'pcs',
+
+  category: '',
+
+  frequency: 'One-Time',
+
+  periodMonth:
+    todayPH.slice(0, 7),
+
+  payrollPeriodStart: '',
+  payrollPeriodEnd: '',
+
+  expenseDate:
+    todayPH,
+
+  remarks: '',
+
+  dueDate: '',
+  paymentStatus: 'Paid',
+  paidDate: '',
+
+  paymentSource:
+    'Store',
+
+  maintenanceType: '',
+  billType: '',
+
+  laborType: 'Regular',
+  laborAmountStatus: 'Actual',
+
+  payday: ''
+})
+
+const submitting =
+  ref(false)
+
+const isEditMode =
+  ref(false)
+
+const editingExpenseId =
+  ref(null)
+
+const error =
+  ref('')
+
+const success =
+  ref('')
+
+// =====================================================
+// BILL PAYMENT MODAL
+// =====================================================
+
+const isBillPaymentModalOpen =
+  ref(false)
+
+const selectedBillForPayment =
+  ref(null)
+
+const billPaymentSource =
+  ref('Store')
+
+const billPaymentSubmitting =
+  ref(false)
+
+// =====================================================
+// MASTER EXPENSE ITEMS
+// =====================================================
+
+const masterExpenseItems =
+  ref([])
+
+const masterLoading =
+  ref(false)
+
+// =====================================================
+// FALLBACK INVENTORY ITEMS
 // =====================================================
 
 const inventoryFallbackItems = [
-  // ===================================================
-  // INGREDIENTS
-  // ===================================================
-
   {
     name: 'Atsuete',
     category: 'Ingredient'
@@ -381,11 +656,6 @@ const inventoryFallbackItems = [
     name: 'Toyo',
     category: 'Ingredient'
   },
-
-  // ===================================================
-  // MATERIALS
-  // ===================================================
-
   {
     name: 'Bilao',
     category: 'Material'
@@ -453,106 +723,7 @@ const inventoryFallbackItems = [
 ]
 
 // =====================================================
-// FORM
-// =====================================================
-
-const form = ref({
-  item: '',
-  expenseItemId: null,
-
-  price: '',
-  qty: 1,
-  unit: 'pcs',
-
-  category: 'Ingredient',
-
-  frequency: 'One-Time',
-
-  periodMonth:
-    todayPH.slice(0, 7),
-
-  payrollPeriodStart: '',
-  payrollPeriodEnd: '',
-
-  expenseDate: todayPH,
-
-  remarks: '',
-
-  dueDate: '',
-  paymentStatus: 'Paid',
-  paidDate: '',
-
-  // Store = store cash / kaha
-  // Owner = owner's own money
-  paymentSource: 'Store',
-
-  maintenanceType: '',
-  billType: '',
-
-  laborType: 'Regular',
-  laborAmountStatus: 'Actual',
-
-  payday: ''
-})
-
-const submitting = ref(false)
-
-// =====================================================
-// BILL PAYMENT MODAL
-// =====================================================
-
-const isBillPaymentModalOpen =
-  ref(false)
-
-const selectedBillForPayment =
-  ref(null)
-
-const billPaymentSource =
-  ref('Store')
-
-const billPaymentSubmitting =
-  ref(false)
-
-// =====================================================
-// AUTH
-// =====================================================
-
-const getAuthHeaders = () => {
-  const token =
-    authStore.getToken?.() ||
-    localStorage.getItem(
-      'token'
-    ) ||
-    ''
-
-  return token
-    ? {
-        Authorization:
-          `Bearer ${token}`
-      }
-    : {}
-}
-
-const error = ref('')
-const success = ref('')
-
-const isEditMode = ref(false)
-
-const editingExpenseId =
-  ref(null)
-
-// =====================================================
-// EXPENSE MASTER ITEMS
-// =====================================================
-
-const masterExpenseItems =
-  ref([])
-
-const masterLoading =
-  ref(false)
-
-// =====================================================
-// MASTER ITEM KEY
+// MASTER ITEM HELPERS
 // =====================================================
 
 const getMasterItemKey =
@@ -564,10 +735,6 @@ const getMasterItemKey =
     ).trim().toLowerCase()}`
   }
 
-// =====================================================
-// MERGE MASTER ITEMS
-// =====================================================
-
 const mergeMasterItems =
   (
     existingItems,
@@ -576,7 +743,8 @@ const mergeMasterItems =
     const map = new Map()
 
     for (
-      const item of existingItems || []
+      const item of
+        existingItems || []
     ) {
       if (
         item?.name &&
@@ -590,7 +758,8 @@ const mergeMasterItems =
     }
 
     for (
-      const item of newItems || []
+      const item of
+        newItems || []
     ) {
       if (
         item?.name &&
@@ -702,30 +871,11 @@ const fetchMasterExpenseItems =
     }
   }
 
-const activeMasterItems =
-  computed(() => {
-    if (
-      activeSection.value ===
-      'Ingredient'
-    ) {
-      return masterExpenseItems.value.filter(
-        item =>
-          isInventoryCategory(
-            item.category
-          )
-      )
-    }
-
-    return masterExpenseItems.value.filter(
-      item =>
-        item.category ===
-        form.value.category
-    )
-  })
-
 const selectedMasterItem =
   computed(() => {
-    if (!form.value.expenseItemId) {
+    if (
+      !form.value.expenseItemId
+    ) {
       return null
     }
 
@@ -739,6 +889,79 @@ const selectedMasterItem =
             form.value.expenseItemId
           )
       ) || null
+    )
+  })
+
+// =====================================================
+// FORM CATEGORY STATE
+// =====================================================
+
+const isCategorySelected =
+  computed(() => {
+    return Boolean(
+      form.value.category
+    )
+  })
+
+const isExistingExpenseItem =
+  computed(() => {
+    return Boolean(
+      form.value.expenseItemId
+    )
+  })
+
+const isInventoryExpense =
+  computed(() => {
+    return isInventoryCategory(
+      form.value.category
+    )
+  })
+
+const isBillExpense =
+  computed(() => {
+    return (
+      form.value.category ===
+      'Bill'
+    )
+  })
+
+const isLaborExpense =
+  computed(() => {
+    return (
+      form.value.category ===
+      'Labor'
+    )
+  })
+
+const isUlamExpense =
+  computed(() => {
+    if (
+      form.value.category !==
+      'Labor'
+    ) {
+      return false
+    }
+
+    return isUlamLabor(
+      form.value.item,
+      form.value.laborType
+    )
+  })
+
+const isAdminLabor =
+  computed(() => {
+    return (
+      isLaborExpense.value &&
+      !isUlamExpense.value
+    )
+  })
+
+const isOperatingExpense =
+  computed(() => {
+    return (
+      isOperatingCategory(
+        form.value.category
+      )
     )
   })
 
@@ -765,30 +988,8 @@ const expenseFrequencyOptions = [
   'One-Time'
 ]
 
-const isInventoryExpense =
-  computed(() => {
-    return isInventoryCategory(
-      form.value.category
-    )
-  })
-
-const isLaborExpense =
-  computed(() => {
-    return (
-      form.value.category ===
-      'Labor'
-    )
-  })
-
-const isExistingExpenseItem =
-  computed(() => {
-    return Boolean(
-      form.value.expenseItemId
-    )
-  })
-
 // =====================================================
-// SEARCH NAME MATCH
+// ITEM SEARCH
 // =====================================================
 
 const matchesItemQuery =
@@ -822,10 +1023,6 @@ const matchesItemQuery =
       normalizedQuery
     )
   }
-
-// =====================================================
-// AUTOCOMPLETE SCORE
-// =====================================================
 
 const getItemScore =
   (
@@ -895,9 +1092,61 @@ const getItemScore =
     return 0
   }
 
-// =====================================================
-// SEARCH EXPENSE ITEMS
-// =====================================================
+const filterItemsForRole =
+  items => {
+    const records =
+      Array.isArray(items)
+        ? items
+        : []
+
+    if (
+      isAdmin.value
+    ) {
+      return records.filter(
+        item =>
+          item?.isActive !== false
+      )
+    }
+
+    return records.filter(
+      item => {
+        if (
+          item?.isActive === false
+        ) {
+          return false
+        }
+
+        if (
+          isOperatingCategory(
+            item?.category
+          )
+        ) {
+          return true
+        }
+
+        if (
+          item?.category ===
+          'Bill'
+        ) {
+          return isCashierAllowedBill(
+            item?.name
+          )
+        }
+
+        if (
+          item?.category ===
+          'Labor'
+        ) {
+          return isUlamLabor(
+            item?.name,
+            item?.laborType
+          )
+        }
+
+        return false
+      }
+    )
+  }
 
 const searchExpenseItems =
   async () => {
@@ -924,25 +1173,10 @@ const searchExpenseItems =
             )
         )
 
-    if (
-      activeSection.value ===
-      'Ingredient'
-    ) {
-      localItems =
-        localItems.filter(
-          item =>
-            isInventoryCategory(
-              item.category
-            )
-        )
-    } else {
-      localItems =
-        localItems.filter(
-          item =>
-            item.category ===
-            form.value.category
-        )
-    }
+    localItems =
+      filterItemsForRole(
+        localItems
+      )
 
     let apiItems = []
 
@@ -955,15 +1189,15 @@ const searchExpenseItems =
         query
       )
 
-      if (
-        activeSection.value !==
-        'Ingredient'
-      ) {
-        params.append(
-          'category',
-          form.value.category
-        )
-      }
+      /*
+      |--------------------------------------------------------------------------
+      | IMPORTANT:
+      | Do not send category here.
+      |
+      | Item autocomplete is UNIVERSAL.
+      | The selected existing item decides the category.
+      |--------------------------------------------------------------------------
+      */
 
       const data =
         await fetchJson(
@@ -976,9 +1210,8 @@ const searchExpenseItems =
         )
 
       apiItems =
-        extractArray(data).filter(
-          item =>
-            item?.isActive !== false
+        filterItemsForRole(
+          extractArray(data)
         )
 
     } catch (err) {
@@ -986,26 +1219,6 @@ const searchExpenseItems =
         'API autocomplete search error:',
         err
       )
-    }
-
-    if (
-      activeSection.value ===
-      'Ingredient'
-    ) {
-      apiItems =
-        apiItems.filter(
-          item =>
-            isInventoryCategory(
-              item.category
-            )
-        )
-    } else {
-      apiItems =
-        apiItems.filter(
-          item =>
-            item.category ===
-            form.value.category
-        )
     }
 
     const mergedMap =
@@ -1100,7 +1313,7 @@ const searchExpenseItems =
         )
         .slice(
           0,
-          8
+          10
         )
         .map(
           item => {
@@ -1159,6 +1372,30 @@ const onItemInput =
 
       selectedExpenseItemName.value =
         ''
+
+      /*
+      |--------------------------------------------------------------------------
+      | NEW ITEM:
+      | Category becomes blank until user chooses one.
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        !isEditMode.value
+      ) {
+        if (
+          isCashier.value
+        ) {
+          form.value.category =
+            ''
+        } else if (
+          activeSection.value ===
+          'Ingredient'
+        ) {
+          form.value.category =
+            ''
+        }
+      }
     }
 
     await searchExpenseItems()
@@ -1186,6 +1423,16 @@ const selectExpenseItem =
     selectedExpenseItemName.value =
       item.name || ''
 
+    /*
+    |--------------------------------------------------------------------------
+    | EXISTING ITEM:
+    | Category is automatically loaded from master.
+    |--------------------------------------------------------------------------
+    */
+
+    form.value.category =
+      item.category || ''
+
     if (
       expenseFrequencyOptions.includes(
         item.frequency
@@ -1198,7 +1445,37 @@ const selectExpenseItem =
         'One-Time'
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Do NOT autofill Ulam amount from default master amount.
+    |
+    | Ulam is now manual actual daily input.
+    |--------------------------------------------------------------------------
+    */
+
     if (
+      item.category ===
+        'Labor' &&
+      isUlamLabor(
+        item.name,
+        item.laborType
+      )
+    ) {
+      form.value.price =
+        ''
+
+      form.value.frequency =
+        'One-Time'
+
+      form.value.laborType =
+        'Ulam'
+
+      form.value.unit =
+        'day'
+
+      form.value.expenseDate =
+        todayPH
+    } else if (
       item.defaultAmount !==
         undefined &&
       item.defaultAmount !==
@@ -1222,27 +1499,55 @@ const selectExpenseItem =
       'Labor'
     ) {
       form.value.laborType =
-        item.laborType ||
-        'Regular'
+        isUlamLabor(
+          item.name,
+          item.laborType
+        )
+          ? 'Ulam'
+          : (
+              item.laborType ||
+              'Regular'
+            )
     }
 
-    form.value.category =
-      item.category ||
-      form.value.category
+    /*
+    |--------------------------------------------------------------------------
+    | Update Admin tab based on selected item.
+    |--------------------------------------------------------------------------
+    */
 
     if (
-      isInventoryCategory(
-        item.category
-      )
+      isAdmin.value
     ) {
-      activeSection.value =
-        'Ingredient'
+      if (
+        isOperatingCategory(
+          item.category
+        )
+      ) {
+        activeSection.value =
+          'Ingredient'
 
-      inventoryCategoryFilter.value =
-        item.category
-    } else {
-      activeSection.value =
-        item.category
+        if (
+          isInventoryCategory(
+            item.category
+          )
+        ) {
+          inventoryCategoryFilter.value =
+            item.category
+        }
+      } else if (
+        item.category ===
+        'Bill'
+      ) {
+        activeSection.value =
+          'Bill'
+      } else if (
+        item.category ===
+        'Labor'
+      ) {
+        activeSection.value =
+          'Labor'
+      }
     }
 
     updatePeriodFromFrequency()
@@ -1278,17 +1583,6 @@ const closeItemSuggestions =
   }
 
 // =====================================================
-// BILL ITEM COMPATIBILITY
-// =====================================================
-
-const selectBillItem =
-  async item => {
-    await selectExpenseItem(
-      item
-    )
-  }
-
-// =====================================================
 // PREPARE BILL
 // =====================================================
 
@@ -1307,24 +1601,16 @@ const prepareBillFromSelectedItem =
     updatePeriodFromFrequency()
 
     if (
-      form.value.frequency ===
-      'Monthly'
-    ) {
-      await fetchBillEstimate()
-      return
-    }
-
-    if (
-      form.value.frequency ===
-      'Weekly'
-    ) {
-      await fetchBillEstimate()
-      return
-    }
-
-    if (
-      form.value.frequency ===
-      'Daily'
+      isAdmin.value &&
+      form.value.expenseItemId &&
+      (
+        form.value.frequency ===
+          'Monthly' ||
+        form.value.frequency ===
+          'Weekly' ||
+        form.value.frequency ===
+          'Daily'
+      )
     ) {
       await fetchBillEstimate()
     }
@@ -1356,8 +1642,7 @@ const fetchBillEstimate =
     }
 
     if (
-      authStore.user?.role !==
-      'Admin'
+      !isAdmin.value
     ) {
       return
     }
@@ -1394,7 +1679,9 @@ const fetchBillEstimate =
           form.value.payrollPeriodStart
       }
 
-      if (periodStart) {
+      if (
+        periodStart
+      ) {
         params.append(
           'periodStart',
           periodStart
@@ -1426,6 +1713,7 @@ const fetchBillEstimate =
             data.amount || 0
           )
       }
+
     } catch (err) {
       console.error(
         'Error fetching bill estimate:',
@@ -1436,24 +1724,6 @@ const fetchBillEstimate =
         err.message ||
         'Failed to load bill estimate.'
     }
-  }
-
-// =====================================================
-// BILL PERIOD
-// =====================================================
-
-const changeBillPeriod =
-  async () => {
-    if (
-      form.value.category !==
-      'Bill'
-    ) {
-      return
-    }
-
-    updatePeriodFromFrequency()
-
-    await fetchBillEstimate()
   }
 
 // =====================================================
@@ -1483,21 +1753,17 @@ const changePaymentStatus =
       form.value.paymentSource =
         'Store'
     }
+
+    if (
+      !form.value.paidDate
+    ) {
+      form.value.paidDate =
+        todayPH
+    }
   }
 
 // =====================================================
-// LABOR ITEM COMPATIBILITY
-// =====================================================
-
-const selectLaborItem =
-  async item => {
-    await selectExpenseItem(
-      item
-    )
-  }
-
-// =====================================================
-// PREPARE LABOR
+// LABOR PREPARE
 // =====================================================
 
 const prepareLaborFromSelectedItem =
@@ -1506,6 +1772,30 @@ const prepareLaborFromSelectedItem =
       form.value.category !==
       'Labor'
     ) {
+      return
+    }
+
+    if (
+      isUlamLabor(
+        form.value.item,
+        form.value.laborType
+      )
+    ) {
+      form.value.laborType =
+        'Ulam'
+
+      form.value.frequency =
+        'One-Time'
+
+      form.value.price =
+        ''
+
+      form.value.unit =
+        'day'
+
+      form.value.expenseDate =
+        todayPH
+
       return
     }
 
@@ -1540,39 +1830,100 @@ const prepareLaborFromSelectedItem =
   }
 
 // =====================================================
-// SELECTED LABOR LABEL
+// 13TH MONTH ESTIMATE
 // =====================================================
 
-const getSelectedLaborLabel =
-  computed(() => {
-    const item =
-      selectedMasterItem.value
-
-    if (!item) {
-      return ''
+const fetch13thMonthEstimate =
+  async () => {
+    if (
+      form.value.category !==
+      'Labor'
+    ) {
+      return
     }
 
-    const parts = []
+    if (
+      form.value.laborType !==
+      '13thMonth'
+    ) {
+      return
+    }
 
-    if (item.laborType) {
-      parts.push(
-        item.laborType
+    if (
+      !form.value.expenseItemId
+    ) {
+      return
+    }
+
+    if (
+      !isAdmin.value
+    ) {
+      return
+    }
+
+    form.value.frequency =
+      'Monthly'
+
+    if (
+      !form.value.periodMonth
+    ) {
+      form.value.periodMonth =
+        selectedLaborMonth.value ||
+        selectedDate.value.slice(
+          0,
+          7
+        )
+    }
+
+    updatePeriodFromFrequency()
+
+    try {
+      const params =
+        new URLSearchParams()
+
+      params.append(
+        'month',
+        form.value.periodMonth
       )
-    }
 
-    if (item.frequency) {
-      parts.push(
-        item.frequency
+      params.append(
+        'expenseItemId',
+        form.value.expenseItemId
       )
-    }
 
-    return parts.join(
-      ' • '
-    )
-  })
+      const data =
+        await fetchJson(
+          `${API}/expenses/labor/13th-month-estimate?${params.toString()}`,
+          {
+            headers: {
+              ...getAuthHeaders()
+            }
+          }
+        )
+
+      if (
+        !isEditMode.value
+      ) {
+        form.value.price =
+          Number(
+            data?.amount || 0
+          )
+      }
+
+    } catch (err) {
+      console.error(
+        'Error fetching 13th month estimate:',
+        err
+      )
+
+      error.value =
+        err.message ||
+        'Failed to load 13th month estimate.'
+    }
+  }
 
 // =====================================================
-// DATE HELPERS
+// FREQUENCY / PERIOD
 // =====================================================
 
 const formatInputDate =
@@ -1703,36 +2054,6 @@ const getDateOnly =
     ).format(parsed)
   }
 
-const addDaysToDate =
-  (
-    dateString,
-    days
-  ) => {
-    if (!dateString) {
-      return ''
-    }
-
-    const parts =
-      dateString
-        .split('-')
-        .map(Number)
-
-    const date =
-      new Date(
-        parts[0],
-        parts[1] - 1,
-        parts[2]
-      )
-
-    date.setDate(
-      date.getDate() + days
-    )
-
-    return formatInputDate(
-      date
-    )
-  }
-
 const getMonthStartDate =
   dateString => {
     if (!dateString) {
@@ -1861,10 +2182,6 @@ const getSunday =
     )
   }
 
-// =====================================================
-// FREQUENCY / PERIOD
-// =====================================================
-
 const updatePeriodFromFrequency =
   () => {
     const frequency =
@@ -1916,7 +2233,7 @@ const updatePeriodFromFrequency =
                   selectedLaborMonth.value ||
                   todayPH.slice(0, 7)
                 )
-              : selectedDate.value.slice(
+              : todayPH.slice(
                   0,
                   7
                 )
@@ -1955,7 +2272,7 @@ const updatePeriodFromFrequency =
                   selectedLaborMonth.value ||
                   todayPH.slice(0, 7)
                 )
-              : selectedDate.value.slice(
+              : todayPH.slice(
                   0,
                   7
                 )
@@ -2006,206 +2323,369 @@ const changeFrequency =
       form.value.category ===
         'Labor' &&
       form.value.laborType ===
-      '13thMonth'
+        '13thMonth'
     ) {
       await fetch13thMonthEstimate()
     }
   }
 
 // =====================================================
-// 13TH MONTH ESTIMATE
+// CATEGORY CHANGE
 // =====================================================
 
-const fetch13thMonthEstimate =
+const changeCategory =
   async () => {
-    if (
-      form.value.category !==
-      'Labor'
-    ) {
-      return
-    }
-
-    if (
-      form.value.laborType !==
-      '13thMonth'
-    ) {
-      return
-    }
-
-    if (
-      !form.value.expenseItemId
-    ) {
-      return
-    }
-
-    if (
-      authStore.user?.role !==
-      'Admin'
-    ) {
-      return
-    }
-
-    form.value.frequency =
-      'Monthly'
-
-    if (
-      !form.value.periodMonth
-    ) {
-      form.value.periodMonth =
-        selectedLaborMonth.value ||
-        selectedDate.value.slice(
-          0,
-          7
-        )
-    }
-
-    updatePeriodFromFrequency()
-
-    try {
-      const params =
-        new URLSearchParams()
-
-      params.append(
-        'month',
-        form.value.periodMonth
-      )
-
-      params.append(
-        'expenseItemId',
-        form.value.expenseItemId
-      )
-
-      const data =
-        await fetchJson(
-          `${API}/expenses/labor/13th-month-estimate?${params.toString()}`,
-          {
-            headers: {
-              ...getAuthHeaders()
-            }
-          }
-        )
-
-      if (
-        !isEditMode.value
-      ) {
-        form.value.price =
-          Number(
-            data?.amount || 0
-          )
-
-        form.value.laborAmountStatus =
-          data?.source ===
-          'Actual'
-            ? 'Actual'
-            : 'Estimated'
-      }
-
-    } catch (err) {
-      console.error(
-        'Error fetching 13th month estimate:',
-        err
-      )
-
-      error.value =
-        err.message ||
-        'Failed to load 13th month estimate.'
-    }
-  }
-
-const change13thMonthPeriod =
-  async () => {
-    if (
-      form.value.category !==
-      'Labor'
-    ) {
-      return
-    }
-
-    if (
-      form.value.laborType !==
-      '13thMonth'
-    ) {
-      return
-    }
-
-    form.value.frequency =
-      'Monthly'
-
-    updatePeriodFromFrequency()
-
-    await fetch13thMonthEstimate()
-  }
-
-// =====================================================
-// LABOR MONTH FILTER
-// =====================================================
-
-const changeLaborMonth =
-  async () => {
-    if (
-      authStore.user?.role !==
-      'Admin'
-    ) {
-      return
-    }
-
-    if (
-      !selectedLaborMonth.value
-    ) {
-      selectedLaborMonth.value =
-        todayPH.slice(
-          0,
-          7
-        )
-    }
-
-    if (
-      activeSection.value ===
-      'Labor'
-    ) {
-      form.value.periodMonth =
-        selectedLaborMonth.value
-    }
-
     error.value = ''
 
-    await fetchLaborMonthExpenses()
-  }
+    /*
+    |--------------------------------------------------------------------------
+    | Selecting a NEW category means this is a new item
+    | unless we're currently editing an existing record.
+    |--------------------------------------------------------------------------
+    */
 
-// =====================================================
-// BILL MONTH FILTER
-// =====================================================
-
-const changeBillMonth =
-  async () => {
     if (
-      authStore.user?.role !==
-      'Admin'
+      !isEditMode.value
     ) {
-      return
+      form.value.expenseItemId =
+        null
+
+      selectedExpenseItemId.value =
+        null
+
+      selectedExpenseItemName.value =
+        ''
+
+      itemSuggestions.value =
+        []
+
+      showItemSuggestions.value =
+        false
     }
 
-    if (
-      !selectedBillMonth.value
-    ) {
-      selectedBillMonth.value =
-        todayPH.slice(
-          0,
-          7
-        )
-    }
+    form.value.price =
+      ''
+
+    form.value.qty =
+      1
+
+    form.value.unit =
+      'pcs'
+
+    form.value.frequency =
+      'One-Time'
+
+    form.value.periodMonth =
+      todayPH.slice(
+        0,
+        7
+      )
+
+    form.value.payrollPeriodStart =
+      ''
+
+    form.value.payrollPeriodEnd =
+      ''
+
+    form.value.expenseDate =
+      todayPH
+
+    form.value.remarks =
+      ''
+
+    form.value.dueDate =
+      ''
+
+    form.value.paymentStatus =
+      'Paid'
+
+    form.value.paidDate =
+      ''
+
+    form.value.paymentSource =
+      'Store'
+
+    form.value.maintenanceType =
+      ''
+
+    form.value.billType =
+      ''
+
+    form.value.laborType =
+      'Regular'
+
+    form.value.laborAmountStatus =
+      'Actual'
+
+    form.value.payday =
+      ''
 
     if (
-      activeSection.value ===
+      form.value.category ===
       'Bill'
     ) {
-      form.value.periodMonth =
-        selectedBillMonth.value
+      form.value.billType =
+        form.value.item
     }
 
-    error.value = ''
+    if (
+      form.value.category ===
+      'Labor'
+    ) {
+      if (
+        isCashier.value
+      ) {
+        form.value.item =
+          'Ulam / Meal Subsidy'
 
-    await fetchBillMonthExpenses()
+        form.value.laborType =
+          'Ulam'
+
+        form.value.frequency =
+          'One-Time'
+
+        form.value.unit =
+          'day'
+
+        form.value.expenseDate =
+          todayPH
+      } else {
+        form.value.laborType =
+          'Regular'
+      }
+    }
+
+    if (
+      isInventoryCategory(
+        form.value.category
+      )
+    ) {
+      inventoryCategoryFilter.value =
+        form.value.category
+    }
+
+    updatePeriodFromFrequency()
+  }
+
+// =====================================================
+// ADMIN SECTION CHANGE
+// =====================================================
+
+const changeSection =
+  async section => {
+    if (
+      !isAdmin.value
+    ) {
+      return
+    }
+
+    activeSection.value =
+      section
+
+    /*
+    |--------------------------------------------------------------------------
+    | Category behavior:
+    |
+    | Operating Expenses = blank for new item.
+    | Bills = Bill.
+    | Labor Cost = Labor.
+    |--------------------------------------------------------------------------
+    */
+
+    const defaultCategory =
+      section === 'Bill'
+        ? 'Bill'
+        : section === 'Labor'
+          ? 'Labor'
+          : ''
+
+    form.value = {
+      item: '',
+      expenseItemId: null,
+
+      price: '',
+      qty: 1,
+      unit: 'pcs',
+
+      category:
+        defaultCategory,
+
+      frequency:
+        'One-Time',
+
+      periodMonth:
+        section === 'Bill'
+          ? selectedBillMonth.value
+          : section === 'Labor'
+            ? selectedLaborMonth.value
+            : todayPH.slice(
+                0,
+                7
+              ),
+
+      payrollPeriodStart:
+        '',
+
+      payrollPeriodEnd:
+        '',
+
+      expenseDate:
+        todayPH,
+
+      remarks:
+        '',
+
+      dueDate:
+        '',
+
+      paymentStatus:
+        'Paid',
+
+      paidDate:
+        '',
+
+      paymentSource:
+        'Store',
+
+      maintenanceType:
+        '',
+
+      billType:
+        section === 'Bill'
+          ? ''
+          : '',
+
+      laborType:
+        'Regular',
+
+      laborAmountStatus:
+        'Actual',
+
+      payday:
+        ''
+    }
+
+    selectedExpenseItemName.value =
+      ''
+
+    selectedExpenseItemId.value =
+      null
+
+    showItemSuggestions.value =
+      false
+
+    itemSuggestions.value =
+      []
+
+    if (
+      section ===
+      'Ingredient'
+    ) {
+      inventoryCategoryFilter.value =
+        'All'
+
+      await fetchExpenses()
+      return
+    }
+
+    if (
+      section ===
+      'Bill'
+    ) {
+      await fetchBillMonthExpenses()
+      return
+    }
+
+    if (
+      section ===
+      'Labor'
+    ) {
+      await fetchLaborMonthExpenses()
+      return
+    }
+  }
+
+// =====================================================
+// SELECT CASHIER BILL
+// =====================================================
+
+const selectCashierBill =
+  billName => {
+    const existingMaster =
+      masterExpenseItems.value.find(
+        item =>
+          item.category ===
+            'Bill' &&
+          normalizeExpenseName(
+            item.name
+          ) ===
+            normalizeExpenseName(
+              billName
+            )
+      )
+
+    form.value.item =
+      billName
+
+    form.value.expenseItemId =
+      existingMaster?._id ||
+      null
+
+    form.value.category =
+      'Bill'
+
+    form.value.billType =
+      billName
+
+    form.value.frequency =
+      existingMaster?.frequency &&
+      expenseFrequencyOptions.includes(
+        existingMaster.frequency
+      )
+        ? existingMaster.frequency
+        : 'One-Time'
+
+    form.value.price =
+      ''
+
+    form.value.qty =
+      1
+
+    form.value.unit =
+      'pcs'
+
+    form.value.dueDate =
+      ''
+
+    form.value.paymentStatus =
+      'Paid'
+
+    form.value.paidDate =
+      todayPH
+
+    form.value.paymentSource =
+      'Store'
+
+    form.value.expenseDate =
+      todayPH
+
+    form.value.remarks =
+      ''
+
+    selectedExpenseItemName.value =
+      billName
+
+    selectedExpenseItemId.value =
+      existingMaster?._id ||
+      null
+
+    updatePeriodFromFrequency()
+
+    showItemSuggestions.value =
+      false
+
+    itemSuggestions.value =
+      []
   }
 
 // =====================================================
@@ -2215,8 +2695,7 @@ const changeBillMonth =
 const fetchLaborMonthExpenses =
   async () => {
     if (
-      authStore.user?.role !==
-      'Admin'
+      !isAdmin.value
     ) {
       laborMonthExpenses.value =
         []
@@ -2266,11 +2745,8 @@ const fetchLaborMonthExpenses =
           }
         )
 
-      const records =
-        extractArray(data)
-
       laborMonthExpenses.value =
-        records
+        extractArray(data)
           .filter(
             record =>
               record.category ===
@@ -2350,8 +2826,7 @@ const fetchLaborMonthExpenses =
 const fetchBillMonthExpenses =
   async () => {
     if (
-      authStore.user?.role !==
-      'Admin'
+      !isAdmin.value
     ) {
       billMonthExpenses.value =
         []
@@ -2401,11 +2876,8 @@ const fetchBillMonthExpenses =
           }
         )
 
-      const records =
-        extractArray(data)
-
       billMonthExpenses.value =
-        records
+        extractArray(data)
           .filter(
             record =>
               record.category ===
@@ -2492,157 +2964,63 @@ const fetchBillMonthExpenses =
   }
 
 // =====================================================
-// SWITCH SECTION
+// LABOR MONTH FILTER
 // =====================================================
 
-const changeSection =
-  async section => {
+const changeLaborMonth =
+  async () => {
     if (
-      section === 'Labor' &&
-      authStore.user?.role !==
-        'Admin'
+      !isAdmin.value
     ) {
-      activeSection.value =
-        'Ingredient'
-
-      form.value.category =
-        'Ingredient'
-
       return
     }
 
-    activeSection.value =
-      section
-
-    form.value.category =
-      section
-
-    form.value.item =
-      ''
-
-    form.value.expenseItemId =
-      null
-
-    form.value.price =
-      ''
-
-    form.value.qty =
-      1
-
-    form.value.unit =
-      'pcs'
-
-    form.value.expenseDate =
-      todayPH
-
-    form.value.remarks =
-      ''
-
-    form.value.frequency =
-      'One-Time'
-
-    form.value.periodMonth =
-      section === 'Bill'
-        ? selectedBillMonth.value
-        : section === 'Labor'
-          ? selectedLaborMonth.value
-          : todayPH.slice(
-              0,
-              7
-            )
-
-    form.value.payrollPeriodStart =
-      ''
-
-    form.value.payrollPeriodEnd =
-      ''
-
-    form.value.maintenanceType =
-      ''
-
-    form.value.billType =
-      ''
-
-    form.value.dueDate =
-      ''
-
-    form.value.paymentStatus =
-      'Paid'
-
-    form.value.paidDate =
-      ''
-
-    form.value.paymentSource =
-      'Store'
-
-    form.value.laborType =
-      'Regular'
-
-    form.value.laborAmountStatus =
-      'Actual'
-
-    form.value.payday =
-      ''
-
-    selectedExpenseItemName.value =
-      ''
-
-    selectedExpenseItemId.value =
-      null
-
-    showItemSuggestions.value =
-      false
-
-    itemSuggestions.value =
-      []
-
     if (
-      section === 'Ingredient'
-    ) {
-      inventoryCategoryFilter.value =
-        'All'
-    }
-
-    error.value = ''
-    success.value = ''
-
-    if (
-      section === 'Labor'
+      !selectedLaborMonth.value
     ) {
       selectedLaborMonth.value =
-        selectedLaborMonth.value ||
-        selectedDate.value.slice(
-          0,
-          7
-        )
-
-      form.value.periodMonth =
-        selectedLaborMonth.value
-
-      await fetchLaborMonthExpenses()
-
-      return
-    }
-
-    if (
-      section === 'Bill'
-    ) {
-      selectedBillMonth.value =
-        selectedBillMonth.value ||
         todayPH.slice(
           0,
           7
         )
+    }
 
-      form.value.periodMonth =
-        selectedBillMonth.value
+    form.value.periodMonth =
+      selectedLaborMonth.value
 
-      await fetchBillMonthExpenses()
+    error.value = ''
 
+    await fetchLaborMonthExpenses()
+  }
+
+// =====================================================
+// BILL MONTH FILTER
+// =====================================================
+
+const changeBillMonth =
+  async () => {
+    if (
+      !isAdmin.value
+    ) {
       return
     }
 
-    await fetchExpenses()
+    if (
+      !selectedBillMonth.value
+    ) {
+      selectedBillMonth.value =
+        todayPH.slice(
+          0,
+          7
+        )
+    }
+
+    form.value.periodMonth =
+      selectedBillMonth.value
+
+    error.value = ''
+
+    await fetchBillMonthExpenses()
   }
 
 // =====================================================
@@ -2651,7 +3029,8 @@ const changeSection =
 
 const clearExpenseFilters =
   async () => {
-    searchExpense.value = ''
+    searchExpense.value =
+      ''
 
     selectedDate.value =
       getTodayPH()
@@ -2684,7 +3063,6 @@ const clearExpenseFilters =
         selectedLaborMonth.value
 
       await fetchLaborMonthExpenses()
-
       return
     }
 
@@ -2696,7 +3074,6 @@ const clearExpenseFilters =
         selectedBillMonth.value
 
       await fetchBillMonthExpenses()
-
       return
     }
 
@@ -2715,12 +3092,39 @@ const submitExpense =
     const itemName =
       form.value.item.trim()
 
+    /*
+    |--------------------------------------------------------------------------
+    | ITEM
+    |--------------------------------------------------------------------------
+    */
+
     if (!itemName) {
       error.value =
         'Item ay required.'
 
       return
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CATEGORY
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      !form.value.category
+    ) {
+      error.value =
+        'Pumili muna ng Category.'
+
+      return
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AMOUNT
+    |--------------------------------------------------------------------------
+    */
 
     if (
       form.value.price === '' ||
@@ -2735,17 +3139,97 @@ const submitExpense =
       return
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | CASHIER BILL RESTRICTION
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      isCashier.value &&
+      form.value.category ===
+      'Bill' &&
+      !isCashierAllowedBill(
+        itemName
+      )
+    ) {
+      error.value =
+        'Cashier can only record Electricity Bill, Pest Control, Water Bill, or WiFi Bill.'
+
+      return
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CASHIER LABOR = ULAM ONLY
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      isCashier.value &&
+      form.value.category ===
+      'Labor'
+    ) {
+      if (
+        !isUlamLabor(
+          itemName,
+          form.value.laborType
+        )
+      ) {
+        error.value =
+          'Cashier can only record Ulam / Meal Subsidy.'
+
+        return
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CASHIER DATE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      isCashier.value
+    ) {
+      form.value.expenseDate =
+        todayPH
+
+      if (
+        form.value.category ===
+        'Labor'
+      ) {
+        form.value.frequency =
+          'One-Time'
+
+        form.value.laborType =
+          'Ulam'
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN LABOR RESTRICTION
+    |--------------------------------------------------------------------------
+    */
+
     if (
       form.value.category ===
         'Labor' &&
-      authStore.user?.role !==
-      'Admin'
+      !isUlamExpense.value &&
+      !isAdmin.value
     ) {
       error.value =
         'Admin access required for Labor Cost.'
 
       return
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FREQUENCY
+    |--------------------------------------------------------------------------
+    */
 
     if (
       !expenseFrequencyOptions.includes(
@@ -2757,6 +3241,12 @@ const submitExpense =
 
       return
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WEEKLY
+    |--------------------------------------------------------------------------
+    */
 
     if (
       form.value.frequency ===
@@ -2783,6 +3273,12 @@ const submitExpense =
       }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | MONTHLY / DAILY
+    |--------------------------------------------------------------------------
+    */
+
     if (
       form.value.frequency ===
         'Monthly' ||
@@ -2801,6 +3297,12 @@ const submitExpense =
       updatePeriodFromFrequency()
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ONE-TIME
+    |--------------------------------------------------------------------------
+    */
+
     if (
       form.value.frequency ===
         'One-Time' &&
@@ -2811,6 +3313,36 @@ const submitExpense =
 
       return
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ULAM = ALWAYS ONE-TIME DAILY ACTUAL
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      form.value.category ===
+        'Labor' &&
+      isUlamExpense.value
+    ) {
+      form.value.frequency =
+        'One-Time'
+
+      form.value.expenseDate =
+        todayPH
+
+      form.value.laborType =
+        'Ulam'
+
+      form.value.unit =
+        'day'
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BILL PAYMENT
+    |--------------------------------------------------------------------------
+    */
 
     if (
       form.value.category ===
@@ -2840,6 +3372,7 @@ const submitExpense =
       ) {
         form.value.paymentSource =
           ''
+
         form.value.paidDate =
           ''
       }
@@ -2882,6 +3415,15 @@ const submitExpense =
           )
       }
 
+      if (
+        form.value.category ===
+          'Labor' &&
+        isUlamExpense.value
+      ) {
+        recordDate =
+          todayPH
+      }
+
       let periodStart =
         null
 
@@ -2916,12 +3458,28 @@ const submitExpense =
           )
       }
 
+      if (
+        form.value.category ===
+          'Labor' &&
+        isUlamExpense.value
+      ) {
+        periodStart =
+          null
+
+        periodEnd =
+          null
+      }
+
       const laborType =
         form.value.category ===
         'Labor'
           ? (
-              form.value.laborType ||
-              'Regular'
+              isUlamExpense.value
+                ? 'Ulam'
+                : (
+                    form.value.laborType ||
+                    'Regular'
+                  )
             )
           : undefined
 
@@ -2934,33 +3492,29 @@ const submitExpense =
         'Labor'
       ) {
         if (
+          isUlamExpense.value
+        ) {
+          recordUnit =
+            'day'
+        } else if (
           form.value.frequency ===
           'Weekly'
         ) {
           recordUnit =
             'week'
-        }
-
-        if (
+        } else if (
           form.value.frequency ===
           'Monthly'
         ) {
           recordUnit =
             'month'
-        }
-
-        if (
+        } else if (
           form.value.frequency ===
           'Daily'
         ) {
           recordUnit =
             'day'
-        }
-
-        if (
-          form.value.frequency ===
-          'One-Time'
-        ) {
+        } else {
           recordUnit =
             'pcs'
         }
@@ -3002,7 +3556,11 @@ const submitExpense =
 
         recordedBy:
           authStore.user?.username ||
-          'Admin',
+          (
+            isCashier.value
+              ? 'Cashier'
+              : 'Admin'
+          ),
 
         expenseFrequency:
           form.value.frequency,
@@ -3033,7 +3591,7 @@ const submitExpense =
                 'Paid'
                   ? (
                       form.value.paidDate ||
-                      null
+                      todayPH
                     )
                   : null
               )
@@ -3061,10 +3619,14 @@ const submitExpense =
           form.value.category ===
           'Labor'
             ? (
-                form.value.frequency ===
-                'One-Time'
+                isUlamExpense.value
                   ? 'Daily'
-                  : form.value.frequency
+                  : (
+                      form.value.frequency ===
+                      'One-Time'
+                        ? 'Daily'
+                        : form.value.frequency
+                    )
               )
             : undefined,
 
@@ -3072,8 +3634,12 @@ const submitExpense =
           form.value.category ===
           'Labor'
             ? (
-                periodStart ||
-                recordDate
+                isUlamExpense.value
+                  ? recordDate
+                  : (
+                      periodStart ||
+                      recordDate
+                    )
               )
             : null,
 
@@ -3081,8 +3647,12 @@ const submitExpense =
           form.value.category ===
           'Labor'
             ? (
-                periodEnd ||
-                recordDate
+                isUlamExpense.value
+                  ? recordDate
+                  : (
+                      periodEnd ||
+                      recordDate
+                    )
               )
             : null,
 
@@ -3143,12 +3713,14 @@ const submitExpense =
         resetForm()
 
         if (
+          isAdmin.value &&
           activeSection.value ===
           'Labor'
         ) {
           await fetchLaborMonthExpenses()
 
         } else if (
+          isAdmin.value &&
           activeSection.value ===
           'Bill'
         ) {
@@ -3188,6 +3760,19 @@ const submitExpense =
 
 const resetForm =
   () => {
+    const defaultCategory =
+      isAdmin.value
+        ? (
+            activeSection.value ===
+            'Bill'
+              ? 'Bill'
+              : activeSection.value ===
+                'Labor'
+                ? 'Labor'
+                : ''
+          )
+        : ''
+
     form.value = {
       item: '',
       expenseItemId: null,
@@ -3197,10 +3782,7 @@ const resetForm =
       unit: 'pcs',
 
       category:
-        activeSection.value ===
-        'Ingredient'
-          ? 'Ingredient'
-          : activeSection.value,
+        defaultCategory,
 
       frequency:
         'One-Time',
@@ -3281,7 +3863,8 @@ const resetForm =
     selectedExpenseItemId.value =
       null
 
-    error.value = ''
+    error.value =
+      ''
 
     showItemSuggestions.value =
       false
@@ -3294,62 +3877,99 @@ const resetForm =
 // FETCH CURRENT SECTION
 // =====================================================
 
-const fetchExpenses =
-  async () => {
-    if (
-      activeSection.value ===
-      'Labor'
-    ) {
-      await fetchLaborMonthExpenses()
-      return
-    }
+  const fetchExpenses =
+    async () => {
+      try {
+        const params =
+          new URLSearchParams()
 
-    if (
-      activeSection.value ===
-      'Bill'
-    ) {
-      await fetchBillMonthExpenses()
-      return
-    }
-
-    try {
-      const params =
-        new URLSearchParams()
-
-      if (selectedDate.value) {
-        params.append(
-          'date',
+        if (
           selectedDate.value
-        )
-      }
+        ) {
+          if (
+            isCashier.value
+          ) {
+            /*
+            |--------------------------------------------------------------------------
+            | CASHIER
+            |--------------------------------------------------------------------------
+            |
+            | A recurring Bill such as Electricity Bill may have its
+            | record date set to the beginning of the billing month.
+            |
+            | Therefore Cashier must fetch month-to-date records,
+            | then the frontend will use paidDate/date to determine
+            | which records belong to the selected day.
+            |--------------------------------------------------------------------------
+            */
 
-      const data =
-        await fetchJson(
-          `${API}/expenses?${params.toString()}`,
-          {
-            headers: {
-              ...getAuthHeaders()
-            }
+            const monthStart =
+              getMonthStartDate(
+                selectedDate.value.slice(
+                  0,
+                  7
+                )
+              )
+
+            params.append(
+              'startDate',
+              monthStart
+            )
+
+            params.append(
+              'endDate',
+              selectedDate.value
+            )
+
+          } else {
+            /*
+            |--------------------------------------------------------------------------
+            | ADMIN
+            |--------------------------------------------------------------------------
+            |
+            | Normal daily operating expense view.
+            |--------------------------------------------------------------------------
+            */
+
+            params.append(
+              'startDate',
+              selectedDate.value
+            )
+
+            params.append(
+              'endDate',
+              selectedDate.value
+            )
           }
+        }
+
+        const data =
+          await fetchJson(
+            `${API}/expenses?${params.toString()}`,
+            {
+              headers: {
+                ...getAuthHeaders()
+              }
+            }
+          )
+
+        dailyExpenses.value =
+          extractArray(data)
+
+      } catch (err) {
+        console.error(
+          'Error fetching expenses:',
+          err
         )
 
-      dailyExpenses.value =
-        extractArray(data)
+        dailyExpenses.value =
+          []
 
-    } catch (err) {
-      console.error(
-        'Error fetching expenses:',
-        err
-      )
-
-      dailyExpenses.value =
-        []
-
-      error.value =
-        err.message ||
-        'Hindi ma-load ang expenses.'
+        error.value =
+          err.message ||
+          'Hindi ma-load ang expenses.'
+      }
     }
-  }
 
 // =====================================================
 // WATCH DAILY DATE
@@ -3362,17 +3982,7 @@ watch(
       activeSection.value ===
       'Labor'
     ) {
-      selectedLaborMonth.value =
-        selectedDate.value.slice(
-          0,
-          7
-        )
-
-      form.value.periodMonth =
-        selectedLaborMonth.value
-
       await fetchLaborMonthExpenses()
-
       return
     }
 
@@ -3460,7 +4070,14 @@ const expenses =
         .trim()
         .toLowerCase()
 
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN LABOR
+    |--------------------------------------------------------------------------
+    */
+
     if (
+      isAdmin.value &&
       activeSection.value ===
       'Labor'
     ) {
@@ -3490,7 +4107,14 @@ const expenses =
       )
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN BILLS
+    |--------------------------------------------------------------------------
+    */
+
     if (
+      isAdmin.value &&
       activeSection.value ===
       'Bill'
     ) {
@@ -3520,6 +4144,12 @@ const expenses =
       )
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | NORMAL DAILY RECORDS
+    |--------------------------------------------------------------------------
+    */
+
     const records =
       Array.isArray(
         dailyExpenses.value
@@ -3527,20 +4157,43 @@ const expenses =
         ? dailyExpenses.value
         : []
 
+    /*
+    |--------------------------------------------------------------------------
+    | CASHIER
+    |--------------------------------------------------------------------------
+    */
+
     if (
-      activeSection.value ===
-      'Ingredient'
+      isCashier.value
     ) {
       return records.filter(
         exp => {
-          const rawDate =
-            exp.date ||
-            exp.expenseDate ||
-            ''
+          /*
+          |--------------------------------------------------------------------------
+          | For Cashier:
+          |
+          | Paid Bill -> use paidDate
+          | Other expenses -> use date
+          |--------------------------------------------------------------------------
+          */
+
+          const recordDate =
+            exp.category === 'Bill'
+              ? (
+                  exp.paidDate ||
+                  exp.date ||
+                  exp.expenseDate ||
+                  ''
+                )
+              : (
+                  exp.date ||
+                  exp.expenseDate ||
+                  ''
+                )
 
           const cleanDate =
             getDateOnly(
-              rawDate
+              recordDate
             )
 
           const matchesDate =
@@ -3552,6 +4205,7 @@ const expenses =
               exp.name ||
               exp.title ||
               exp.item ||
+              exp.expenseItem?.name ||
               ''
             ).toLowerCase()
 
@@ -3561,34 +4215,30 @@ const expenses =
               search
             )
 
-          const matchesInventoryCategory =
-            inventoryCategoryFilter.value ===
-              'All'
-              ? isInventoryCategory(
-                  exp.category
-                )
-              : exp.category ===
-                  inventoryCategoryFilter.value
-
           return (
             matchesDate &&
             matchesSearch &&
-            matchesInventoryCategory
+            isCashierAllowedRecord(
+              exp
+            )
           )
         }
       )
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN OPERATING EXPENSES
+    |--------------------------------------------------------------------------
+    */
+
     return records.filter(
       exp => {
-        const rawDate =
-          exp.date ||
-          exp.expenseDate ||
-          ''
-
         const cleanDate =
           getDateOnly(
-            rawDate
+            exp.date ||
+            exp.expenseDate ||
+            ''
           )
 
         const matchesDate =
@@ -3609,14 +4259,19 @@ const expenses =
             search
           )
 
-        const matchesSection =
-          exp.category ===
-          activeSection.value
+        const matchesCategory =
+          inventoryCategoryFilter.value ===
+            'All'
+            ? isOperatingCategory(
+                exp.category
+              )
+            : exp.category ===
+                inventoryCategoryFilter.value
 
         return (
           matchesDate &&
           matchesSearch &&
-          matchesSection
+          matchesCategory
         )
       }
     )
@@ -3628,14 +4283,13 @@ const expenses =
 
 const totalExpenses =
   computed(() => {
-    const records =
+    return (
       Array.isArray(
         expenses.value
       )
         ? expenses.value
         : []
-
-    return records.reduce(
+    ).reduce(
       (
         sum,
         exp
@@ -3685,13 +4339,7 @@ const paidBills =
       return 0
     }
 
-    return (
-      Array.isArray(
-        expenses.value
-      )
-        ? expenses.value
-        : []
-    ).filter(
+    return expenses.value.filter(
       exp =>
         getBillStatus(exp) ===
         'Paid'
@@ -3707,13 +4355,7 @@ const dueBills =
       return 0
     }
 
-    return (
-      Array.isArray(
-        expenses.value
-      )
-        ? expenses.value
-        : []
-    ).filter(
+    return expenses.value.filter(
       exp =>
         getBillStatus(exp) ===
         'Due'
@@ -3729,13 +4371,7 @@ const overdueBills =
       return 0
     }
 
-    return (
-      Array.isArray(
-        expenses.value
-      )
-        ? expenses.value
-        : []
-    ).filter(
+    return expenses.value.filter(
       exp =>
         getBillStatus(exp) ===
         'Overdue'
@@ -3751,13 +4387,7 @@ const paidBillAmount =
       return 0
     }
 
-    return (
-      Array.isArray(
-        expenses.value
-      )
-        ? expenses.value
-        : []
-    )
+    return expenses.value
       .filter(
         exp =>
           getBillStatus(exp) ===
@@ -3788,13 +4418,7 @@ const unpaidBillAmount =
       return 0
     }
 
-    return (
-      Array.isArray(
-        expenses.value
-      )
-        ? expenses.value
-        : []
-    )
+    return expenses.value
       .filter(
         exp =>
           getBillStatus(exp) !==
@@ -3831,7 +4455,6 @@ const fmtAmount =
         {
           minimumFractionDigits:
             2,
-
           maximumFractionDigits:
             2
         }
@@ -3852,7 +4475,6 @@ const formatDate =
           year: 'numeric',
           month: 'short',
           day: '2-digit',
-
           timeZone:
             'Asia/Manila'
         }
@@ -3894,22 +4516,16 @@ const getBillStatus =
 const editExpense =
   async expense => {
     if (
-      expense.isSystemEstimate
+      !isAdmin.value
     ) {
-      error.value =
-        'System estimates cannot be edited. Record the actual amount instead.'
-
       return
     }
 
     if (
-      expense.category ===
-        'Labor' &&
-      authStore.user?.role !==
-      'Admin'
+      expense.isSystemEstimate
     ) {
       error.value =
-        'Admin access required for Labor Cost.'
+        'System estimates cannot be edited. Record the actual amount instead.'
 
       return
     }
@@ -3921,18 +4537,33 @@ const editExpense =
       expense._id
 
     if (
-      isInventoryCategory(
+      isOperatingCategory(
         expense.category
       )
     ) {
       activeSection.value =
         'Ingredient'
 
-      inventoryCategoryFilter.value =
-        expense.category
-    } else {
+      if (
+        isInventoryCategory(
+          expense.category
+        )
+      ) {
+        inventoryCategoryFilter.value =
+          expense.category
+      }
+    } else if (
+      expense.category ===
+      'Bill'
+    ) {
       activeSection.value =
-        expense.category
+        'Bill'
+    } else if (
+      expense.category ===
+      'Labor'
+    ) {
+      activeSection.value =
+        'Labor'
     }
 
     const expenseItemId =
@@ -4007,7 +4638,7 @@ const editExpense =
 
       category:
         expense.category ||
-        'Ingredient',
+        '',
 
       frequency:
         frequency,
@@ -4020,33 +4651,14 @@ const editExpense =
           ? getDateOnly(
               expense.payrollPeriodStart
             )
-          : (
-              frequency ===
-              'Weekly'
-                ? (
-                    expense.billingPeriodStart
-                      ? getDateOnly(
-                          expense.billingPeriodStart
-                        )
-                      : ''
-                  )
-                : ''
-            ),
+          : '',
 
       payrollPeriodEnd:
         expense.payrollPeriodEnd
           ? getDateOnly(
               expense.payrollPeriodEnd
             )
-          : (
-              frequency ===
-                'Weekly' &&
-              expense.billingPeriodEnd
-                ? getDateOnly(
-                    expense.billingPeriodEnd
-                  )
-                : ''
-            ),
+          : '',
 
       expenseDate:
         expense.date
@@ -4108,9 +4720,16 @@ const editExpense =
         expense.category ===
         'Labor'
           ? (
-              expense.laborType ||
-              expense.expenseItem?.laborType ||
-              'Regular'
+              isUlamLabor(
+                expense.name,
+                expense.laborType
+              )
+                ? 'Ulam'
+                : (
+                    expense.laborType ||
+                    expense.expenseItem?.laborType ||
+                    'Regular'
+                  )
             )
           : 'Regular',
 
@@ -4163,8 +4782,11 @@ const editExpense =
         form.value.expenseDate
     }
 
-    error.value = ''
-    success.value = ''
+    error.value =
+      ''
+
+    success.value =
+      ''
 
     await fetchMasterExpenseItems()
 
@@ -4180,6 +4802,12 @@ const editExpense =
 
 const deleteExpense =
   async expenseOrId => {
+    if (
+      !isAdmin.value
+    ) {
+      return
+    }
+
     const expense =
       typeof expenseOrId ===
       'object'
@@ -4275,6 +4903,12 @@ const deleteExpense =
 
 const markBillPaid =
   async expense => {
+    if (
+      !isAdmin.value
+    ) {
+      return
+    }
+
     if (!expense) {
       error.value =
         'Invalid bill record.'
@@ -4313,7 +4947,8 @@ const markBillPaid =
         ? expense.paymentSource
         : 'Store'
 
-    error.value = ''
+    error.value =
+      ''
 
     isBillPaymentModalOpen.value =
       true
@@ -4360,7 +4995,8 @@ const confirmMarkBillPaid =
     billPaymentSubmitting.value =
       true
 
-    error.value = ''
+    error.value =
+      ''
 
     try {
       await fetchJson(
@@ -4388,14 +5024,7 @@ const confirmMarkBillPaid =
 
       cancelBillPayment()
 
-      if (
-        activeSection.value ===
-        'Bill'
-      ) {
-        await fetchBillMonthExpenses()
-      } else {
-        await fetchExpenses()
-      }
+      await fetchBillMonthExpenses()
 
       setTimeout(() => {
         success.value =
@@ -4424,6 +5053,14 @@ const confirmMarkBillPaid =
 
 onMounted(async () => {
   await fetchMasterExpenseItems()
+
+  /*
+  |--------------------------------------------------------------------------
+  | Admin starts in Operating Expenses with blank category.
+  | Cashier starts with blank category.
+  |--------------------------------------------------------------------------
+  */
+
   await fetchExpenses()
 })
 </script>
@@ -4447,60 +5084,85 @@ onMounted(async () => {
       <p
         class="text-sm text-gray-500 mt-1"
       >
-        Record and monitor all business operating expenses.
+        Record and monitor business expenses.
       </p>
     </div>
 
     <!-- ================================================= -->
-    <!-- EXPENSE TABS -->
+    <!-- ADMIN TABS -->
     <!-- ================================================= -->
 
     <div
+      v-if="isAdmin"
       class="bg-white border border-gray-100 shadow-sm rounded-2xl p-2"
     >
+
       <div
         class="flex gap-2 overflow-x-auto"
       >
 
-        <template
+        <button
           v-for="section in expenseSections"
           :key="section.key"
+          type="button"
+          @click="
+            changeSection(section.key)
+          "
+          :class="[
+            'whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors',
+            activeSection === section.key
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-blue-50 hover:text-blue-700'
+          ]"
         >
 
-          <button
-            v-if="
-              section.key !== 'Labor' ||
-              authStore.user?.role === 'Admin'
-            "
-            type="button"
-            @click="
-              changeSection(section.key)
-            "
-            :class="[
-              'whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors',
-              activeSection === section.key
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-blue-50 hover:text-blue-700'
-            ]"
+          <span
+            class="mr-1"
           >
-            <span class="mr-1">
-              {{ section.icon }}
-            </span>
+            {{ section.icon }}
+          </span>
 
-            {{ section.label }}
-          </button>
+          {{ section.label }}
 
-        </template>
+        </button>
 
       </div>
+
     </div>
 
     <!-- ================================================= -->
-    <!-- BILLS SUMMARY -->
+    <!-- CASHIER HEADER -->
     <!-- ================================================= -->
 
     <div
-      v-if="activeSection === 'Bill'"
+      v-else
+      class="bg-white border border-gray-100 shadow-sm rounded-2xl px-4 py-3"
+    >
+
+      <div
+        class="font-bold text-blue-800 flex items-center gap-2"
+      >
+        <span>💰</span>
+        <span>Expenses</span>
+      </div>
+
+      <div
+        class="text-xs text-gray-500 mt-1"
+      >
+        Record today's allowed expenses.
+      </div>
+
+    </div>
+
+    <!-- ================================================= -->
+    <!-- BILL SUMMARY -->
+    <!-- ================================================= -->
+
+    <div
+      v-if="
+        isAdmin &&
+        activeSection === 'Bill'
+      "
       class="grid grid-cols-2 md:grid-cols-4 gap-3"
     >
 
@@ -4605,25 +5267,32 @@ onMounted(async () => {
       <div
         class="bg-blue-600 text-white py-3 px-4 font-semibold flex items-center gap-2"
       >
+
         <span>
           {{
             isEditMode
               ? '✏️ Edit Expense'
               : `+ Record ${
-                  expenseSections.find(
-                    section =>
-                      section.key === activeSection
-                  )?.label || 'Expense'
+                  isCashier
+                    ? 'Expense'
+                    : activeSection === 'Bill'
+                      ? 'Bill'
+                      : activeSection === 'Labor'
+                        ? 'Labor Cost'
+                        : 'Operating Expense'
                 }`
           }}
         </span>
+
       </div>
 
       <div
         class="p-5 space-y-4"
       >
 
+        <!-- ================================================= -->
         <!-- MESSAGES -->
+        <!-- ================================================= -->
 
         <div
           v-if="error"
@@ -4639,7 +5308,9 @@ onMounted(async () => {
           {{ success }}
         </div>
 
-        <!-- UNIVERSAL ITEM -->
+        <!-- ================================================= -->
+        <!-- ITEM + AMOUNT + CATEGORY -->
+        <!-- ================================================= -->
 
         <div
           class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"
@@ -4669,7 +5340,54 @@ onMounted(async () => {
               <span class="text-red-500">*</span>
             </label>
 
+            <!-- CASHIER BILL -->
+
+            <select
+              v-if="
+                isCashier &&
+                form.category === 'Bill'
+              "
+              v-model="form.item"
+              @change="
+                selectCashierBill(form.item)
+              "
+              class="w-full border border-gray-300 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+
+              <option value="">
+                Select Bill
+              </option>
+
+              <option
+                v-for="bill in CASHIER_ALLOWED_BILLS"
+                :key="bill"
+                :value="bill"
+              >
+                {{ bill }}
+              </option>
+
+            </select>
+
+            <!-- CASHIER ULAM -->
+
             <input
+              v-else-if="
+                isCashier &&
+                form.category === 'Labor'
+              "
+              :value="
+                form.item ||
+                'Ulam / Meal Subsidy'
+              "
+              type="text"
+              readonly
+              class="w-full border border-gray-300 rounded-lg p-2 bg-gray-100 text-gray-600 cursor-not-allowed"
+            />
+
+            <!-- UNIVERSAL ITEM -->
+
+            <input
+              v-else
               v-model="form.item"
               @input="onItemInput"
               @focus="searchExpenseItems"
@@ -4710,13 +5428,14 @@ onMounted(async () => {
                 <div
                   class="text-xs text-gray-500"
                 >
-                  {{ item.category }}
+                  {{ getCategoryLabel(item) }}
 
                   <span
                     v-if="item.frequency"
                   >
                     • {{ item.frequency }}
                   </span>
+
                 </div>
 
               </div>
@@ -4726,7 +5445,19 @@ onMounted(async () => {
             <div
               class="text-xs text-gray-400 mt-1"
             >
-              Type a new item or select an existing item from the suggestions.
+              <span
+                v-if="
+                  isExistingExpenseItem
+                "
+              >
+                Existing item selected. Category loaded automatically.
+              </span>
+
+              <span
+                v-else
+              >
+                Type an item name to search existing expense items, or enter a new item.
+              </span>
             </div>
 
           </div>
@@ -4777,11 +5508,17 @@ onMounted(async () => {
               class="block text-sm font-semibold text-gray-700 mb-1"
             >
               Category
+              <span class="text-red-500">*</span>
             </label>
 
+            <!-- CASHIER -->
+
             <select
-              v-if="activeSection === 'Ingredient'"
+              v-if="
+                isCashier
+              "
               v-model="form.category"
+              @change="changeCategory"
               :disabled="
                 isExistingExpenseItem
               "
@@ -4789,9 +5526,43 @@ onMounted(async () => {
             >
 
               <option
-                v-for="category in inventoryCategoryOptions.filter(
-                  category => category !== 'All'
-                )"
+                value=""
+              >
+                Select Category
+              </option>
+
+              <option
+                v-for="option in cashierCategoryOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+
+            </select>
+
+            <!-- ADMIN OPERATING -->
+
+            <select
+              v-else-if="
+                activeSection === 'Ingredient'
+              "
+              v-model="form.category"
+              @change="changeCategory"
+              :disabled="
+                isExistingExpenseItem
+              "
+              class="w-full border border-gray-300 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+            >
+
+              <option
+                value=""
+              >
+                Select Category
+              </option>
+
+              <option
+                v-for="category in operatingCategoryOptions"
                 :key="category"
                 :value="category"
               >
@@ -4800,13 +5571,14 @@ onMounted(async () => {
 
             </select>
 
+            <!-- ADMIN BILL / LABOR -->
+
             <input
               v-else
               :value="
-                expenseSections.find(
-                  section =>
-                    section.key === activeSection
-                )?.label || activeSection
+                activeSection === 'Bill'
+                  ? 'Bill'
+                  : 'Labor'
               "
               type="text"
               readonly
@@ -4814,32 +5586,35 @@ onMounted(async () => {
             />
 
             <div
-              v-if="activeSection === 'Ingredient'"
               class="text-xs text-gray-400 mt-1"
             >
-
               <span
-                v-if="isExistingExpenseItem"
+                v-if="
+                  isExistingExpenseItem
+                "
               >
-                Category automatically loaded from the item master.
+                Category automatically loaded from the existing item.
               </span>
 
               <span
                 v-else
               >
-                Choose whether this item is an Ingredient or Material.
+                Choose a category for the new item.
               </span>
-
             </div>
 
           </div>
 
         </div>
 
+        <!-- ================================================= -->
         <!-- INVENTORY DETAILS -->
+        <!-- ================================================= -->
 
         <div
-          v-if="isInventoryExpense"
+          v-if="
+            isInventoryExpense
+          "
           class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"
         >
 
@@ -4913,9 +5688,18 @@ onMounted(async () => {
 
         </div>
 
-        <!-- FREQUENCY -->
+        <!-- ================================================= -->
+        <!-- ADMIN BILL / LABOR FREQUENCY -->
+        <!-- ================================================= -->
 
         <div
+          v-if="
+            isAdmin &&
+            (
+              isBillExpense ||
+              isAdminLabor
+            )
+          "
           class="grid grid-cols-1 md:grid-cols-4 gap-4"
         >
 
@@ -4948,10 +5732,19 @@ onMounted(async () => {
 
         </div>
 
-        <!-- WEEKLY PERIOD -->
+        <!-- ================================================= -->
+        <!-- WEEKLY -->
+        <!-- ================================================= -->
 
         <div
-          v-if="form.frequency === 'Weekly'"
+          v-if="
+            isAdmin &&
+            form.frequency === 'Weekly' &&
+            (
+              isBillExpense ||
+              isAdminLabor
+            )
+          "
           class="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
 
@@ -4981,7 +5774,6 @@ onMounted(async () => {
               class="block text-sm font-semibold text-gray-700 mb-1"
             >
               Period End
-              <span class="text-red-500">*</span>
             </label>
 
             <input
@@ -4995,10 +5787,19 @@ onMounted(async () => {
 
         </div>
 
-        <!-- MONTHLY PERIOD -->
+        <!-- ================================================= -->
+        <!-- MONTHLY -->
+        <!-- ================================================= -->
 
         <div
-          v-if="form.frequency === 'Monthly'"
+          v-if="
+            isAdmin &&
+            form.frequency === 'Monthly' &&
+            (
+              isBillExpense ||
+              isAdminLabor
+            )
+          "
           class="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
 
@@ -5066,10 +5867,19 @@ onMounted(async () => {
 
         </div>
 
-        <!-- DAILY PERIOD -->
+        <!-- ================================================= -->
+        <!-- DAILY -->
+        <!-- ================================================= -->
 
         <div
-          v-if="form.frequency === 'Daily'"
+          v-if="
+            isAdmin &&
+            form.frequency === 'Daily' &&
+            (
+              isBillExpense ||
+              isAdminLabor
+            )
+          "
           class="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
 
@@ -5137,7 +5947,9 @@ onMounted(async () => {
 
         </div>
 
-        <!-- ONE-TIME PERIOD -->
+        <!-- ================================================= -->
+        <!-- ONE-TIME DATE -->
+        <!-- ================================================= -->
 
         <div
           v-if="
@@ -5157,7 +5969,7 @@ onMounted(async () => {
 
             <input
               v-if="
-                authStore.user?.role === 'Admin'
+                isAdmin
               "
               v-model="form.expenseDate"
               type="date"
@@ -5169,19 +5981,20 @@ onMounted(async () => {
               :value="todayPH"
               type="date"
               readonly
-              class="w-full border border-gray-300 rounded-lg p-2 bg-gray-100 text-gray-500 cursor-not-allowed"
+              class="w-full border border-gray-300 rounded-lg p-2 bg-gray-100 text-gray-500"
             />
 
           </div>
 
         </div>
 
+        <!-- ================================================= -->
         <!-- PAYMENT SOURCE -->
+        <!-- ================================================= -->
 
         <div
           v-if="
-            form.category !== 'Bill' ||
-            form.paymentStatus === 'Paid'
+            form.category
           "
           class="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
@@ -5214,7 +6027,7 @@ onMounted(async () => {
             >
               {{
                 form.paymentSource === 'Owner'
-                  ? 'Owner ang gumamit ng sariling pera para sa expense.'
+                  ? 'Owner ang gumamit ng sariling pera.'
                   : 'Pera ay kinuha sa store cash / kaha.'
               }}
             </div>
@@ -5223,11 +6036,13 @@ onMounted(async () => {
 
         </div>
 
-        <!-- BILLS -->
+        <!-- ================================================= -->
+        <!-- BILL DETAILS -->
+        <!-- ================================================= -->
 
         <div
           v-if="
-            form.category === 'Bill'
+            isBillExpense
           "
           class="space-y-4"
         >
@@ -5245,14 +6060,17 @@ onMounted(async () => {
             <p
               class="text-sm text-blue-700 mt-1"
             >
-              Pumili ng existing Bill item o mag-type ng bagong bill item.
-              Ang bagong item ay puwedeng gamitin muli sa susunod.
+              {{
+                isCashier
+                  ? 'I-record ang actual bill amount. Puwedeng Paid o Due.'
+                  : 'Bill amount, period, payment status at due date.'
+              }}
             </p>
 
           </div>
 
           <div
-            class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end"
+            class="grid grid-cols-1 md:grid-cols-3 gap-4"
           >
 
             <div>
@@ -5285,12 +6103,12 @@ onMounted(async () => {
                 class="w-full border border-gray-300 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
               >
 
-                <option value="Due">
-                  Due
-                </option>
-
                 <option value="Paid">
                   Paid
+                </option>
+
+                <option value="Due">
+                  Due
                 </option>
 
               </select>
@@ -5320,86 +6138,65 @@ onMounted(async () => {
 
         </div>
 
-        <!-- LABOR COST -->
+        <!-- ================================================= -->
+        <!-- ADMIN LABOR DETAILS -->
+        <!-- ================================================= -->
 
         <div
           v-if="
-            form.category === 'Labor' &&
-            authStore.user?.role === 'Admin'
+            isAdminLabor
           "
-          class="space-y-4"
+          class="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2"
         >
 
           <div
-            class="bg-blue-50 border border-blue-100 rounded-xl p-4"
+            class="font-black text-blue-800"
           >
-
-            <div
-              class="font-black text-blue-800"
-            >
-              Labor Cost
-            </div>
-
-            <p
-              class="text-sm text-blue-700 mt-1"
-            >
-              Piliin o i-type ang Labor item, pagkatapos pumili ng Frequency
-              at ilagay ang tamang period at amount.
-            </p>
-
+            Labor Cost
           </div>
 
           <div
-            class="bg-gray-50 border border-gray-200 rounded-xl p-4"
+            class="text-sm text-blue-700"
           >
-
-            <div
-              class="font-semibold text-gray-700"
-            >
-              Current Labor Entry
-            </div>
-
-            <div
-              class="text-sm text-gray-500 mt-1"
-            >
-
-              <span
-                v-if="form.frequency === 'Weekly'"
-              >
-                Weekly payroll period
-              </span>
-
-              <span
-                v-else-if="
-                  form.frequency === 'Monthly'
-                "
-              >
-                Monthly labor cost
-              </span>
-
-              <span
-                v-else-if="
-                  form.frequency === 'Daily'
-                "
-              >
-                Daily labor cost
-              </span>
-
-              <span
-                v-else
-              >
-                One-time labor cost
-              </span>
-
-            </div>
-
+            Regular Labor, Labor Benefits, at 13th Month ay Admin-only.
           </div>
 
         </div>
 
-        <!-- REMARKS -->
+        <!-- ================================================= -->
+        <!-- CASHIER ULAM -->
+        <!-- ================================================= -->
 
-        <div>
+        <div
+          v-if="
+            isUlamExpense
+          "
+          class="bg-orange-50 border border-orange-100 rounded-xl p-4"
+        >
+
+          <div
+            class="font-black text-orange-800"
+          >
+            Ulam / Meal Subsidy
+          </div>
+
+          <div
+            class="text-sm text-orange-700 mt-1"
+          >
+            Actual daily amount lang ang ilagay. Hindi ito system estimate.
+          </div>
+
+        </div>
+
+        <!-- ================================================= -->
+        <!-- REMARKS -->
+        <!-- ================================================= -->
+
+        <div
+          v-if="
+            form.category
+          "
+        >
 
           <label
             class="block text-sm font-semibold text-gray-700 mb-1"
@@ -5423,7 +6220,9 @@ onMounted(async () => {
 
         </div>
 
+        <!-- ================================================= -->
         <!-- BUTTONS -->
+        <!-- ================================================= -->
 
         <div
           class="flex gap-2 pt-2"
@@ -5453,13 +6252,11 @@ onMounted(async () => {
             type="button"
             class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-5 py-2 rounded-lg transition-colors"
           >
-
             {{
               isEditMode
                 ? 'Cancel Edit'
                 : 'Clear'
             }}
-
           </button>
 
         </div>
@@ -5488,10 +6285,14 @@ onMounted(async () => {
             class="font-bold text-blue-800"
           >
             {{
-              expenseSections.find(
-                section =>
-                  section.key === activeSection
-              )?.label || activeSection
+              isCashier
+                ? 'Expenses'
+                : expenseSections.find(
+                    section =>
+                      section.key ===
+                      activeSection
+                  )?.label ||
+                  activeSection
             }}
           </span>
 
@@ -5514,8 +6315,13 @@ onMounted(async () => {
             class="border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
           />
 
+          <!-- ADMIN OPERATING FILTER -->
+
           <select
-            v-if="activeSection === 'Ingredient'"
+            v-if="
+              isAdmin &&
+              activeSection === 'Ingredient'
+            "
             v-model="inventoryCategoryFilter"
             class="border border-gray-300 rounded-lg p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -5527,17 +6333,19 @@ onMounted(async () => {
             >
               {{
                 category === 'All'
-                  ? 'All Categories'
+                  ? 'All Operating Expenses'
                   : category
               }}
             </option>
 
           </select>
 
+          <!-- LABOR MONTH -->
+
           <div
             v-if="
-              activeSection === 'Labor' &&
-              authStore.user?.role === 'Admin'
+              isAdmin &&
+              activeSection === 'Labor'
             "
             class="flex items-center gap-2"
           >
@@ -5550,16 +6358,19 @@ onMounted(async () => {
 
             <input
               v-model="selectedLaborMonth"
+              @change="changeLaborMonth"
               type="month"
               class="border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             />
 
           </div>
 
+          <!-- BILL MONTH -->
+
           <div
             v-else-if="
-              activeSection === 'Bill' &&
-              authStore.user?.role === 'Admin'
+              isAdmin &&
+              activeSection === 'Bill'
             "
             class="flex items-center gap-2"
           >
@@ -5572,11 +6383,14 @@ onMounted(async () => {
 
             <input
               v-model="selectedBillMonth"
+              @change="changeBillMonth"
               type="month"
               class="border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             />
 
           </div>
+
+          <!-- DAILY DATE -->
 
           <template
             v-else
@@ -5584,7 +6398,7 @@ onMounted(async () => {
 
             <input
               v-if="
-                authStore.user?.role === 'Admin'
+                isAdmin
               "
               v-model="selectedDate"
               type="date"
@@ -5612,46 +6426,25 @@ onMounted(async () => {
 
       </div>
 
-      <!-- LABOR MONTH INFO -->
+      <!-- INFO -->
 
       <div
         v-if="
-          activeSection === 'Labor' &&
-          authStore.user?.role === 'Admin'
+          isCashier
         "
         class="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm text-blue-700"
       >
 
-        Showing Labor Cost records applicable to:
+        Showing today's allowed expense records for
 
         <strong>
-          {{ selectedLaborMonth }}
+          {{ selectedDate }}
         </strong>
 
       </div>
 
-      <!-- BILL MONTH INFO -->
-
       <div
-        v-if="
-          activeSection === 'Bill' &&
-          authStore.user?.role === 'Admin'
-        "
-        class="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm text-blue-700"
-      >
-
-        Showing Bill records applicable to:
-
-        <strong>
-          {{ selectedBillMonth }}
-        </strong>
-
-      </div>
-
-      <!-- INVENTORY FILTER INFO -->
-
-      <div
-        v-if="
+        v-else-if="
           activeSection === 'Ingredient'
         "
         class="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm text-blue-700"
@@ -5662,7 +6455,7 @@ onMounted(async () => {
         <strong>
           {{
             inventoryCategoryFilter === 'All'
-              ? 'Ingredients and Materials'
+              ? 'All Operating Expenses'
               : `${inventoryCategoryFilter} records`
           }}
         </strong>
@@ -5675,7 +6468,39 @@ onMounted(async () => {
 
       </div>
 
+      <div
+        v-else-if="
+          activeSection === 'Bill'
+        "
+        class="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm text-blue-700"
+      >
+
+        Showing Bill records applicable to:
+
+        <strong>
+          {{ selectedBillMonth }}
+        </strong>
+
+      </div>
+
+      <div
+        v-else-if="
+          activeSection === 'Labor'
+        "
+        class="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm text-blue-700"
+      >
+
+        Showing Labor Cost records applicable to:
+
+        <strong>
+          {{ selectedLaborMonth }}
+        </strong>
+
+      </div>
+
+      <!-- ================================================= -->
       <!-- LOADING -->
+      <!-- ================================================= -->
 
       <div
         v-if="
@@ -5699,7 +6524,9 @@ onMounted(async () => {
 
       </div>
 
+      <!-- ================================================= -->
       <!-- TABLE -->
+      <!-- ================================================= -->
 
       <div
         v-else
@@ -5726,6 +6553,7 @@ onMounted(async () => {
 
               <th
                 v-if="
+                  !isCashier &&
                   activeSection === 'Ingredient'
                 "
                 class="px-4 py-3 text-center"
@@ -5735,8 +6563,11 @@ onMounted(async () => {
 
               <th
                 v-if="
-                  activeSection === 'Bill' ||
-                  activeSection === 'Labor'
+                  !isCashier &&
+                  (
+                    activeSection === 'Bill' ||
+                    activeSection === 'Labor'
+                  )
                 "
                 class="px-4 py-3"
               >
@@ -5745,12 +6576,22 @@ onMounted(async () => {
 
               <th
                 v-if="
-                  activeSection === 'Bill' ||
-                  activeSection === 'Labor'
+                  !isCashier &&
+                  (
+                    activeSection === 'Bill' ||
+                    activeSection === 'Labor'
+                  )
                 "
                 class="px-4 py-3 text-center"
               >
                 Amount Status
+              </th>
+
+              <th
+                v-if="isCashier"
+                class="px-4 py-3 text-center"
+              >
+                Status
               </th>
 
               <th
@@ -5766,40 +6607,48 @@ onMounted(async () => {
               </th>
 
               <th
-                v-if="activeSection === 'Bill'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Bill'
+                "
                 class="px-4 py-3"
               >
                 Due Date
               </th>
 
               <th
-                v-if="activeSection === 'Bill'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Bill'
+                "
                 class="px-4 py-3 text-center"
               >
                 Status
               </th>
 
               <th
-                v-if="activeSection === 'Bill'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Bill'
+                "
                 class="px-4 py-3"
               >
                 Paid Date
               </th>
 
-              <th
-                class="px-4 py-3"
-              >
+              <th class="px-4 py-3">
                 Remarks
               </th>
 
-              <th
-                class="px-4 py-3"
-              >
+              <th class="px-4 py-3">
                 Date
               </th>
 
               <th
-                v-if="activeSection === 'Labor'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Labor'
+                "
                 class="px-4 py-3"
               >
                 Payroll Period
@@ -5812,10 +6661,7 @@ onMounted(async () => {
               </th>
 
               <th
-                v-if="
-                  authStore.user?.role === 'Admin' ||
-                  activeSection === 'Bill'
-                "
+                v-if="isAdmin"
                 class="px-4 py-3 text-center"
               >
                 Actions
@@ -5830,34 +6676,36 @@ onMounted(async () => {
           >
 
             <tr
-              v-if="expenses.length === 0"
+              v-if="
+                expenses.length === 0
+              "
             >
 
               <td
                 :colspan="
-                  activeSection === 'Bill'
-                    ? 13
-                    : activeSection === 'Labor'
-                      ? 11
-                      : activeSection === 'Ingredient'
-                        ? 9
-                        : 8
+                  isCashier
+                    ? 8
+                    : activeSection === 'Bill'
+                      ? 13
+                      : activeSection === 'Labor'
+                        ? 11
+                        : 9
                 "
                 class="px-4 py-8 text-center text-gray-400"
               >
 
                 {{
-                  activeSection === 'Labor'
-                    ? 'Walang Labor Cost records para sa buwang ito.'
-                    : activeSection === 'Bill'
-                      ? 'Walang Bill records para sa buwang ito.'
-                      : activeSection === 'Ingredient'
-                        ? (
+                  isCashier
+                    ? 'Walang expense records para sa petsang ito.'
+                    : activeSection === 'Labor'
+                      ? 'Walang Labor Cost records para sa buwang ito.'
+                      : activeSection === 'Bill'
+                        ? 'Walang Bill records para sa buwang ito.'
+                        : (
                             inventoryCategoryFilter === 'All'
-                              ? 'Walang Ingredient / Material records para sa petsang ito.'
+                              ? 'Walang Operating Expense records para sa petsang ito.'
                               : `Walang ${inventoryCategoryFilter} records para sa petsang ito.`
                           )
-                        : 'Walang expense records para sa petsang ito.'
                 }}
 
               </td>
@@ -5884,14 +6732,15 @@ onMounted(async () => {
               <td
                 class="px-4 py-3 text-gray-500"
               >
-                {{ exp.category || '—' }}
+                {{ getCategoryLabel(exp) }}
               </td>
 
               <td
                 v-if="
+                  !isCashier &&
                   activeSection === 'Ingredient'
                 "
-                class="px-4 py-3 text-center text-gray-700"
+                class="px-4 py-3 text-center"
               >
                 {{ exp.qty || 1 }}
                 {{ exp.unit || 'pcs' }}
@@ -5899,8 +6748,11 @@ onMounted(async () => {
 
               <td
                 v-if="
-                  activeSection === 'Bill' ||
-                  activeSection === 'Labor'
+                  !isCashier &&
+                  (
+                    activeSection === 'Bill' ||
+                    activeSection === 'Labor'
+                  )
                 "
                 class="px-4 py-3"
               >
@@ -5914,8 +6766,11 @@ onMounted(async () => {
 
               <td
                 v-if="
-                  activeSection === 'Bill' ||
-                  activeSection === 'Labor'
+                  !isCashier &&
+                  (
+                    activeSection === 'Bill' ||
+                    activeSection === 'Labor'
+                  )
                 "
                 class="px-4 py-3 text-center"
               >
@@ -5932,7 +6787,6 @@ onMounted(async () => {
                       : 'bg-blue-100 text-blue-700'
                   ]"
                 >
-
                   {{
                     activeSection === 'Bill'
                       ? (
@@ -5944,7 +6798,38 @@ onMounted(async () => {
                           'Estimated'
                         )
                   }}
+                </span>
 
+              </td>
+
+              <td
+                v-if="isCashier"
+                class="px-4 py-3 text-center"
+              >
+
+                <span
+                  v-if="
+                    exp.category === 'Bill'
+                  "
+                  :class="[
+                    'px-2.5 py-1 rounded-full text-xs font-bold',
+                    getBillStatus(exp) === 'Paid'
+                      ? 'bg-green-100 text-green-700'
+                      : getBillStatus(exp) === 'Overdue'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                  ]"
+                >
+                  {{
+                    getBillStatus(exp)
+                  }}
+                </span>
+
+                <span
+                  v-else
+                  class="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700"
+                >
+                  Paid
                 </span>
 
               </td>
@@ -5998,7 +6883,10 @@ onMounted(async () => {
               </td>
 
               <td
-                v-if="activeSection === 'Bill'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Bill'
+                "
                 class="px-4 py-3"
               >
                 {{
@@ -6011,7 +6899,10 @@ onMounted(async () => {
               </td>
 
               <td
-                v-if="activeSection === 'Bill'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Bill'
+                "
                 class="px-4 py-3 text-center"
               >
 
@@ -6033,7 +6924,10 @@ onMounted(async () => {
               </td>
 
               <td
-                v-if="activeSection === 'Bill'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Bill'
+                "
                 class="px-4 py-3"
               >
                 {{
@@ -6069,7 +6963,10 @@ onMounted(async () => {
               </td>
 
               <td
-                v-if="activeSection === 'Labor'"
+                v-if="
+                  !isCashier &&
+                  activeSection === 'Labor'
+                "
                 class="px-4 py-3 whitespace-nowrap"
               >
 
@@ -6131,10 +7028,7 @@ onMounted(async () => {
               </td>
 
               <td
-                v-if="
-                  authStore.user?.role === 'Admin' ||
-                  activeSection === 'Bill'
-                "
+                v-if="isAdmin"
                 class="px-4 py-3 text-center"
               >
 
@@ -6192,9 +7086,7 @@ onMounted(async () => {
                   </span>
 
                   <template
-                    v-else-if="
-                      authStore.user?.role === 'Admin'
-                    "
+                    v-else
                   >
 
                     <button
@@ -6234,9 +7126,7 @@ onMounted(async () => {
 
                     <button
                       @click="
-                        deleteExpense(
-                          exp
-                        )
+                        deleteExpense(exp)
                       "
                       type="button"
                       title="Delete expense"
@@ -6277,7 +7167,9 @@ onMounted(async () => {
 
       </div>
 
+      <!-- ================================================= -->
       <!-- TOTAL -->
+      <!-- ================================================= -->
 
       <div
         class="bg-gray-50 border-t border-gray-100 px-4 py-3 flex justify-end"
@@ -6362,6 +7254,7 @@ onMounted(async () => {
           </div>
 
           <div>
+
             <label
               class="block text-sm font-semibold text-gray-700 mb-2"
             >
