@@ -277,7 +277,7 @@ const fetchEditMenus = async () => {
     const token = authStore.getToken()
 
     const response = await axios.get(
-      '/api/menus',
+      `${API}/menus`,
       {
         headers: {
           Authorization: `Bearer ${token}`
@@ -311,7 +311,7 @@ const fetchEditAddOns = async () => {
     const token = authStore.getToken()
 
     const response = await axios.get(
-      '/api/add-ons',
+      `${API}/add-ons`,
       {
         headers: {
           Authorization: `Bearer ${token}`
