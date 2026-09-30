@@ -3286,15 +3286,32 @@ const submitExpense =
         'Daily'
     ) {
       if (
-        !form.value.periodMonth
+        form.value.category ===
+        'Bill'
       ) {
-        error.value =
-          'Month ay required.'
+        // Bills: ang Date (cash-out day) ang required.
+        // Ang billed month ay auto mula sa Date.
+        if (
+          !form.value.expenseDate
+        ) {
+          error.value =
+            'Date ay required.'
 
-        return
+          return
+        }
+      } else {
+        // Labor (Monthly/Daily): Month pa rin ang basehan.
+        if (
+          !form.value.periodMonth
+        ) {
+          error.value =
+            'Month ay required.'
+
+          return
+        }
+
+        updatePeriodFromFrequency()
       }
-
-      updatePeriodFromFrequency()
     }
 
     /*
@@ -3410,9 +3427,14 @@ const submitExpense =
           'Daily'
       ) {
         recordDate =
-          getMonthStartDate(
-            form.value.periodMonth
-          )
+          form.value.category === 'Bill'
+            ? (
+                form.value.expenseDate ||
+                todayPH
+              )
+            : getMonthStartDate(
+                form.value.periodMonth
+              )
       }
 
       if (
@@ -3447,14 +3469,22 @@ const submitExpense =
         form.value.frequency ===
           'Daily'
       ) {
+        const billMonthSource =
+          form.value.category === 'Bill'
+            ? (
+                form.value.expenseDate ||
+                todayPH
+              )
+            : form.value.periodMonth
+
         periodStart =
           getMonthStartDate(
-            form.value.periodMonth
+            billMonthSource
           )
 
         periodEnd =
           getMonthEndDate(
-            form.value.periodMonth
+            billMonthSource
           )
       }
 
@@ -5795,10 +5825,7 @@ onMounted(async () => {
           v-if="
             isAdmin &&
             form.frequency === 'Monthly' &&
-            (
-              isBillExpense ||
-              isAdminLabor
-            )
+            isAdminLabor
           "
           class="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
@@ -5875,10 +5902,7 @@ onMounted(async () => {
           v-if="
             isAdmin &&
             form.frequency === 'Daily' &&
-            (
-              isBillExpense ||
-              isAdminLabor
-            )
+            isAdminLabor
           "
           class="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
@@ -5953,7 +5977,8 @@ onMounted(async () => {
 
         <div
           v-if="
-            form.frequency === 'One-Time'
+            form.frequency === 'One-Time' ||
+            isBillExpense
           "
           class="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
@@ -5983,6 +6008,46 @@ onMounted(async () => {
               readonly
               class="w-full border border-gray-300 rounded-lg p-2 bg-gray-100 text-gray-500"
             />
+
+            <div
+              class="text-xs text-gray-400 mt-1"
+            >
+              Araw na lumabas ang pera sa kaha (cash-out).
+            </div>
+
+          </div>
+
+          <!-- Billed month (derived from Date) — para sa report distribution -->
+          <div
+            v-if="
+              isBillExpense &&
+              (
+                form.frequency === 'Monthly' ||
+                form.frequency === 'Daily'
+              )
+            "
+          >
+
+            <label
+              class="block text-sm font-semibold text-gray-700 mb-1"
+            >
+              Billed Month
+            </label>
+
+            <input
+              :value="
+                (form.expenseDate || todayPH).slice(0, 7)
+              "
+              type="month"
+              readonly
+              class="w-full border border-gray-300 rounded-lg p-2 bg-gray-100 text-gray-500"
+            />
+
+            <div
+              class="text-xs text-gray-400 mt-1"
+            >
+              Auto mula sa Date. I-back date para sa ibang buwan.
+            </div>
 
           </div>
 
@@ -6039,104 +6104,12 @@ onMounted(async () => {
         <!-- ================================================= -->
         <!-- BILL DETAILS -->
         <!-- ================================================= -->
-
-        <div
-          v-if="
-            isBillExpense
-          "
-          class="space-y-4"
-        >
-
-          <div
-            class="bg-blue-50 border border-blue-100 rounded-xl p-4"
-          >
-
-            <div
-              class="font-black text-blue-800"
-            >
-              Bill Details
-            </div>
-
-            <p
-              class="text-sm text-blue-700 mt-1"
-            >
-              {{
-                isCashier
-                  ? 'I-record ang actual bill amount. Puwedeng Paid o Due.'
-                  : 'Bill amount, period, payment status at due date.'
-              }}
-            </p>
-
-          </div>
-
-          <div
-            class="grid grid-cols-1 md:grid-cols-3 gap-4"
-          >
-
-            <div>
-
-              <label
-                class="block text-sm font-semibold text-gray-700 mb-1"
-              >
-                Due Date
-              </label>
-
-              <input
-                v-model="form.dueDate"
-                type="date"
-                class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-
-            </div>
-
-            <div>
-
-              <label
-                class="block text-sm font-semibold text-gray-700 mb-1"
-              >
-                Payment Status
-              </label>
-
-              <select
-                v-model="form.paymentStatus"
-                @change="changePaymentStatus"
-                class="w-full border border-gray-300 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-
-                <option value="Paid">
-                  Paid
-                </option>
-
-                <option value="Due">
-                  Due
-                </option>
-
-              </select>
-
-            </div>
-
-            <div>
-
-              <label
-                class="block text-sm font-semibold text-gray-700 mb-1"
-              >
-                Paid Date
-              </label>
-
-              <input
-                v-model="form.paidDate"
-                type="date"
-                :disabled="
-                  form.paymentStatus !== 'Paid'
-                "
-                class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:text-gray-400"
-              />
-
-            </div>
-
-          </div>
-
-        </div>
+        <!--
+          Tinanggal na ang Due Date / Payment Status / Paid Date.
+          Bawat bill ay Paid na agad sa oras ng pag-record, at ang
+          "Date" (cash-out day) sa itaas ang siyang gamit ng Cash
+          Ledger. Ang billed month para sa reports ay auto mula sa Date.
+        -->
 
         <!-- ================================================= -->
         <!-- ADMIN LABOR DETAILS -->
