@@ -33,6 +33,31 @@ const error = ref('')
 
 /*
 |--------------------------------------------------------------------------
+| Cash Audit Snapshot
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| This is always for the selected date only.
+| It is NOT cumulative MTD or YTD cash.
+|
+*/
+
+const cashAudit = ref({
+  date: '',
+  openingCash: 0,
+  cashSales: 0,
+  otherCashIn: 0,
+  storeExpenses: 0,
+  otherCashOut: 0,
+  expectedCash: 0,
+  gcashReceived: 0
+})
+
+const cashAuditLoading = ref(false)
+const cashAuditError = ref('')
+
+/*
+|--------------------------------------------------------------------------
 | API
 |--------------------------------------------------------------------------
 */
@@ -590,6 +615,131 @@ const averageProfit =
 
 /*
 |--------------------------------------------------------------------------
+| Fetch Cash Audit Snapshot
+|--------------------------------------------------------------------------
+*/
+
+const fetchCashAudit = async () => {
+  if (!selectedDate.value) {
+    return
+  }
+
+  cashAuditLoading.value =
+    true
+
+  cashAuditError.value =
+    ''
+
+  try {
+    const token =
+      getToken()
+
+    if (!token) {
+      throw new Error(
+        'Walang authentication token.'
+      )
+    }
+
+    const response =
+      await axios.get(
+        `${API}/cash-transactions`,
+        {
+          params: {
+            date:
+              selectedDate.value
+          },
+
+          headers:
+            getAuthHeaders()
+        }
+      )
+
+    const data =
+      response.data || {}
+
+    cashAudit.value = {
+      date:
+        data.date ||
+        selectedDate.value,
+
+      openingCash:
+        Number(
+          data.openingCash || 0
+        ),
+
+      cashSales:
+        Number(
+          data.cashSales || 0
+        ),
+
+      otherCashIn:
+        Number(
+          data.otherCashIn || 0
+        ),
+
+      storeExpenses:
+        Number(
+          data.storeExpenses || 0
+        ),
+
+      otherCashOut:
+        Number(
+          data.otherCashOut || 0
+        ),
+
+      expectedCash:
+        Number(
+          data.expectedCash || 0
+        ),
+
+      gcashReceived:
+        Number(
+          data.gcashReceived || 0
+        )
+    }
+  } catch (err) {
+    console.error(
+      'fetchCashAudit error:',
+      err
+    )
+
+    cashAudit.value = {
+      date:
+        selectedDate.value,
+
+      openingCash: 0,
+      cashSales: 0,
+      otherCashIn: 0,
+      storeExpenses: 0,
+      otherCashOut: 0,
+      expectedCash: 0,
+      gcashReceived: 0
+    }
+
+    if (
+      err?.response?.status ===
+      401
+    ) {
+      cashAuditError.value =
+        'Session expired o invalid ang login token.'
+    } else if (
+      err?.response?.data?.message
+    ) {
+      cashAuditError.value =
+        err.response.data.message
+    } else {
+      cashAuditError.value =
+        err?.message ||
+        'Hindi ma-load ang Cash Audit Snapshot.'
+    }
+  } finally {
+    cashAuditLoading.value =
+      false
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
 | Fetch Reports
 |--------------------------------------------------------------------------
 */
@@ -656,6 +806,15 @@ const fetchReports = async () => {
         response.data
       )
     }
+
+    /*
+    |----------------------------------------------------------------------
+    | Cash Audit Snapshot
+    |----------------------------------------------------------------------
+    */
+
+    await fetchCashAudit()
+
   } catch (err) {
     console.error(
       'fetchReports error:',
@@ -779,7 +938,7 @@ onMounted(() => {
           <p
             class="text-sm text-gray-500 mt-1"
           >
-            Sales, expenses, and estimated profit.
+            Sales, expenses, cash position, and estimated profit.
           </p>
 
         </div>
@@ -1092,6 +1251,420 @@ onMounted(() => {
           </div>
 
         </div>
+
+        <!-- ======================================================== -->
+        <!-- CASH AUDIT SNAPSHOT -->
+        <!-- ======================================================== -->
+
+        <section class="space-y-4">
+
+          <div
+            class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2"
+          >
+
+            <div>
+
+              <h2
+                class="text-xl font-black text-gray-800"
+              >
+                Cash Audit Snapshot
+              </h2>
+
+              <p
+                class="text-sm text-gray-500 mt-1"
+              >
+                Physical cash and GCash position for the selected date.
+              </p>
+
+            </div>
+
+            <div
+              class="text-sm text-gray-500"
+            >
+              Selected Date:
+              <span
+                class="font-black text-gray-700"
+              >
+                {{
+                  cashAudit.date ||
+                  selectedDate
+                }}
+              </span>
+            </div>
+
+          </div>
+
+          <!-- CASH AUDIT ERROR -->
+
+          <div
+            v-if="cashAuditError"
+            class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-medium"
+          >
+            {{ cashAuditError }}
+          </div>
+
+          <!-- CASH AUDIT LOADING -->
+
+          <div
+            v-if="cashAuditLoading"
+            class="bg-white border border-gray-200 rounded-2xl p-8 text-center text-sm text-gray-500 shadow-sm"
+          >
+            Loading cash audit snapshot...
+          </div>
+
+          <div
+            v-else
+            class="space-y-4"
+          >
+
+            <!-- SUMMARY CARDS -->
+
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+            >
+
+              <!-- OPENING -->
+
+              <div
+                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+              >
+
+                <p
+                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                >
+                  Opening Cash
+                </p>
+
+                <p
+                  class="text-2xl md:text-3xl font-black text-gray-800 mt-2"
+                >
+                  {{
+                    formatAmount(
+                      cashAudit.openingCash
+                    )
+                  }}
+                </p>
+
+                <p
+                  class="text-xs text-gray-400 mt-1"
+                >
+                  Initial cash in the drawer.
+                </p>
+
+              </div>
+
+              <!-- CASH SALES -->
+
+              <div
+                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+              >
+
+                <p
+                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                >
+                  Cash Sales
+                </p>
+
+                <p
+                  class="text-2xl md:text-3xl font-black text-emerald-600 mt-2"
+                >
+                  {{
+                    formatAmount(
+                      cashAudit.cashSales
+                    )
+                  }}
+                </p>
+
+                <p
+                  class="text-xs text-gray-400 mt-1"
+                >
+                  Actual cash received from sales.
+                </p>
+
+              </div>
+
+              <!-- STORE EXPENSES -->
+
+              <div
+                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+              >
+
+                <p
+                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                >
+                  Store-paid Expenses
+                </p>
+
+                <p
+                  class="text-2xl md:text-3xl font-black text-red-600 mt-2"
+                >
+                  {{
+                    formatAmount(
+                      cashAudit.storeExpenses
+                    )
+                  }}
+                </p>
+
+                <p
+                  class="text-xs text-gray-400 mt-1"
+                >
+                  Deducted from physical cash.
+                </p>
+
+              </div>
+
+              <!-- OTHER CASH OUT -->
+
+              <div
+                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+              >
+
+                <p
+                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                >
+                  Other Cash Out
+                </p>
+
+                <p
+                  class="text-2xl md:text-3xl font-black text-red-600 mt-2"
+                >
+                  {{
+                    formatAmount(
+                      cashAudit.otherCashOut
+                    )
+                  }}
+                </p>
+
+                <p
+                  class="text-xs text-gray-400 mt-1"
+                >
+                  Other physical cash released.
+                </p>
+
+              </div>
+
+              <!-- EXPECTED CASH -->
+
+              <div
+                class="rounded-2xl p-5 shadow-sm border-2"
+                :style="{
+                  borderColor:
+                    settingsStore.themeColor
+                }"
+              >
+
+                <p
+                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                >
+                  Expected Cash in Drawer
+                </p>
+
+                <p
+                  class="text-2xl md:text-3xl font-black text-gray-900 mt-2"
+                >
+                  {{
+                    formatAmount(
+                      cashAudit.expectedCash
+                    )
+                  }}
+                </p>
+
+                <p
+                  class="text-xs text-gray-500 mt-1"
+                >
+                  Expected physical cash after movements.
+                </p>
+
+              </div>
+
+              <!-- GCASH -->
+
+              <div
+                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+              >
+
+                <p
+                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                >
+                  GCash Received
+                </p>
+
+                <p
+                  class="text-2xl md:text-3xl font-black mt-2"
+                  :style="{
+                    color:
+                      settingsStore.themeColor
+                  }"
+                >
+                  {{
+                    formatAmount(
+                      cashAudit.gcashReceived
+                    )
+                  }}
+                </p>
+
+                <p
+                  class="text-xs text-gray-400 mt-1"
+                >
+                  Separate from physical cash drawer.
+                </p>
+
+              </div>
+
+            </div>
+
+            <!-- CASH FORMULA -->
+
+            <div
+              class="bg-gray-50 border border-gray-200 rounded-2xl p-5"
+            >
+
+              <p
+                class="text-xs font-black uppercase tracking-wide text-gray-500"
+              >
+                Expected Cash Calculation
+              </p>
+
+              <div
+                class="mt-3 grid grid-cols-1 sm:grid-cols-5 gap-3"
+              >
+
+                <div
+                  class="rounded-xl bg-white border border-gray-200 p-4"
+                >
+
+                  <p
+                    class="text-xs text-gray-400"
+                  >
+                    Opening
+                  </p>
+
+                  <p
+                    class="font-black text-gray-800 mt-1"
+                  >
+                    {{
+                      formatAmount(
+                        cashAudit.openingCash
+                      )
+                    }}
+                  </p>
+
+                </div>
+
+                <div
+                  class="rounded-xl bg-white border border-gray-200 p-4"
+                >
+
+                  <p
+                    class="text-xs text-gray-400"
+                  >
+                    + Cash In
+                  </p>
+
+                  <p
+                    class="font-black text-emerald-600 mt-1"
+                  >
+                    {{
+                      formatAmount(
+                        cashAudit.cashSales +
+                        cashAudit.otherCashIn
+                      )
+                    }}
+                  </p>
+
+                </div>
+
+                <div
+                  class="rounded-xl bg-white border border-gray-200 p-4"
+                >
+
+                  <p
+                    class="text-xs text-gray-400"
+                  >
+                    - Store Expenses
+                  </p>
+
+                  <p
+                    class="font-black text-red-600 mt-1"
+                  >
+                    {{
+                      formatAmount(
+                        cashAudit.storeExpenses
+                      )
+                    }}
+                  </p>
+
+                </div>
+
+                <div
+                  class="rounded-xl bg-white border border-gray-200 p-4"
+                >
+
+                  <p
+                    class="text-xs text-gray-400"
+                  >
+                    - Other Cash Out
+                  </p>
+
+                  <p
+                    class="font-black text-red-600 mt-1"
+                  >
+                    {{
+                      formatAmount(
+                        cashAudit.otherCashOut
+                      )
+                    }}
+                  </p>
+
+                </div>
+
+                <div
+                  class="rounded-xl border-2 p-4"
+                  :style="{
+                    borderColor:
+                      settingsStore.themeColor
+                  }"
+                >
+
+                  <p
+                    class="text-xs text-gray-500"
+                  >
+                    = Expected
+                  </p>
+
+                  <p
+                    class="font-black text-gray-900 mt-1"
+                  >
+                    {{
+                      formatAmount(
+                        cashAudit.expectedCash
+                      )
+                    }}
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- SNAPSHOT NOTE -->
+
+            <div
+              class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3"
+            >
+
+              <p
+                class="text-xs text-blue-700 leading-relaxed"
+              >
+                Cash Audit Snapshot ay para lamang sa selected date. Kahit MTD o YTD ang report period, hindi ito cumulative cash balance. Para sa actual daily cash audit, gamitin ang Cash Ledger bilang detailed source.
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
 
         <!-- SALES SUMMARY -->
 
