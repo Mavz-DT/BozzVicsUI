@@ -482,6 +482,10 @@ const form = ref({
   paymentStatus: 'Paid',
   paidDate: '',
 
+  // Store = store cash / kaha
+  // Owner = owner's own money
+  paymentSource: 'Store',
+
   maintenanceType: '',
   billType: '',
 
@@ -492,6 +496,22 @@ const form = ref({
 })
 
 const submitting = ref(false)
+
+// =====================================================
+// BILL PAYMENT MODAL
+// =====================================================
+
+const isBillPaymentModalOpen =
+  ref(false)
+
+const selectedBillForPayment =
+  ref(null)
+
+const billPaymentSource =
+  ref('Store')
+
+const billPaymentSubmitting =
+  ref(false)
 
 // =====================================================
 // AUTH
@@ -1434,6 +1454,35 @@ const changeBillPeriod =
     updatePeriodFromFrequency()
 
     await fetchBillEstimate()
+  }
+
+// =====================================================
+// BILL PAYMENT STATUS
+// =====================================================
+
+const changePaymentStatus =
+  () => {
+    if (
+      form.value.paymentStatus ===
+      'Due'
+    ) {
+      form.value.paidDate =
+        ''
+
+      form.value.paymentSource =
+        ''
+
+      return
+    }
+
+    if (
+      !['Store', 'Owner'].includes(
+        form.value.paymentSource
+      )
+    ) {
+      form.value.paymentSource =
+        'Store'
+    }
   }
 
 // =====================================================
@@ -2523,6 +2572,9 @@ const changeSection =
     form.value.paidDate =
       ''
 
+    form.value.paymentSource =
+      'Store'
+
     form.value.laborType =
       'Regular'
 
@@ -2770,6 +2822,36 @@ const submitExpense =
         form.value.paymentStatus =
           'Paid'
       }
+
+      if (
+        form.value.paymentStatus ===
+        'Paid' &&
+        !['Store', 'Owner'].includes(
+          form.value.paymentSource
+        )
+      ) {
+        form.value.paymentSource =
+          'Store'
+      }
+
+      if (
+        form.value.paymentStatus ===
+        'Due'
+      ) {
+        form.value.paymentSource =
+          ''
+        form.value.paidDate =
+          ''
+      }
+    } else {
+      if (
+        !['Store', 'Owner'].includes(
+          form.value.paymentSource
+        )
+      ) {
+        form.value.paymentSource =
+          'Store'
+      }
     }
 
     submitting.value =
@@ -2947,8 +3029,22 @@ const submitExpense =
           form.value.category ===
           'Bill'
             ? (
-                form.value.paidDate ||
-                null
+                form.value.paymentStatus ===
+                'Paid'
+                  ? (
+                      form.value.paidDate ||
+                      null
+                    )
+                  : null
+              )
+            : null,
+
+        paymentSource:
+          form.value.paymentStatus ===
+          'Paid'
+            ? (
+                form.value.paymentSource ||
+                'Store'
               )
             : null,
 
@@ -3153,6 +3249,9 @@ const resetForm =
 
       paidDate:
         '',
+
+      paymentSource:
+        'Store',
 
       maintenanceType:
         '',
@@ -3978,6 +4077,15 @@ const editExpense =
             )
           : '',
 
+      paymentSource:
+        expense.paymentStatus ===
+        'Due'
+          ? ''
+          : (
+              expense.paymentSource ||
+              'Store'
+            ),
+
       maintenanceType:
         expense.category ===
         'Maintenance'
@@ -4166,7 +4274,17 @@ const deleteExpense =
 // =====================================================
 
 const markBillPaid =
-  async id => {
+  async expense => {
+    if (!expense) {
+      error.value =
+        'Invalid bill record.'
+
+      return
+    }
+
+    const id =
+      expense?._id
+
     if (!id) {
       error.value =
         'Invalid bill record.'
@@ -4185,13 +4303,64 @@ const markBillPaid =
       return
     }
 
-    if (
-      !confirm(
-        'Mark this bill as Paid?'
+    selectedBillForPayment.value =
+      expense
+
+    billPaymentSource.value =
+      ['Store', 'Owner'].includes(
+        expense.paymentSource
       )
-    ) {
+        ? expense.paymentSource
+        : 'Store'
+
+    error.value = ''
+
+    isBillPaymentModalOpen.value =
+      true
+  }
+
+const cancelBillPayment =
+  () => {
+    isBillPaymentModalOpen.value =
+      false
+
+    selectedBillForPayment.value =
+      null
+
+    billPaymentSource.value =
+      'Store'
+
+    billPaymentSubmitting.value =
+      false
+  }
+
+const confirmMarkBillPaid =
+  async () => {
+    const id =
+      selectedBillForPayment.value?._id
+
+    if (!id) {
+      error.value =
+        'Invalid bill record.'
+
       return
     }
+
+    if (
+      !['Store', 'Owner'].includes(
+        billPaymentSource.value
+      )
+    ) {
+      error.value =
+        'Pumili kung Store o Owner ang nagbayad.'
+
+      return
+    }
+
+    billPaymentSubmitting.value =
+      true
+
+    error.value = ''
 
     try {
       await fetchJson(
@@ -4200,13 +4369,24 @@ const markBillPaid =
           method: 'PUT',
 
           headers: {
+            'Content-Type':
+              'application/json',
+
             ...getAuthHeaders()
-          }
+          },
+
+          body:
+            JSON.stringify({
+              paymentSource:
+                billPaymentSource.value
+            })
         }
       )
 
       success.value =
         'Bill marked as Paid successfully.'
+
+      cancelBillPayment()
 
       if (
         activeSection.value ===
@@ -4231,6 +4411,10 @@ const markBillPaid =
       error.value =
         err.message ||
         'Failed to mark bill as Paid.'
+
+    } finally {
+      billPaymentSubmitting.value =
+        false
     }
   }
 
@@ -4992,6 +5176,53 @@ onMounted(async () => {
 
         </div>
 
+        <!-- PAYMENT SOURCE -->
+
+        <div
+          v-if="
+            form.category !== 'Bill' ||
+            form.paymentStatus === 'Paid'
+          "
+          class="grid grid-cols-1 md:grid-cols-3 gap-4"
+        >
+
+          <div>
+
+            <label
+              class="block text-sm font-semibold text-gray-700 mb-1"
+            >
+              Paid From
+            </label>
+
+            <select
+              v-model="form.paymentSource"
+              class="w-full border border-gray-300 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+
+              <option value="Store">
+                Store / Kaha
+              </option>
+
+              <option value="Owner">
+                Owner
+              </option>
+
+            </select>
+
+            <div
+              class="text-xs text-gray-400 mt-1"
+            >
+              {{
+                form.paymentSource === 'Owner'
+                  ? 'Owner ang gumamit ng sariling pera para sa expense.'
+                  : 'Pera ay kinuha sa store cash / kaha.'
+              }}
+            </div>
+
+          </div>
+
+        </div>
+
         <!-- BILLS -->
 
         <div
@@ -5050,6 +5281,7 @@ onMounted(async () => {
 
               <select
                 v-model="form.paymentStatus"
+                @change="changePaymentStatus"
                 class="w-full border border-gray-300 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
               >
 
@@ -5528,6 +5760,12 @@ onMounted(async () => {
               </th>
 
               <th
+                class="px-4 py-3 text-center"
+              >
+                Paid From
+              </th>
+
+              <th
                 v-if="activeSection === 'Bill'"
                 class="px-4 py-3"
               >
@@ -5598,12 +5836,12 @@ onMounted(async () => {
               <td
                 :colspan="
                   activeSection === 'Bill'
-                    ? 12
+                    ? 13
                     : activeSection === 'Labor'
-                      ? 10
+                      ? 11
                       : activeSection === 'Ingredient'
-                        ? 8
-                        : 7
+                        ? 9
+                        : 8
                 "
                 class="px-4 py-8 text-center text-gray-400"
               >
@@ -5722,6 +5960,41 @@ onMounted(async () => {
                     0
                   )
                 }}
+              </td>
+
+              <td
+                class="px-4 py-3 text-center"
+              >
+
+                <span
+                  v-if="
+                    exp.isSystemEstimate ||
+                    exp.paymentStatus === 'Due'
+                  "
+                  class="text-xs text-gray-400"
+                >
+                  —
+                </span>
+
+                <span
+                  v-else-if="
+                    (
+                      exp.paymentSource ||
+                      'Store'
+                    ) === 'Owner'
+                  "
+                  class="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700"
+                >
+                  Owner
+                </span>
+
+                <span
+                  v-else
+                  class="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700"
+                >
+                  Store
+                </span>
+
               </td>
 
               <td
@@ -5876,9 +6149,7 @@ onMounted(async () => {
                       exp.paymentStatus !== 'Paid'
                     "
                     @click="
-                      markBillPaid(
-                        exp._id
-                      )
+                      markBillPaid(exp)
                     "
                     type="button"
                     title="Mark as Paid"
@@ -6018,6 +6289,184 @@ onMounted(async () => {
           Total Expenses:
           {{ fmtAmount(totalExpenses) }}
         </span>
+
+      </div>
+
+    </div>
+
+    <!-- ================================================= -->
+    <!-- BILL PAYMENT MODAL -->
+    <!-- ================================================= -->
+
+    <div
+      v-if="isBillPaymentModalOpen"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      @click.self="cancelBillPayment"
+    >
+
+      <div
+        class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+      >
+
+        <div
+          class="bg-blue-600 text-white px-5 py-4"
+        >
+
+          <div
+            class="text-lg font-bold"
+          >
+            Mark Bill as Paid
+          </div>
+
+          <div
+            class="text-sm text-blue-100 mt-1"
+          >
+            Piliin kung saan nanggaling ang pambayad.
+          </div>
+
+        </div>
+
+        <div
+          class="p-5 space-y-4"
+        >
+
+          <div
+            v-if="selectedBillForPayment"
+            class="bg-gray-50 border border-gray-200 rounded-xl p-4"
+          >
+
+            <div
+              class="font-semibold text-gray-800"
+            >
+              {{
+                selectedBillForPayment.name ||
+                selectedBillForPayment.title ||
+                selectedBillForPayment.item ||
+                'Bill'
+              }}
+            </div>
+
+            <div
+              class="text-lg font-bold text-red-600 mt-1"
+            >
+              {{
+                fmtAmount(
+                  selectedBillForPayment.cost ??
+                  selectedBillForPayment.amount ??
+                  selectedBillForPayment.price ??
+                  0
+                )
+              }}
+            </div>
+
+          </div>
+
+          <div>
+            <label
+              class="block text-sm font-semibold text-gray-700 mb-2"
+            >
+              Paid From
+            </label>
+
+            <div
+              class="grid grid-cols-2 gap-3"
+            >
+
+              <button
+                type="button"
+                @click="
+                  billPaymentSource = 'Store'
+                "
+                :class="[
+                  'rounded-xl border-2 px-4 py-4 text-left transition-all',
+                  billPaymentSource === 'Store'
+                    ? 'border-green-500 bg-green-50 text-green-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                ]"
+              >
+
+                <div
+                  class="font-bold"
+                >
+                  Store / Kaha
+                </div>
+
+                <div
+                  class="text-xs mt-1"
+                >
+                  Galing sa pera ng store.
+                </div>
+
+              </button>
+
+              <button
+                type="button"
+                @click="
+                  billPaymentSource = 'Owner'
+                "
+                :class="[
+                  'rounded-xl border-2 px-4 py-4 text-left transition-all',
+                  billPaymentSource === 'Owner'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                ]"
+              >
+
+                <div
+                  class="font-bold"
+                >
+                  Owner
+                </div>
+
+                <div
+                  class="text-xs mt-1"
+                >
+                  Sariling pera ng owner.
+                </div>
+
+              </button>
+
+            </div>
+
+          </div>
+
+          <div
+            class="flex gap-2 pt-2"
+          >
+
+            <button
+              type="button"
+              @click="
+                cancelBillPayment
+              "
+              :disabled="
+                billPaymentSubmitting
+              "
+              class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              @click="
+                confirmMarkBillPaid
+              "
+              :disabled="
+                billPaymentSubmitting
+              "
+              class="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors disabled:opacity-50"
+            >
+              {{
+                billPaymentSubmitting
+                  ? 'Saving...'
+                  : 'Confirm Payment'
+              }}
+            </button>
+
+          </div>
+
+        </div>
 
       </div>
 
