@@ -2311,9 +2311,32 @@ onMounted(() => {
       class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
     >
 
+      <!-- TOTAL SALES -->
       <div
-        class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
+        class="relative group bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
       >
+        <button
+          type="button"
+          aria-label="Paliwanag"
+          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+        >
+          i
+        </button>
+
+        <div
+          class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+        >
+          <p class="font-bold mb-1">Total Sales</p>
+          <p>
+            Kabuuang benta ng pagkain (food sales) para sa
+            araw na ito. HINDI kasama ang delivery fee —
+            pass-through lang iyon, hindi benta.
+          </p>
+          <p class="mt-1 text-gray-300">
+            Formula: Cash Sales + GCash Sales
+          </p>
+        </div>
+
         <p class="text-sm font-bold text-gray-500">
           Total Sales
         </p>
@@ -2323,9 +2346,31 @@ onMounted(() => {
         </p>
       </div>
 
+      <!-- PAID TRANSACTIONS -->
       <div
-        class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
+        class="relative group bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
       >
+        <button
+          type="button"
+          aria-label="Paliwanag"
+          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+        >
+          i
+        </button>
+
+        <div
+          class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+        >
+          <p class="font-bold mb-1">Paid Transactions</p>
+          <p>
+            Bilang ng mga bayad na order (settled at paid)
+            para sa araw na ito.
+          </p>
+          <p class="mt-1 text-gray-300">
+            Formula: bilang ng mga row sa talaan sa ibaba
+          </p>
+        </div>
+
         <p class="text-sm font-bold text-gray-500">
           Paid Transactions
         </p>
@@ -2335,9 +2380,33 @@ onMounted(() => {
         </p>
       </div>
 
+      <!-- CASH SALES -->
       <div
-        class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
+        class="relative group bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
       >
+        <button
+          type="button"
+          aria-label="Paliwanag"
+          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+        >
+          i
+        </button>
+
+        <div
+          class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+        >
+          <p class="font-bold mb-1">Cash Sales</p>
+          <p>
+            Bahagi ng food sales na binayaran nang CASH.
+            Tinanggal na rito ang delivery fee — ang cash
+            movement ng delivery fee ay nasa Cash Ledger
+            page.
+          </p>
+          <p class="mt-1 text-gray-300">
+            Formula: food sales ng mga Cash na bayad
+          </p>
+        </div>
+
         <p class="text-sm font-bold text-gray-500">
           Cash Sales
         </p>
@@ -2347,9 +2416,33 @@ onMounted(() => {
         </p>
       </div>
 
+      <!-- GCASH SALES -->
       <div
-        class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
+        class="relative group bg-white rounded-2xl shadow-sm border border-gray-200 p-5"
       >
+        <button
+          type="button"
+          aria-label="Paliwanag"
+          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+        >
+          i
+        </button>
+
+        <div
+          class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+        >
+          <p class="font-bold mb-1">GCash Sales</p>
+          <p>
+            Bahagi ng food sales na binayaran nang GCash.
+            HINDI na kasama ang delivery fee — kaya kung
+            may ₱70 delivery na binayad sa GCash, food
+            sales lang ang bibilangin dito.
+          </p>
+          <p class="mt-1 text-gray-300">
+            Formula: food sales ng mga GCash na bayad
+          </p>
+        </div>
+
         <p class="text-sm font-bold text-gray-500">
           GCash Sales
         </p>

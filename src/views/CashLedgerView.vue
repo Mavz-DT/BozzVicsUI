@@ -1158,8 +1158,24 @@ onMounted(() => {
         <!-- OPENING CASH -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Opening Cash</p>
+            <p>Ang cash na nasa drawer bago magsimula ang mga transaksyon ngayong araw.</p>
+            <p class="mt-1 text-gray-300">Formula: manu-manong itinatakda ng admin/cashier para sa petsa.</p>
+          </div>
 
           <p
             class="text-xs font-bold uppercase tracking-wide text-gray-400"
@@ -1184,8 +1200,25 @@ onMounted(() => {
         <!-- CASH SALES -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Cash Sales</p>
+            <p>CASH lang na natanggap sa benta ngayong araw. HINDI kasama ang GCash (nasa "GCash Received" iyon) — kaya mas maliit ito kaysa Total Sales sa Sales Record.</p>
+            <p class="mt-1 text-gray-300">Formula: kabuuan ng mga bayad na Cash (method = Cash) sa mga order ngayong araw.</p>
+            <p class="mt-1 text-emerald-300">Total Sales = Cash Sales + GCash Received.</p>
+          </div>
 
           <p
             class="text-xs font-bold uppercase tracking-wide text-gray-400"
@@ -1210,8 +1243,24 @@ onMounted(() => {
         <!-- STORE EXPENSES -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Store-paid Expenses</p>
+            <p>Mga gastos na binayaran gamit ang pera sa kaha (source = Store). Hindi kasama ang Owner-paid o Due.</p>
+            <p class="mt-1 text-gray-300">Formula: kabuuan ng Expense records (Paid, source = Store) para sa araw.</p>
+          </div>
 
           <p
             class="text-xs font-bold uppercase tracking-wide text-gray-400"
@@ -1236,8 +1285,24 @@ onMounted(() => {
         <!-- OTHER CASH OUT -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Other Cash Out</p>
+            <p>Iba pang CASH na lumabas sa kaha maliban sa Store Expenses: refunds, rider payout, employee cashout, manual cash-out.</p>
+            <p class="mt-1 text-gray-300">Formula: kabuuan ng Cash OUT na transactions (hindi kasama ang Store Expenses).</p>
+          </div>
 
           <p
             class="text-xs font-bold uppercase tracking-wide text-gray-400"
@@ -1272,12 +1337,28 @@ onMounted(() => {
         <!-- EXPECTED CASH -->
 
         <div
-          class="rounded-2xl p-6 shadow-sm border-2"
+          class="relative group rounded-2xl p-6 shadow-sm border-2"
           :style="{
             borderColor:
               themeColor
           }"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Expected Cash in Drawer</p>
+            <p>Ito ang dapat na laman ng kaha ngayon kung tama lahat ng record. Ihambing sa aktwal na bilang ng pera.</p>
+            <p class="mt-1 text-gray-300">Formula: Opening Cash + Cash Sales + Other Cash In − Store Expenses − Other Cash Out.</p>
+          </div>
 
           <p
             class="text-xs font-black uppercase tracking-wide text-gray-500"
@@ -1383,8 +1464,25 @@ onMounted(() => {
         <!-- GCASH -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-6 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Total GCash Received</p>
+            <p>GCash na natanggap ngayong araw. HIWALAY ito sa pisikal na cash drawer.</p>
+            <p class="mt-1 text-gray-300">Formula: Σ GCash payments (sales) + GCash-in (employee exchange) − GCash refunds/out.</p>
+            <p class="mt-1 text-emerald-300">Total Sales = Cash Sales + GCash Received.</p>
+          </div>
 
           <p
             class="text-xs font-black uppercase tracking-wide text-gray-400"
@@ -1477,8 +1575,24 @@ onMounted(() => {
         <!-- TOTAL CASH IN -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Total Cash In</p>
+            <p>Lahat ng CASH na pumasok sa kaha ngayong araw (hindi kasama ang GCash).</p>
+            <p class="mt-1 text-gray-300">Formula: Cash Sales + Other Cash In.</p>
+          </div>
 
           <p
             class="text-xs font-bold uppercase tracking-wide text-gray-400"
@@ -1503,8 +1617,24 @@ onMounted(() => {
         <!-- TOTAL CASH OUT -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Total Cash Out</p>
+            <p>Lahat ng CASH na lumabas sa kaha ngayong araw.</p>
+            <p class="mt-1 text-gray-300">Formula: Store-paid Expenses + Other Cash Out.</p>
+          </div>
 
           <p
             class="text-xs font-bold uppercase tracking-wide text-gray-400"
@@ -1529,8 +1659,24 @@ onMounted(() => {
         <!-- NET MOVEMENT -->
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          class="relative group bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
         >
+
+          <button
+            type="button"
+            aria-label="Paliwanag"
+            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          >
+            i
+          </button>
+
+          <div
+            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          >
+            <p class="font-bold mb-1">Net Cash Movement</p>
+            <p>Netong galaw ng cash ngayong araw — kung gaano tumaas o bumaba ang pera sa kaha.</p>
+            <p class="mt-1 text-gray-300">Formula: Total Cash In − Total Cash Out.</p>
+          </div>
 
           <p
             class="text-xs font-bold uppercase tracking-wide text-gray-400"
