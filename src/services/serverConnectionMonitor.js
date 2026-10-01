@@ -601,6 +601,91 @@ const installFetchMonitor =
 // INSTALL GLOBAL MONITOR
 // =====================================================
 
+// =====================================================
+// KEEP-ALIVE (Render free-tier anti-sleep)
+// =====================================================
+//
+// Nag-pi-ping sa /api/health kada 10 minuto habang bukas ang app,
+// para hindi matulog ang Render free-tier server (nag-i-spin down
+// ito pagkatapos ng ~15 min na walang request).
+//
+// Dumadaan sa parehong endpoint ng "Connect to server" button, at
+// dahil naka-monitor na ang fetch, na-re-refresh din nito ang
+// connection status sa navbar.
+//
+// TANDAAN: client-side ito — gumagana lang habang may bukas na app
+// (hal. habang open ang POS sa oras ng negosyo). Kapag walang bukas
+// na app, matutulog pa rin ang server. Para sa 24/7 na anti-sleep,
+// gumamit ng external uptime pinger (hal. UptimeRobot / cron-job.org)
+// papunta sa /api/health.
+// =====================================================
+
+const KEEP_ALIVE_API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/$/, '')
+
+const KEEP_ALIVE_INTERVAL =
+  10 * 60 * 1000 // 10 minuto
+
+let keepAliveTimer =
+  null
+
+const pingServerKeepAlive =
+  async () => {
+    // Huwag mag-ping kung offline ang device.
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.onLine === false
+    ) {
+      return
+    }
+
+    try {
+      await fetch(
+        `${KEEP_ALIVE_API_BASE_URL}/api/health`,
+        {
+          method: 'GET',
+          cache: 'no-store'
+        }
+      )
+    } catch (error) {
+      // Tahimik — hahawakan na ng monitor ang connection state.
+    }
+  }
+
+const startServerKeepAlive =
+  () => {
+    if (
+      keepAliveTimer ||
+      typeof window === 'undefined'
+    ) {
+      return
+    }
+
+    // Unang ping agad, tapos kada 10 minuto.
+    pingServerKeepAlive()
+
+    keepAliveTimer =
+      setInterval(
+        pingServerKeepAlive,
+        KEEP_ALIVE_INTERVAL
+      )
+
+    // Mag-ping din agad pagbalik ng focus sa app (kung na-throttle
+    // ang timer habang naka-background ang tab).
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (
+          document.visibilityState === 'visible'
+        ) {
+          pingServerKeepAlive()
+        }
+      }
+    )
+  }
+
 export const initServerConnectionMonitor =
   () => {
 
@@ -616,6 +701,8 @@ export const initServerConnectionMonitor =
     installAxiosMonitor()
 
     installFetchMonitor()
+
+    startServerKeepAlive()
 
 
     if (
