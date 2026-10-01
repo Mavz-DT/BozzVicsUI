@@ -181,18 +181,18 @@ const isCashier =
 const expenseSections = [
   {
     key: 'Ingredient',
-    label: 'Operating Expenses',
+    label: 'Expenses',
     icon: '💼'
-  },
-  {
-    key: 'Bill',
-    label: 'Bills',
-    icon: '🧾'
   },
   {
     key: 'Labor',
     label: 'Labor Cost',
     icon: '👷'
+  },
+  {
+    key: 'Bill',
+    label: 'Bills',
+    icon: '🧾'
   }
 ]
 
@@ -201,6 +201,12 @@ const activeSection =
 
 const searchExpense =
   ref('')
+
+// Category sub-filter para sa Expenses tab (All / Ingredient / Material).
+// IMPORTANTE: dapat may default na 'All' — kung undefined ito, mabi-break
+// ang expenses list (walang lalabas) at magpapakita ng "undefined records".
+const inventoryCategoryFilter =
+  ref('All')
 
 // =====================================================
 // CATEGORY OPTIONS
@@ -4264,11 +4270,24 @@ const expenses =
 
     return records.filter(
       exp => {
+        /*
+        |--------------------------------------------------------------------------
+        | Pareho ng scope sa cashier Expenses page — para "parehong
+        | expenses" ang admin Operating page at ang cashier page.
+        | Kasama ang records na ginawa ng cashier (operating + allowed
+        | bills + ulam). Ang petsa ay base sa record/pay date (`date`).
+        |--------------------------------------------------------------------------
+        */
+
+        const recordDate =
+          exp.date ||
+          exp.paidDate ||
+          exp.expenseDate ||
+          ''
+
         const cleanDate =
           getDateOnly(
-            exp.date ||
-            exp.expenseDate ||
-            ''
+            recordDate
           )
 
         const matchesDate =
@@ -4280,6 +4299,7 @@ const expenses =
             exp.name ||
             exp.title ||
             exp.item ||
+            exp.expenseItem?.name ||
             ''
           ).toLowerCase()
 
@@ -4289,11 +4309,41 @@ const expenses =
             search
           )
 
+        // 'All' = lahat ng daily expense records na ini-input (kasama
+        // ang mga ginawa ng cashier): operating categories + allowed
+        // bills + ulam / iba pang DAILY labor.
+        //
+        // EXCLUDE lang ang MONTHLY / WEEKLY na recurring labor
+        // (Salaries, 13th Month, benefits) — nasa hiwalay na Labor Cost
+        // tab ito ni admin.
+        //
+        // Specific = ang piniling inventory category lang.
+        const isMonthlyLabor =
+          exp.category === 'Labor' &&
+          [
+            'Monthly',
+            'Weekly'
+          ].includes(
+            exp.expenseFrequency
+          )
+
         const matchesCategory =
           inventoryCategoryFilter.value ===
             'All'
-            ? isOperatingCategory(
-                exp.category
+            ? (
+                isOperatingCategory(
+                  exp.category
+                ) ||
+                (
+                  exp.category === 'Bill' &&
+                  isCashierAllowedBill(
+                    exp.name
+                  )
+                ) ||
+                (
+                  exp.category === 'Labor' &&
+                  !isMonthlyLabor
+                )
               )
             : exp.category ===
                 inventoryCategoryFilter.value
@@ -4545,8 +4595,11 @@ const getBillStatus =
 
 const editExpense =
   async expense => {
+    // Parehong admin at cashier ay pwedeng mag-edit (ang server ang
+    // nag-e-enforce ng limitasyon para sa cashier).
     if (
-      !isAdmin.value
+      !isAdmin.value &&
+      !isCashier.value
     ) {
       return
     }
@@ -4832,8 +4885,11 @@ const editExpense =
 
 const deleteExpense =
   async expenseOrId => {
+    // Parehong admin at cashier ay pwedeng mag-delete (ang server ang
+    // nag-e-enforce ng limitasyon para sa cashier).
     if (
-      !isAdmin.value
+      !isAdmin.value &&
+      !isCashier.value
     ) {
       return
     }
@@ -6634,7 +6690,7 @@ onMounted(async () => {
               </th>
 
               <th
-                v-if="isAdmin"
+                v-if="isAdmin || isCashier"
                 class="px-4 py-3 text-center"
               >
                 Actions
@@ -7001,7 +7057,7 @@ onMounted(async () => {
               </td>
 
               <td
-                v-if="isAdmin"
+                v-if="isAdmin || isCashier"
                 class="px-4 py-3 text-center"
               >
 
