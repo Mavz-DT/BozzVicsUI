@@ -13,6 +13,26 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 // =========================
+// INFO CARD TOOLTIPS
+// =========================
+//
+// Sa desktop: lumalabas kapag hinover (group-hover).
+// Sa touchscreen: walang hover, kaya i-tap ang ⓘ
+// button para i-toggle. Isa lang ang bukas sa isang
+// pagkakataon.
+//
+const activeTip = ref('')
+
+const toggleTip = key => {
+  activeTip.value =
+    activeTip.value === key ? '' : key
+}
+
+const closeTips = () => {
+  activeTip.value = ''
+}
+
+// =========================
 // API
 // =========================
 
@@ -2318,13 +2338,15 @@ onMounted(() => {
         <button
           type="button"
           aria-label="Paliwanag"
-          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          @click.stop="toggleTip('total-sales')"
+          class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
         >
           i
         </button>
 
         <div
-          class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          :class="{ 'opacity-100 pointer-events-auto': activeTip === 'total-sales' }"
+          class="pointer-events-none absolute z-30 right-3 top-11 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
         >
           <p class="font-bold mb-1">Total Sales</p>
           <p>
@@ -2353,13 +2375,15 @@ onMounted(() => {
         <button
           type="button"
           aria-label="Paliwanag"
-          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          @click.stop="toggleTip('paid-tx')"
+          class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
         >
           i
         </button>
 
         <div
-          class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          :class="{ 'opacity-100 pointer-events-auto': activeTip === 'paid-tx' }"
+          class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
         >
           <p class="font-bold mb-1">Paid Transactions</p>
           <p>
@@ -2387,13 +2411,15 @@ onMounted(() => {
         <button
           type="button"
           aria-label="Paliwanag"
-          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          @click.stop="toggleTip('cash-sales')"
+          class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
         >
           i
         </button>
 
         <div
-          class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          :class="{ 'opacity-100 pointer-events-auto': activeTip === 'cash-sales' }"
+          class="pointer-events-none absolute z-30 right-3 top-11 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
         >
           <p class="font-bold mb-1">Cash Sales</p>
           <p>
@@ -2423,13 +2449,15 @@ onMounted(() => {
         <button
           type="button"
           aria-label="Paliwanag"
-          class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+          @click.stop="toggleTip('gcash-sales')"
+          class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
         >
           i
         </button>
 
         <div
-          class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+          :class="{ 'opacity-100 pointer-events-auto': activeTip === 'gcash-sales' }"
+          class="pointer-events-none absolute z-30 right-3 top-11 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
         >
           <p class="font-bold mb-1">GCash Sales</p>
           <p>

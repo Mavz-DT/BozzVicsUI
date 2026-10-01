@@ -36,6 +36,21 @@ const {
 )
 
 // =========================
+// INFO CARD TOOLTIPS
+// =========================
+//
+// Desktop: lumalabas kapag hinover (group-hover).
+// Touchscreen: walang hover, kaya i-tap ang i button
+// para i-toggle. Isa lang ang bukas sa isang pagkakataon.
+//
+const activeTip = ref('')
+
+const toggleTip = key => {
+  activeTip.value =
+    activeTip.value === key ? '' : key
+}
+
+// =========================
 // API
 // =========================
 
@@ -1164,13 +1179,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('opening-cash')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'opening-cash' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Opening Cash</p>
             <p>Ang cash na nasa drawer bago magsimula ang mga transaksyon ngayong araw.</p>
@@ -1206,13 +1223,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('cash-sales')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'cash-sales' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Cash Sales</p>
             <p>CASH lang na natanggap sa benta ngayong araw. HINDI kasama ang GCash (nasa "GCash Received" iyon) — kaya mas maliit ito kaysa Total Sales sa Sales Record.</p>
@@ -1249,13 +1268,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('store-expenses')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'store-expenses' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Store-paid Expenses</p>
             <p>Mga gastos na binayaran gamit ang pera sa kaha (source = Store). Hindi kasama ang Owner-paid o Due.</p>
@@ -1291,13 +1312,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('other-cash-out')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'other-cash-out' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Other Cash Out</p>
             <p>Iba pang CASH na lumabas sa kaha maliban sa Store Expenses: refunds, rider payout, employee cashout, manual cash-out.</p>
@@ -1347,13 +1370,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('expected-drawer')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'expected-drawer' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Expected Cash in Drawer</p>
             <p>Ito ang dapat na laman ng kaha ngayon kung tama lahat ng record. Ihambing sa aktwal na bilang ng pera.</p>
@@ -1470,13 +1495,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('gcash-received')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'gcash-received' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-72 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Total GCash Received</p>
             <p>GCash na natanggap ngayong araw. HIWALAY ito sa pisikal na cash drawer.</p>
@@ -1581,13 +1608,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('cash-in')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'cash-in' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Total Cash In</p>
             <p>Lahat ng CASH na pumasok sa kaha ngayong araw (hindi kasama ang GCash).</p>
@@ -1623,13 +1652,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('cash-out')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'cash-out' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Total Cash Out</p>
             <p>Lahat ng CASH na lumabas sa kaha ngayong araw.</p>
@@ -1665,13 +1696,15 @@ onMounted(() => {
           <button
             type="button"
             aria-label="Paliwanag"
-            class="absolute top-3 right-3 z-10 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black leading-none flex items-center justify-center hover:bg-gray-200"
+            @click.stop="toggleTip('net-movement')"
+            class="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-gray-100 text-gray-500 text-xs font-black leading-none flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
           >
             i
           </button>
 
           <div
-            class="pointer-events-none absolute z-30 right-3 top-9 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            :class="{ 'opacity-100 pointer-events-auto': activeTip === 'net-movement' }"
+            class="pointer-events-none absolute z-30 right-3 top-11 w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed p-3 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
           >
             <p class="font-bold mb-1">Net Cash Movement</p>
             <p>Netong galaw ng cash ngayong araw — kung gaano tumaas o bumaba ang pera sa kaha.</p>
