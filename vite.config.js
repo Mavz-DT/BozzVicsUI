@@ -27,7 +27,18 @@ export default defineConfig(
         tailwindcss(),
 
         VitePWA({
-          registerType: 'autoUpdate',
+          // 'prompt' = hindi auto-update; magpapakita tayo ng banner
+          // na may "I-update" button (tingnan ang PwaUpdatePrompt.vue).
+          registerType: 'prompt',
+
+          // Ang registration ay ginagawa ng useRegisterSW sa component,
+          // kaya huwag nang mag-auto-inject para iisang beses lang.
+          injectRegister: false,
+
+          workbox: {
+            // Linisin ang lumang precache pagkatapos mag-update.
+            cleanupOutdatedCaches: true
+          },
 
           manifest: {
             name: "Bozz Vic's POS",

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import Navbar from './components/Navbar.vue'
 import SessionExpiredBanner from './components/SessionExpiredBanner.vue'
+import PwaUpdatePrompt from './components/PwaUpdatePrompt.vue'
 
 import { useSettingsStore } from './stores/settings'
 
@@ -39,5 +40,8 @@ onMounted(() => {
     >
       <router-view />
     </main>
+
+    <!-- Global PWA update banner -->
+    <PwaUpdatePrompt />
   </div>
 </template>
