@@ -219,6 +219,21 @@ const operatingCategoryOptions = [
   'Miscellaneous'
 ]
 
+// Dropdown-only options para sa Expenses tab ng admin. Kasama rito
+// ang 'Labor' (one-time labor cost) PERO HINDI ito idinadagdag sa
+// operatingCategoryOptions dahil ginagamit iyon ng isOperatingCategory
+// — kung isasama, mali-mali ang pag-classify ng Labor bilang operating.
+const operatingFormCategoryOptions = [
+  ...operatingCategoryOptions,
+  'Labor'
+]
+
+// Label para sa category sa dropdown (Labor -> "Labor Cost").
+const categoryOptionLabel = category =>
+  category === 'Labor'
+    ? 'Labor Cost'
+    : category
+
 const adminCategoryOptions = [
   'Ingredient',
   'Material',
@@ -954,11 +969,26 @@ const isUlamExpense =
     )
   })
 
+// One-time labor cost (hindi payroll): category Labor, One-Time
+// frequency, at walang payroll period. Kasama rito ang Ulam at ang
+// iba pang one-time labor na free-text ang pangalan. Ide-derive ang
+// laborType sa submit ('Ulam' kung ulam, kung hindi ay 'OneTime').
+const isOneTimeLabor =
+  computed(() => {
+    return (
+      form.value.category ===
+        'Labor' &&
+      form.value.frequency ===
+        'One-Time'
+    )
+  })
+
 const isAdminLabor =
   computed(() => {
     return (
       isLaborExpense.value &&
-      !isUlamExpense.value
+      !isUlamExpense.value &&
+      !isOneTimeLabor.value
     )
   })
 
@@ -2438,26 +2468,35 @@ const changeCategory =
       form.value.category ===
       'Labor'
     ) {
+      /*
+      |----------------------------------------------------------------
+      | Labor Cost na pinili mula sa dropdown (Expenses tab) =
+      | ONE-TIME labor cost na may bukas na item name.
+      |
+      | Hindi na auto-"Ulam". Ang Ulam ay isa lang sa mga
+      | puwedeng one-time labor cost. Ang laborType ay
+      | ide-derive sa submit base sa pangalan (Ulam kung "ulam",
+      | kung hindi ay 'OneTime').
+      |
+      | Ang monthly / weekly payroll ay nasa admin Labor Cost tab
+      | (naka-set ang category doon via changeSection, hindi dito).
+      |----------------------------------------------------------------
+      */
+
+      form.value.frequency =
+        'One-Time'
+
+      form.value.unit =
+        'day'
+
+      form.value.laborType =
+        'Regular'
+
       if (
         isCashier.value
       ) {
-        form.value.item =
-          'Ulam'
-
-        form.value.laborType =
-          'Ulam'
-
-        form.value.frequency =
-          'One-Time'
-
-        form.value.unit =
-          'day'
-
         form.value.expenseDate =
           todayPH
-      } else {
-        form.value.laborType =
-          'Regular'
       }
     }
 
@@ -3167,26 +3206,26 @@ const submitExpense =
 
     /*
     |--------------------------------------------------------------------------
-    | CASHIER LABOR = ULAM ONLY
+    | CASHIER LABOR = ONE-TIME LANG
     |--------------------------------------------------------------------------
+    |
+    | Puwede nang mag-record ang cashier ng kahit anong one-time
+    | labor cost (hindi lang Ulam), basta One-Time. Ang monthly /
+    | weekly payroll ay admin Labor Cost tab lang.
+    |
     */
 
     if (
       isCashier.value &&
       form.value.category ===
-      'Labor'
+        'Labor' &&
+      form.value.frequency !==
+        'One-Time'
     ) {
-      if (
-        !isUlamLabor(
-          itemName,
-          form.value.laborType
-        )
-      ) {
-        error.value =
-          'Cashier can only record Ulam.'
+      error.value =
+        'Cashier: one-time labor cost lang ang puwedeng i-record.'
 
-        return
-      }
+      return
     }
 
     /*
@@ -3205,11 +3244,10 @@ const submitExpense =
         form.value.category ===
         'Labor'
       ) {
+        // One-time labor cost. Hindi na forced na Ulam —
+        // ide-derive ang laborType base sa pangalan sa ibaba.
         form.value.frequency =
           'One-Time'
-
-        form.value.laborType =
-          'Ulam'
       }
     }
 
@@ -3222,11 +3260,11 @@ const submitExpense =
     if (
       form.value.category ===
         'Labor' &&
-      !isUlamExpense.value &&
-      !isAdmin.value
+      !isAdmin.value &&
+      !isOneTimeLabor.value
     ) {
       error.value =
-        'Admin access required for Labor Cost.'
+        'Admin access required for payroll Labor Cost (monthly/weekly).'
 
       return
     }
@@ -3512,10 +3550,12 @@ const submitExpense =
           ? (
               isUlamExpense.value
                 ? 'Ulam'
-                : (
-                    form.value.laborType ||
-                    'Regular'
-                  )
+                : isOneTimeLabor.value
+                  ? 'OneTime'
+                  : (
+                      form.value.laborType ||
+                      'Regular'
+                    )
             )
           : undefined
 
@@ -3528,7 +3568,8 @@ const submitExpense =
         'Labor'
       ) {
         if (
-          isUlamExpense.value
+          isUlamExpense.value ||
+          isOneTimeLabor.value
         ) {
           recordUnit =
             'day'
@@ -5454,23 +5495,12 @@ onMounted(async () => {
 
             </select>
 
-            <!-- CASHIER ULAM -->
-
-            <input
-              v-else-if="
-                isCashier &&
-                form.category === 'Labor'
-              "
-              :value="
-                form.item ||
-                'Ulam'
-              "
-              type="text"
-              readonly
-              class="w-full border border-gray-300 rounded-lg p-2 bg-gray-100 text-gray-600 cursor-not-allowed"
-            />
-
             <!-- UNIVERSAL ITEM -->
+            <!--
+              Labor Cost (one-time) ay bukas na ring item name
+              para sa cashier at admin. Hindi na forced na "Ulam".
+              Ang Ulam ay isa lang sa mga puwedeng one-time labor.
+            -->
 
             <input
               v-else
@@ -5648,11 +5678,11 @@ onMounted(async () => {
               </option>
 
               <option
-                v-for="category in operatingCategoryOptions"
+                v-for="category in operatingFormCategoryOptions"
                 :key="category"
                 :value="category"
               >
-                {{ category }}
+                {{ categoryOptionLabel(category) }}
               </option>
 
             </select>
