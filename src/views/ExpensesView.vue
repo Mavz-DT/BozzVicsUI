@@ -388,15 +388,13 @@ const isCashierAllowedRecord =
 
 const getCategoryLabel =
   expense => {
+    // Walang "Ulam" na category. Ang Ulam ay item name na may
+    // category na Labor Cost. Lahat ng Labor ay "Labor Cost".
     if (
       expense?.category ===
-        'Labor' &&
-      isUlamLabor(
-        expense?.name,
-        expense?.laborType
-      )
+      'Labor'
     ) {
-      return 'Ulam'
+      return 'Labor Cost'
     }
 
     return (
