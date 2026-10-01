@@ -8,39 +8,102 @@
 | I-click ang "I-update" para i-activate ang bagong version at
 | awtomatikong mag-reload.
 |
-| Nagche-check din tuwing 1 oras para sa mga tab na buong araw bukas
-| (tulad ng POS), para hindi sila ma-stuck sa lumang bersyon.
+| TANDAAN: lalabas lang ang banner kapag may mas BAGONG deploy kaysa sa
+| kasalukuyang naka-install. Ang pag-delete/reinstall ay kinukuha agad
+| ang pinakabago, kaya walang ipapakitang update doon.
+|
+| Para siguradong madetect agad ang bagong deploy, nagche-check tayo:
+|   - sa pag-load / pag-register ng SW
+|   - tuwing babalik ang focus sa app (visibilitychange)
+|   - tuwing 30 minuto (para sa tab na buong araw bukas)
+|
+| Nag-lo-log din sa console (DevTools) para ma-verify ang estado.
 |--------------------------------------------------------------------------
 */
 
+import { onBeforeUnmount, watch } from 'vue'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
 
 const UPDATE_CHECK_INTERVAL =
-  60 * 60 * 1000 // 1 oras
+  30 * 60 * 1000 // 30 minuto
+
+let swRegistration = null
+let intervalId = null
+
+const checkForUpdate = () => {
+  if (swRegistration) {
+    swRegistration.update().catch(() => {})
+  }
+}
+
+const onVisible = () => {
+  if (document.visibilityState === 'visible') {
+    checkForUpdate()
+  }
+}
 
 const {
   needRefresh,
   updateServiceWorker
 } = useRegisterSW({
+  immediate: true,
+
   onRegisteredSW(swUrl, registration) {
+    console.log('[PWA] Service worker registered:', swUrl)
+
     if (!registration) {
       return
     }
 
-    setInterval(() => {
-      registration.update()
-    }, UPDATE_CHECK_INTERVAL)
+    swRegistration = registration
+
+    // Agad na check sa pag-register.
+    checkForUpdate()
+
+    // Periodic check.
+    intervalId = setInterval(
+      checkForUpdate,
+      UPDATE_CHECK_INTERVAL
+    )
+
+    // Check tuwing babalik ang user sa app.
+    document.addEventListener(
+      'visibilitychange',
+      onVisible
+    )
+  },
+
+  onRegisterError(error) {
+    console.error('[PWA] Service worker registration error:', error)
   }
 })
 
+// Para makita sa DevTools console kung kailan may update.
+watch(
+  needRefresh,
+  value => {
+    console.log('[PWA] needRefresh =', value)
+  }
+)
+
 const applyUpdate = () => {
-  // true = i-reload ang page pagkatapos i-activate ang bagong SW.
   updateServiceWorker(true)
 }
 
 const dismiss = () => {
   needRefresh.value = false
 }
+
+onBeforeUnmount(() => {
+  if (intervalId) {
+    clearInterval(intervalId)
+  }
+
+  document.removeEventListener(
+    'visibilitychange',
+    onVisible
+  )
+})
 </script>
 
 <template>

@@ -250,8 +250,10 @@ const cashierCategoryOptions = [
     label: 'Bill'
   },
   {
+    // Category = Labor Cost. Ang "Ulam" ay item name (auto-set kapag
+    // pinili ito), HINDI category. Walang category na "Ulam".
     value: 'Labor',
-    label: 'Ulam'
+    label: 'Labor Cost'
   }
 ]
 
