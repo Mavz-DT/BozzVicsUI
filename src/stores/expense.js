@@ -111,19 +111,26 @@ export const useExpenseStore = defineStore('expense', () => {
           () => null
         )
 
+      const message =
+        result?.message ||
+        `Hindi na-save ang expense (${res.status}).`
+
       console.error(
         'Failed to add expense:',
-        result?.message ||
-          res.status
+        message
       )
+
+      // Itapon ang error para maipakita sa user (hindi na tahimik).
+      throw new Error(message)
     } catch (err) {
       console.error(
         'Error adding expense:',
         err
       )
-    }
 
-    return false
+      // Ipasa ang mensahe pataas para makita ng cashier/admin.
+      throw err
+    }
   }
 
   return {
