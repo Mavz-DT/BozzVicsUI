@@ -18,6 +18,7 @@ import ExpenseItemsView from '../views/ExpenseItemsView.vue'
 import MenuManagementView from '../views/MenuManagementView.vue'
 import ManageUsersView from '../views/ManageUsersView.vue'
 import CashLedgerView from '../views/CashLedgerView.vue'
+import ExpensesView from '../views/ExpensesView.vue'
 
 const routes = [
   {
@@ -69,7 +70,7 @@ const routes = [
   {
     path: '/expenses',
     name: 'expenses',
-    component: () => import('../views/ExpensesView.vue'),
+    component: ExpensesView,
     meta: {
       requiresAuth: true
     }
