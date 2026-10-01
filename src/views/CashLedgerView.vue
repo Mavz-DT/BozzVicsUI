@@ -618,6 +618,217 @@ const saveOpeningCash =
   }
 
 // =========================
+// EMPLOYEE CASH / GCASH EXCHANGE
+// =========================
+//
+// Cashout: Cash OUT (drawer -) + GCash IN (gcash +)
+// Cashin : Cash IN  (drawer +) + GCash OUT (gcash -)
+//
+// =========================
+
+const showExchangeModal =
+  ref(false)
+
+const exchangeDirection =
+  ref('Cashout')
+
+const exchangeAmount =
+  ref('')
+
+const exchangeEmployee =
+  ref('')
+
+const exchangeRemarks =
+  ref('')
+
+const savingExchange =
+  ref(false)
+
+const exchangeError =
+  ref('')
+
+// Kapag may laman = edit mode (groupId ng exchange na ine-edit).
+const editingExchangeGroupId =
+  ref(null)
+
+const openExchangeModal =
+  () => {
+    editingExchangeGroupId.value = null
+    exchangeDirection.value = 'Cashout'
+    exchangeAmount.value = ''
+    exchangeEmployee.value = ''
+    exchangeRemarks.value = ''
+    exchangeError.value = ''
+    showExchangeModal.value = true
+  }
+
+// I-edit ang isang existing exchange (mula sa movement row).
+const openEditExchange =
+  row => {
+    if (!isAdmin.value || !row?.exchangeGroupId) {
+      return
+    }
+
+    editingExchangeGroupId.value =
+      row.exchangeGroupId
+
+    exchangeDirection.value =
+      row.transactionType === 'Employee Cashin'
+        ? 'Cashin'
+        : 'Cashout'
+
+    exchangeAmount.value =
+      row.amount
+
+    exchangeEmployee.value =
+      row.employeeName || ''
+
+    exchangeRemarks.value =
+      row.remarks || ''
+
+    exchangeError.value = ''
+    showExchangeModal.value = true
+  }
+
+// I-reverse (offsetting entry) — Admin only.
+const reverseExchange =
+  async row => {
+    if (!isAdmin.value || !row?.exchangeGroupId) {
+      return
+    }
+
+    if (
+      !window.confirm(
+        'I-reverse ang exchange na ito? Gagawa ng kabaligtarang entry (mananatili ang original).'
+      )
+    ) {
+      return
+    }
+
+    try {
+      await axios.post(
+        `${API}/cash-transactions/employee-exchange/${row.exchangeGroupId}/reverse`,
+        {},
+        getAuthConfig()
+      )
+      await fetchCashLedger()
+    } catch (error) {
+      console.error('Error reversing exchange:', error)
+      errorMessage.value =
+        error.response?.data?.message ||
+        'Hindi ma-reverse ang exchange.'
+    }
+  }
+
+// I-delete ang parehong leg — Admin only.
+const deleteExchange =
+  async row => {
+    if (!isAdmin.value || !row?.exchangeGroupId) {
+      return
+    }
+
+    if (
+      !window.confirm(
+        'Burahin ang exchange na ito? Matatanggal ang parehong Cash at GCash leg. Hindi na maibabalik.'
+      )
+    ) {
+      return
+    }
+
+    try {
+      await axios.delete(
+        `${API}/cash-transactions/employee-exchange/${row.exchangeGroupId}`,
+        getAuthConfig()
+      )
+      await fetchCashLedger()
+    } catch (error) {
+      console.error('Error deleting exchange:', error)
+      errorMessage.value =
+        error.response?.data?.message ||
+        'Hindi ma-delete ang exchange.'
+    }
+  }
+
+const closeExchangeModal =
+  () => {
+    showExchangeModal.value = false
+  }
+
+const submitEmployeeExchange =
+  async () => {
+    exchangeError.value = ''
+
+    const amount =
+      Number(exchangeAmount.value)
+
+    if (
+      !Number.isFinite(amount) ||
+      amount < 0.01
+    ) {
+      exchangeError.value =
+        'Maglagay ng tamang halaga (mas malaki sa zero).'
+      return
+    }
+
+    if (
+      !exchangeEmployee.value.trim()
+    ) {
+      exchangeError.value =
+        'Pangalan ng empleyado ay required.'
+      return
+    }
+
+    savingExchange.value = true
+
+    try {
+      const payload = {
+        amount:
+          Number(amount.toFixed(2)),
+        direction:
+          exchangeDirection.value,
+        employeeName:
+          exchangeEmployee.value.trim(),
+        remarks:
+          exchangeRemarks.value.trim()
+      }
+
+      if (
+        editingExchangeGroupId.value
+      ) {
+        // EDIT (Admin only)
+        await axios.put(
+          `${API}/cash-transactions/employee-exchange/${editingExchangeGroupId.value}`,
+          payload,
+          getAuthConfig()
+        )
+      } else {
+        // BAGONG exchange
+        await axios.post(
+          `${API}/cash-transactions/employee-exchange`,
+          payload,
+          getAuthConfig()
+        )
+      }
+
+      showExchangeModal.value = false
+      editingExchangeGroupId.value = null
+
+      await fetchCashLedger()
+    } catch (error) {
+      console.error(
+        'Error recording employee exchange:',
+        error
+      )
+
+      exchangeError.value =
+        error.response?.data?.message ||
+        'Hindi ma-record ang exchange.'
+    } finally {
+      savingExchange.value = false
+    }
+  }
+
+// =========================
 // DATE CHANGE
 // =========================
 
@@ -898,6 +1109,42 @@ onMounted(() => {
 
         </div>
 
+      </div>
+
+      <!-- ========================= -->
+      <!-- EMPLOYEE CASH / GCASH EXCHANGE -->
+      <!-- ========================= -->
+
+      <div
+        class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+      >
+        <div>
+          <p
+            class="text-xs font-bold uppercase tracking-wide text-gray-400"
+          >
+            Employee Cash / GCash
+          </p>
+          <p
+            class="text-sm text-gray-500 mt-1"
+          >
+            Cashout: cash palabas sa kaha, GCash papasok. &nbsp;·&nbsp;
+            Cash-in: cash papasok sa kaha, GCash palabas. Sa pamamagitan
+            ng empleyado.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          @click="openExchangeModal"
+          :disabled="loading"
+          class="shrink-0 px-5 py-3 rounded-xl text-white text-sm font-black shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          :style="{
+            backgroundColor:
+              themeColor
+          }"
+        >
+          + Employee Cashout / Cash-in
+        </button>
       </div>
 
       <!-- ========================= -->
@@ -1460,6 +1707,13 @@ onMounted(() => {
                     Running Balance
                   </th>
 
+                  <th
+                    v-if="isAdmin"
+                    class="text-center px-5 py-3 font-black text-gray-500"
+                  >
+                    Actions
+                  </th>
+
                 </tr>
 
               </thead>
@@ -1615,6 +1869,46 @@ onMounted(() => {
                       }}
                     </span>
 
+                  </td>
+
+                  <td
+                    v-if="isAdmin"
+                    class="px-5 py-4 whitespace-nowrap text-center"
+                  >
+                    <div
+                      v-if="
+                        transaction.exchangeGroupId
+                      "
+                      class="flex items-center justify-center gap-1"
+                    >
+                      <button
+                        type="button"
+                        @click="openEditExchange(transaction)"
+                        class="px-2 py-1 rounded-lg text-blue-600 hover:bg-blue-50 text-xs font-bold"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        @click="reverseExchange(transaction)"
+                        class="px-2 py-1 rounded-lg text-amber-600 hover:bg-amber-50 text-xs font-bold"
+                      >
+                        Reverse
+                      </button>
+                      <button
+                        type="button"
+                        @click="deleteExchange(transaction)"
+                        class="px-2 py-1 rounded-lg text-red-600 hover:bg-red-50 text-xs font-bold"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <span
+                      v-else
+                      class="text-gray-300"
+                    >
+                      -
+                    </span>
                   </td>
 
                 </tr>
@@ -1820,6 +2114,36 @@ onMounted(() => {
 
                 </div>
 
+                <div
+                  v-if="
+                    isAdmin &&
+                    transaction.exchangeGroupId
+                  "
+                  class="flex gap-2 pt-2"
+                >
+                  <button
+                    type="button"
+                    @click="openEditExchange(transaction)"
+                    class="flex-1 px-2 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    @click="reverseExchange(transaction)"
+                    class="flex-1 px-2 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold"
+                  >
+                    Reverse
+                  </button>
+                  <button
+                    type="button"
+                    @click="deleteExchange(transaction)"
+                    class="flex-1 px-2 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-bold"
+                  >
+                    Delete
+                  </button>
+                </div>
+
               </div>
 
             </div>
@@ -1855,6 +2179,177 @@ onMounted(() => {
 
       </div>
 
+    </div>
+
+    <!-- ========================= -->
+    <!-- EMPLOYEE EXCHANGE MODAL -->
+    <!-- ========================= -->
+
+    <div
+      v-if="showExchangeModal"
+      class="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 px-4"
+      @click.self="closeExchangeModal"
+    >
+      <div
+        class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden"
+      >
+        <div
+          class="px-5 py-4 text-white font-black"
+          :style="{ backgroundColor: themeColor }"
+        >
+          {{
+            editingExchangeGroupId
+              ? 'I-edit ang Exchange'
+              : 'Employee Cashout / Cash-in'
+          }}
+        </div>
+
+        <div class="p-5 space-y-4">
+
+          <!-- DIRECTION -->
+          <div>
+            <label
+              class="block text-xs font-bold text-gray-500 mb-1"
+            >
+              Direksyon
+            </label>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                @click="exchangeDirection = 'Cashout'"
+                :class="[
+                  'px-3 py-2 rounded-xl text-sm font-bold border',
+                  exchangeDirection === 'Cashout'
+                    ? 'text-white'
+                    : 'bg-white text-gray-600 border-gray-300'
+                ]"
+                :style="
+                  exchangeDirection === 'Cashout'
+                    ? { backgroundColor: themeColor, borderColor: themeColor }
+                    : {}
+                "
+              >
+                Cashout
+              </button>
+
+              <button
+                type="button"
+                @click="exchangeDirection = 'Cashin'"
+                :class="[
+                  'px-3 py-2 rounded-xl text-sm font-bold border',
+                  exchangeDirection === 'Cashin'
+                    ? 'text-white'
+                    : 'bg-white text-gray-600 border-gray-300'
+                ]"
+                :style="
+                  exchangeDirection === 'Cashin'
+                    ? { backgroundColor: themeColor, borderColor: themeColor }
+                    : {}
+                "
+              >
+                Cash-in
+              </button>
+            </div>
+
+            <p class="text-xs text-gray-400 mt-2">
+              {{
+                exchangeDirection === 'Cashout'
+                  ? 'Cash palabas sa kaha, GCash papasok sa store.'
+                  : 'Cash papasok sa kaha, GCash palabas sa store.'
+              }}
+            </p>
+          </div>
+
+          <!-- AMOUNT -->
+          <div>
+            <label
+              class="block text-xs font-bold text-gray-500 mb-1"
+            >
+              Halaga
+            </label>
+            <div class="relative">
+              <span
+                class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-400"
+              >
+                ₱
+              </span>
+              <input
+                v-model="exchangeAmount"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                class="w-full border border-gray-300 rounded-xl pl-8 pr-3 py-3 text-lg font-black text-gray-800 outline-none focus:ring-2"
+                :style="{ '--tw-ring-color': themeColor }"
+              />
+            </div>
+          </div>
+
+          <!-- EMPLOYEE -->
+          <div>
+            <label
+              class="block text-xs font-bold text-gray-500 mb-1"
+            >
+              Empleyado
+            </label>
+            <input
+              v-model="exchangeEmployee"
+              type="text"
+              maxlength="100"
+              placeholder="Pangalan ng empleyado"
+              class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2"
+              :style="{ '--tw-ring-color': themeColor }"
+            />
+          </div>
+
+          <!-- REMARKS -->
+          <div>
+            <label
+              class="block text-xs font-bold text-gray-500 mb-1"
+            >
+              Remarks
+            </label>
+            <input
+              v-model="exchangeRemarks"
+              type="text"
+              maxlength="250"
+              placeholder="Optional"
+              class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2"
+              :style="{ '--tw-ring-color': themeColor }"
+            />
+          </div>
+
+          <p
+            v-if="exchangeError"
+            class="text-sm text-red-600"
+          >
+            {{ exchangeError }}
+          </p>
+
+        </div>
+
+        <div
+          class="px-5 py-4 bg-gray-50 flex justify-end gap-2"
+        >
+          <button
+            type="button"
+            @click="closeExchangeModal"
+            class="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100"
+          >
+            Kanselahin
+          </button>
+          <button
+            type="button"
+            @click="submitEmployeeExchange"
+            :disabled="savingExchange"
+            class="px-5 py-2.5 rounded-xl text-white text-sm font-black shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            :style="{ backgroundColor: themeColor }"
+          >
+            {{ savingExchange ? 'Saving...' : 'I-record' }}
+          </button>
+        </div>
+      </div>
     </div>
 
   </div>
