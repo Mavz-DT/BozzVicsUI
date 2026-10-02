@@ -394,9 +394,24 @@ const isCashierAllowedRecord =
       expense.category ===
       'Labor'
     ) {
-      return isUlamLabor(
-        expense.name,
-        expense.laborType
+      // Ulam at iba pang ONE-TIME labor cost ay nakikita at
+      // puwedeng hawakan ng cashier. Ang monthly / weekly payroll
+      // ay admin lang (nasa Labor Cost tab).
+      const isOneTimeActualLabor =
+        isUlamLabor(
+          expense.name,
+          expense.laborType
+        ) ||
+        expense.laborType === 'OneTime'
+
+      return (
+        isOneTimeActualLabor &&
+        ![
+          'Monthly',
+          'Weekly'
+        ].includes(
+          expense.expenseFrequency
+        )
       )
     }
 

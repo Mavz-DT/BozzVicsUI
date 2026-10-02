@@ -15,6 +15,45 @@ export const useCartStore = defineStore('cart', () => {
     return Number(item.price || 0) + getAddOnTotal(item)
   }
 
+  // Kunin ang tamang presyo base sa order type. Kung walang per-type
+  // override (null), gamitin ang base na presyo. Dapat tugma ito sa
+  // resolveMenuPrice sa server para pareho ang total.
+  const resolvePriceForType = (basePrice, prices, orderType) => {
+    const base = Number(basePrice || 0)
+
+    if (!prices) return base
+
+    const key =
+      orderType === 'Dine-In'
+        ? 'dineIn'
+        : orderType === 'Take-Out'
+          ? 'takeOut'
+          : orderType === 'Delivery'
+            ? 'delivery'
+            : null
+
+    if (!key) return base
+
+    const v = prices[key]
+
+    return v !== undefined && v !== null && v !== ''
+      ? Number(v)
+      : base
+  }
+
+  // I-update ang presyo ng lahat ng item sa cart kapag nagbago ang
+  // order type (Dine-In / Take-Out / Delivery).
+  const repriceForOrderType = orderType => {
+    cart.value.forEach(item => {
+      const base =
+        item.basePrice !== undefined && item.basePrice !== null
+          ? item.basePrice
+          : item.price
+
+      item.price = resolvePriceForType(base, item.prices, orderType)
+    })
+  }
+
   const totalAmount = computed(() => {
     return cart.value.reduce(
       (total, item) =>
@@ -75,6 +114,15 @@ export const useCartStore = defineStore('cart', () => {
       name: item.name,
 
       price: Number(item.price),
+
+      // Base na presyo at per-type overrides — para ma-recompute
+      // ang presyo kapag nagbago ang order type.
+      basePrice:
+        item.basePrice !== undefined && item.basePrice !== null
+          ? Number(item.basePrice)
+          : Number(item.price),
+
+      prices: item.prices || null,
 
       stock: Number(item.stock),
 
@@ -140,6 +188,8 @@ export const useCartStore = defineStore('cart', () => {
     updateInstructions,
     getAddOnTotal,
     getItemUnitPrice,
+    resolvePriceForType,
+    repriceForOrderType,
     clearCart
   }
 })

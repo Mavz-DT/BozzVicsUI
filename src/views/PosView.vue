@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useNetworkStatus } from '../composables/useNetworkStatus'
 
 import axios from 'axios'
@@ -67,6 +67,28 @@ const isProcessingPayment =
 
 const orderType =
   ref('')
+
+
+// Kapag nagbago ang order type, i-update ang presyo ng mga item
+// sa cart base sa per-type na presyo (kung meron).
+watch(
+  orderType,
+  newType => {
+    cartStore.repriceForOrderType(
+      newType
+    )
+  }
+)
+
+
+// Presyong ipapakita sa menu card base sa kasalukuyang order type.
+const menuDisplayPrice = item => {
+  return cartStore.resolvePriceForType(
+    item?.price,
+    item?.prices,
+    orderType.value
+  )
+}
 
 
 const selectedOrderNumber =
@@ -674,9 +696,10 @@ const addOnItemTotal =
     }
 
     return (
-      Number(
-        selectedMenuItem.value.price ||
-          0
+      cartStore.resolvePriceForType(
+        selectedMenuItem.value.price,
+        selectedMenuItem.value.prices,
+        orderType.value
       ) +
       selectedAddOnTotal.value
     )
@@ -725,8 +748,22 @@ const confirmAddToCart =
         name:
           menuItem.name,
 
+        // Presyo base sa kasalukuyang order type (kung walang
+        // override, base price). Isinasama ang basePrice at prices
+        // para ma-recompute kapag nagbago ang order type.
         price:
+          cartStore.resolvePriceForType(
+            menuItem.price,
+            menuItem.prices,
+            orderType.value
+          ),
+
+        basePrice:
           menuItem.price,
+
+        prices:
+          menuItem.prices ||
+          null,
 
         stock:
           effectiveCartStock,
@@ -5395,7 +5432,7 @@ onMounted(
                     >
                       ₱{{
                         Number(
-                          item.price
+                          menuDisplayPrice(item)
                         ).toFixed(2)
                       }}
                     </span>

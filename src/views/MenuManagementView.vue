@@ -30,6 +30,10 @@ const menuForm = ref({
   name: '',
   category: '',
   price: 0,
+  // Per-order-type price overrides. Blangko = gamitin ang base price.
+  priceDineIn: '',
+  priceTakeOut: '',
+  priceDelivery: '',
   stock: 0,
   isAvailable: true,
   consumptions: []
@@ -528,6 +532,9 @@ const resetMenuForm = () => {
     name: '',
     category: '',
     price: 0,
+    priceDineIn: '',
+    priceTakeOut: '',
+    priceDelivery: '',
     stock: 0,
     isAvailable: true,
     consumptions: []
@@ -756,6 +763,24 @@ const editMenu = menu => {
     price:
       Number(menu.price) || 0,
 
+    priceDineIn:
+      menu.prices?.dineIn !== undefined &&
+      menu.prices?.dineIn !== null
+        ? menu.prices.dineIn
+        : '',
+
+    priceTakeOut:
+      menu.prices?.takeOut !== undefined &&
+      menu.prices?.takeOut !== null
+        ? menu.prices.takeOut
+        : '',
+
+    priceDelivery:
+      menu.prices?.delivery !== undefined &&
+      menu.prices?.delivery !== null
+        ? menu.prices.delivery
+        : '',
+
     stock:
       Number(menu.stock) || 0,
 
@@ -973,6 +998,22 @@ const saveMenu = async () => {
         ? menuForm.value.consumptions
         : []
 
+    const toOverride = v => {
+      if (
+        v === '' ||
+        v === null ||
+        v === undefined
+      ) {
+        return null
+      }
+
+      const n = Number(v)
+
+      return Number.isFinite(n) && n >= 0
+        ? n
+        : null
+    }
+
     const payload = {
       name:
         menuForm.value.name.trim(),
@@ -984,6 +1025,21 @@ const saveMenu = async () => {
         Number(
           menuForm.value.price
         ),
+
+      prices: {
+        dineIn:
+          toOverride(
+            menuForm.value.priceDineIn
+          ),
+        takeOut:
+          toOverride(
+            menuForm.value.priceTakeOut
+          ),
+        delivery:
+          toOverride(
+            menuForm.value.priceDelivery
+          )
+      },
 
       stock:
         Number(
@@ -1398,7 +1454,7 @@ onMounted(async () => {
                     <label
                       class="mb-1 block text-sm font-medium text-slate-700"
                     >
-                      Selling Price
+                      Selling Price (base)
                     </label>
 
                     <input
@@ -1426,6 +1482,89 @@ onMounted(async () => {
                       step="1"
                       class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
                     />
+
+                  </div>
+
+                </div>
+
+                <!-- Per-order-type price overrides -->
+
+                <div
+                  class="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+
+                  <div
+                    class="mb-2 flex items-center justify-between gap-2"
+                  >
+                    <span
+                      class="text-sm font-semibold text-slate-700"
+                    >
+                      Presyo kada Order Type
+                    </span>
+                  </div>
+
+                  <p
+                    class="mb-3 text-xs text-slate-500"
+                  >
+                    Iwan na blangko kung pareho lang sa base price.
+                    Lagyan lang kung iba ang presyo para sa order type
+                    na iyon.
+                  </p>
+
+                  <div
+                    class="grid grid-cols-1 sm:grid-cols-3 gap-3"
+                  >
+
+                    <div>
+                      <label
+                        class="mb-1 block text-xs font-medium text-slate-600"
+                      >
+                        Dine-In
+                      </label>
+
+                      <input
+                        v-model.number="menuForm.priceDineIn"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        :placeholder="`Base: ${Number(menuForm.price || 0).toFixed(2)}`"
+                        class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        class="mb-1 block text-xs font-medium text-slate-600"
+                      >
+                        Take-Out
+                      </label>
+
+                      <input
+                        v-model.number="menuForm.priceTakeOut"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        :placeholder="`Base: ${Number(menuForm.price || 0).toFixed(2)}`"
+                        class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        class="mb-1 block text-xs font-medium text-slate-600"
+                      >
+                        Delivery
+                      </label>
+
+                      <input
+                        v-model.number="menuForm.priceDelivery"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        :placeholder="`Base: ${Number(menuForm.price || 0).toFixed(2)}`"
+                        class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                      />
+                    </div>
 
                   </div>
 
