@@ -1596,6 +1596,45 @@ const reprintCustomerReceipt =
 
 
             ${
+              (
+                order.customer?.notes ||
+                order.notes ||
+                ''
+              ).trim()
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Notes
+                    </span>
+
+                    <span
+                      style="text-align:right; max-width:60%; white-space:pre-wrap; word-break:break-word;"
+                    >
+                      ${
+                        String(
+                          order.customer?.notes ||
+                            order.notes ||
+                            ''
+                        )
+                          .trim()
+                          .replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                      }
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
               Number(
                 order.deliveryFee || 0
               ) > 0

@@ -1319,6 +1319,12 @@ const printKitchenTicket =
         .join('')
 
 
+    const escHtml = s =>
+      String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+
     const customerSection =
       order.orderType ===
         'Delivery' &&
@@ -1333,8 +1339,43 @@ const printKitchenTicket =
             </span>
 
             <span>
-              ${order.customer.name}
+              ${escHtml(order.customer.name)}
             </span>
+
+          </div>
+
+        `
+
+        : ''
+
+
+    // Delivery notes — dapat makita ng kitchen.
+    const kitchenNotes =
+      (
+        order.customer?.notes ||
+        order.notes ||
+        ''
+      ).trim()
+
+    const notesSection =
+      kitchenNotes
+        ? `
+
+          <div
+            style="margin-top:6px; padding-top:6px; border-top:1px dashed #000;"
+          >
+
+            <div
+              style="font-weight:900; font-size:11px;"
+            >
+              NOTES
+            </div>
+
+            <div
+              style="font-weight:700; font-size:12px; white-space:pre-wrap; word-break:break-word;"
+            >
+              ${escHtml(kitchenNotes)}
+            </div>
 
           </div>
 
@@ -1680,6 +1721,9 @@ const printKitchenTicket =
             ${itemsHtml}
 
           </div>
+
+
+          ${notesSection}
 
 
           <div class="footer">
@@ -2273,6 +2317,46 @@ const printCustomerReceipt =
 
                     <span>
                       ${order.customer.address}
+                    </span>
+
+                  </div>
+
+                `
+
+                : ''
+            }
+
+
+            ${
+              (
+                order.customer?.notes ||
+                order.notes ||
+                ''
+              ).trim()
+
+                ? `
+
+                  <div class="info-row">
+
+                    <span>
+                      Notes
+                    </span>
+
+
+                    <span
+                      style="text-align:right; max-width:60%; white-space:pre-wrap; word-break:break-word;"
+                    >
+                      ${
+                        String(
+                          order.customer?.notes ||
+                            order.notes ||
+                            ''
+                        )
+                          .trim()
+                          .replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                      }
                     </span>
 
                   </div>
@@ -4609,7 +4693,7 @@ onMounted(
                           slot.number
                       "
                       :class="[
-                        'h-12 rounded-lg text-sm font-black border transition-colors',
+                        'h-16 rounded-lg text-lg font-black border transition-colors',
                         selectedOrderNumber ===
                         slot.number
                           ? 'text-white border-transparent shadow-sm'
@@ -4644,14 +4728,14 @@ onMounted(
                             slot.status ===
                             'Occupied'
                           "
-                          class="text-[8px] mt-1 opacity-80"
+                          class="text-[10px] mt-1 opacity-80"
                         >
                           BUSY
                         </span>
 
                         <span
                           v-else
-                          class="text-[8px] mt-1 opacity-0"
+                          class="text-[10px] mt-1 opacity-0"
                         >
                           AVAILABLE
                         </span>
@@ -4671,7 +4755,7 @@ onMounted(
                           slot.number
                         )
                       "
-                      class="w-full py-1.5 rounded-md bg-red-100 hover:bg-red-200 text-red-700 text-[9px] font-black transition-colors"
+                      class="w-full py-2 rounded-md bg-red-100 hover:bg-red-200 text-red-700 text-[11px] font-black transition-colors"
                     >
                       Release
                     </button>
