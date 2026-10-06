@@ -2,6 +2,7 @@
 import {
   ref,
   computed,
+  watch,
   onMounted
 } from 'vue'
 
@@ -339,7 +340,23 @@ const fetchRecordingAttendance = async () => {
 |--------------------------------------------------------------------------
 */
 
-const recordingRows = computed(() => {
+/*
+|--------------------------------------------------------------------------
+| Recording rows
+|--------------------------------------------------------------------------
+| IMPORTANTE: ref ito (hindi computed) para REACTIVE ang mga in-line
+| na edit (pag-click ng status, pag-type ng remarks). Dating computed
+| ito — kaya ang mutation sa status ay hindi na-re-render (read-only
+| ang computed at bagong plain objects ang laman kada recompute), kaya
+| "ayaw ma-click" ang mga attendance.
+|
+| Mula-build ito tuwing may bagong employees o attendance data (via
+| watch sa ibaba). Sa loob ng pag-edit, nananatili ang state.
+*/
+
+const recordingRows = ref([])
+
+const buildRecordingRows = () => {
   const employeeList =
     Array.isArray(employees.value)
       ? employees.value
@@ -350,22 +367,34 @@ const recordingRows = computed(() => {
       ? recordingAttendance.value
       : []
 
-  return employeeList.map(employee => {
-    const record =
-      attendanceList.find(
-        item =>
-          item.employee?._id ===
-          employee._id
-      )
+  recordingRows.value =
+    employeeList.map(employee => {
+      const record =
+        attendanceList.find(
+          item =>
+            item.employee?._id ===
+            employee._id
+        )
 
-    return {
-      employee,
-      status: record?.status || '',
-      remarks: record?.remarks || '',
-      saved: Boolean(record?._id)
-    }
-  })
-})
+      return {
+        employee,
+        status: record?.status || '',
+        remarks: record?.remarks || '',
+        saved: Boolean(record?._id)
+      }
+    })
+}
+
+watch(
+  [
+    employees,
+    recordingAttendance
+  ],
+  buildRecordingRows,
+  {
+    immediate: true
+  }
+)
 
 /*
 |--------------------------------------------------------------------------
