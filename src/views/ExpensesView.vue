@@ -1498,6 +1498,22 @@ const selectExpenseItem =
 
     /*
     |--------------------------------------------------------------------------
+    | CASHIER LABOR = AUTOMATIC ONE-TIME
+    |--------------------------------------------------------------------------
+    | Kahit pumili ang cashier ng labor master na Monthly/Weekly, laging
+    | One-Time ang i-se-set para sa kanila. Recurring payroll = admin lang.
+    */
+
+    if (
+      isCashier.value &&
+      item.category === 'Labor'
+    ) {
+      form.value.frequency =
+        'One-Time'
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Do NOT autofill Ulam amount from default master amount.
     |
     | Ulam is now manual actual daily input.
@@ -3221,31 +3237,19 @@ const submitExpense =
 
     /*
     |--------------------------------------------------------------------------
-    | CASHIER LABOR = ONE-TIME LANG
+    | CASHIER LABOR = AUTOMATIC ONE-TIME
     |--------------------------------------------------------------------------
     |
-    | Puwede nang mag-record ang cashier ng kahit anong one-time
-    | labor cost (hindi lang Ulam), basta One-Time. Ang monthly /
-    | weekly payroll ay admin Labor Cost tab lang.
+    | Para sa cashier, ang labor cost na ini-input ay LAGING One-Time
+    | (automatic). Hindi na ito nag-e-error kahit Monthly/Weekly master
+    | ang napili — silent na ini-set sa One-Time. Ang recurring payroll
+    | ay admin Labor Cost tab lang.
     |
     */
 
-    if (
-      isCashier.value &&
-      form.value.category ===
-        'Labor' &&
-      form.value.frequency !==
-        'One-Time'
-    ) {
-      error.value =
-        'Cashier: one-time labor cost lang ang puwedeng i-record.'
-
-      return
-    }
-
     /*
     |--------------------------------------------------------------------------
-    | CASHIER DATE
+    | CASHIER DATE + ONE-TIME LABOR
     |--------------------------------------------------------------------------
     */
 
@@ -3259,7 +3263,7 @@ const submitExpense =
         form.value.category ===
         'Labor'
       ) {
-        // One-time labor cost. Hindi na forced na Ulam —
+        // Automatic One-Time para sa cashier. Hindi na forced na Ulam —
         // ide-derive ang laborType base sa pangalan sa ibaba.
         form.value.frequency =
           'One-Time'
