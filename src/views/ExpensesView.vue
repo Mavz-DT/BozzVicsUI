@@ -285,6 +285,13 @@ const CASHIER_ALLOWED_BILLS = [
   'WiFi Bill'
 ]
 
+// Labor cost items na puwede LANG i-record ng cashier (case-insensitive).
+// Dalawa lang: "Bale" at "Ulam". Wala nang iba.
+const CASHIER_ALLOWED_LABOR = [
+  'Bale',
+  'Ulam'
+]
+
 const getCategoryOptions =
   computed(() => {
     if (
@@ -336,6 +343,21 @@ const isCashierAllowedBill =
       bill =>
         normalizeExpenseName(
           bill
+        ) === normalizedName
+    )
+  }
+
+const isCashierAllowedLabor =
+  name => {
+    const normalizedName =
+      normalizeExpenseName(
+        name
+      )
+
+    return CASHIER_ALLOWED_LABOR.some(
+      labor =>
+        normalizeExpenseName(
+          labor
         ) === normalizedName
     )
   }
@@ -394,18 +416,12 @@ const isCashierAllowedRecord =
       expense.category ===
       'Labor'
     ) {
-      // Ulam at iba pang ONE-TIME labor cost ay nakikita at
-      // puwedeng hawakan ng cashier. Ang monthly / weekly payroll
-      // ay admin lang (nasa Labor Cost tab).
-      const isOneTimeActualLabor =
-        isUlamLabor(
-          expense.name,
-          expense.laborType
-        ) ||
-        expense.laborType === 'OneTime'
-
+      // Para sa cashier: "Bale" at "Ulam" LANG ang labor cost na
+      // puwedeng makita / hawakan, at dapat hindi monthly/weekly.
       return (
-        isOneTimeActualLabor &&
+        isCashierAllowedLabor(
+          expense.name
+        ) &&
         ![
           'Monthly',
           'Weekly'
@@ -1498,15 +1514,16 @@ const selectExpenseItem =
 
     /*
     |--------------------------------------------------------------------------
-    | CASHIER LABOR = AUTOMATIC ONE-TIME
+    | CASHIER = AUTOMATIC ONE-TIME (maliban sa Bill)
     |--------------------------------------------------------------------------
-    | Kahit pumili ang cashier ng labor master na Monthly/Weekly, laging
-    | One-Time ang i-se-set para sa kanila. Recurring payroll = admin lang.
+    | Kahit pumili ang cashier ng master na Monthly/Weekly, laging
+    | One-Time ang i-se-set para sa kanila — EXCEPT Bill (puwedeng
+    | monthly ang recurring bills). Recurring payroll = admin lang.
     */
 
     if (
       isCashier.value &&
-      item.category === 'Labor'
+      item.category !== 'Bill'
     ) {
       form.value.frequency =
         'One-Time'
@@ -3237,6 +3254,26 @@ const submitExpense =
 
     /*
     |--------------------------------------------------------------------------
+    | CASHIER LABOR RESTRICTION ("Bale" / "Ulam" lang)
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      isCashier.value &&
+      form.value.category ===
+        'Labor' &&
+      !isCashierAllowedLabor(
+        itemName
+      )
+    ) {
+      error.value =
+        'Cashier: "Bale" o "Ulam" lang ang puwedeng labor cost.'
+
+      return
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | CASHIER LABOR = AUTOMATIC ONE-TIME
     |--------------------------------------------------------------------------
     |
@@ -3249,8 +3286,14 @@ const submitExpense =
 
     /*
     |--------------------------------------------------------------------------
-    | CASHIER DATE + ONE-TIME LABOR
+    | CASHIER DATE + AUTOMATIC ONE-TIME
     |--------------------------------------------------------------------------
+    |
+    | Para sa cashier: LAHAT ng item ay automatic na One-Time, kahit
+    | anong category (Ingredient, Material, Maintenance, Miscellaneous,
+    | Labor). EXCEPTION lang ang BILL — iniiwan as-is dahil puwedeng
+    | monthly ang recurring bills (hal. Electricity, WiFi).
+    |
     */
 
     if (
@@ -3260,11 +3303,9 @@ const submitExpense =
         todayPH
 
       if (
-        form.value.category ===
-        'Labor'
+        form.value.category !==
+        'Bill'
       ) {
-        // Automatic One-Time para sa cashier. Hindi na forced na Ulam —
-        // ide-derive ang laborType base sa pangalan sa ibaba.
         form.value.frequency =
           'One-Time'
       }
@@ -5514,11 +5555,39 @@ onMounted(async () => {
 
             </select>
 
+            <!-- CASHIER LABOR COST -->
+            <!--
+              Para sa cashier: "Bale" at "Ulam" LANG ang puwedeng
+              labor cost. Dropdown para hindi makapag-lagay ng iba.
+            -->
+
+            <select
+              v-else-if="
+                isCashier &&
+                form.category === 'Labor'
+              "
+              v-model="form.item"
+              class="w-full border border-gray-300 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+
+              <option value="">
+                Select Labor Cost
+              </option>
+
+              <option
+                v-for="labor in CASHIER_ALLOWED_LABOR"
+                :key="labor"
+                :value="labor"
+              >
+                {{ labor }}
+              </option>
+
+            </select>
+
             <!-- UNIVERSAL ITEM -->
             <!--
-              Labor Cost (one-time) ay bukas na ring item name
-              para sa cashier at admin. Hindi na forced na "Ulam".
-              Ang Ulam ay isa lang sa mga puwedeng one-time labor.
+              Admin (o ibang category) = bukas na item name.
+              Para sa cashier Labor, naka-restrict sa dropdown sa itaas.
             -->
 
             <input
