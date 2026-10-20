@@ -1557,8 +1557,13 @@ const selectExpenseItem =
       form.value.unit =
         'day'
 
-      form.value.expenseDate =
-        todayPH
+      // Cashier: today. Admin: huwag i-reset — puwedeng mag-backdate.
+      if (
+        isCashier.value
+      ) {
+        form.value.expenseDate =
+          todayPH
+      }
     } else if (
       item.defaultAmount !==
         undefined &&
@@ -3449,8 +3454,14 @@ const submitExpense =
       form.value.frequency =
         'One-Time'
 
-      form.value.expenseDate =
-        todayPH
+      // Cashier: laging today. Admin: puwedeng i-backdate — huwag
+      // i-override ang piniling date.
+      if (
+        isCashier.value
+      ) {
+        form.value.expenseDate =
+          todayPH
+      }
 
       form.value.laborType =
         'Ulam'
@@ -3546,8 +3557,14 @@ const submitExpense =
           'Labor' &&
         isUlamExpense.value
       ) {
+        // Cashier: today. Admin: gamitin ang piniling date (backdate OK).
         recordDate =
-          todayPH
+          isCashier.value
+            ? todayPH
+            : (
+                form.value.expenseDate ||
+                todayPH
+              )
       }
 
       let periodStart =
