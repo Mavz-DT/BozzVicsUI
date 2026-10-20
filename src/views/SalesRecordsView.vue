@@ -13,6 +13,23 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 // =========================
+// BACKDATED / MANUAL SALE (admin)
+// =========================
+
+const showManualSaleModal = ref(false)
+const savingManualSale = ref(false)
+const manualSaleError = ref('')
+
+const manualSale = ref({
+  date: '',
+  amount: '',
+  paymentMethod: 'Cash',
+  orderType: 'Dine-In',
+  referenceNumber: '',
+  remarks: ''
+})
+
+// =========================
 // INFO CARD TOOLTIPS
 // =========================
 //
@@ -272,6 +289,118 @@ const handleDateChange = () => {
   }
 
   fetchSalesRecords()
+}
+
+// =========================
+// MANUAL SALE ACTIONS
+// =========================
+
+const openManualSaleModal = () => {
+  manualSaleError.value = ''
+
+  manualSale.value = {
+    date:
+      selectedDate.value ||
+      getTodayPH(),
+    amount: '',
+    paymentMethod: 'Cash',
+    orderType: 'Dine-In',
+    referenceNumber: '',
+    remarks: ''
+  }
+
+  showManualSaleModal.value = true
+}
+
+const closeManualSaleModal = () => {
+  if (savingManualSale.value) {
+    return
+  }
+
+  showManualSaleModal.value = false
+}
+
+const submitManualSale = async () => {
+  manualSaleError.value = ''
+
+  const amt =
+    Number(manualSale.value.amount)
+
+  if (
+    !manualSale.value.date
+  ) {
+    manualSaleError.value =
+      'Pumili ng petsa.'
+    return
+  }
+
+  if (
+    !Number.isFinite(amt) ||
+    amt <= 0
+  ) {
+    manualSaleError.value =
+      'Maglagay ng tamang halaga (mas malaki sa 0).'
+    return
+  }
+
+  if (
+    manualSale.value.paymentMethod ===
+      'GCash' &&
+    !manualSale.value.referenceNumber.trim()
+  ) {
+    manualSaleError.value =
+      'Maglagay ng GCash reference number.'
+    return
+  }
+
+  savingManualSale.value = true
+
+  try {
+    const token =
+      authStore.getToken()
+
+    await axios.post(
+      `${API}/orders/manual-sale`,
+      {
+        date:
+          manualSale.value.date,
+        amount: amt,
+        paymentMethod:
+          manualSale.value.paymentMethod,
+        orderType:
+          manualSale.value.orderType,
+        referenceNumber:
+          manualSale.value.referenceNumber,
+        remarks:
+          manualSale.value.remarks
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    )
+
+    showManualSaleModal.value = false
+
+    // Lumipat sa petsa ng na-record para makita agad.
+    selectedDate.value =
+      manualSale.value.date
+
+    await fetchSalesRecords()
+  } catch (error) {
+    console.error(
+      'submitManualSale error:',
+      error
+    )
+
+    manualSaleError.value =
+      error.response?.data?.message ||
+      error.message ||
+      'Hindi ma-record ang backdated sale.'
+  } finally {
+    savingManualSale.value = false
+  }
 }
 
 // =========================
@@ -2331,23 +2460,167 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Admin Date Picker -->
+      <!-- Admin Date Picker + Backdated Sale -->
       <div
         v-if="isAdmin"
-        class="flex flex-col gap-1"
+        class="flex items-end gap-3"
       >
-        <label
-          class="text-sm font-bold text-gray-700"
-        >
-          Select Date
-        </label>
+        <div class="flex flex-col gap-1">
+          <label
+            class="text-sm font-bold text-gray-700"
+          >
+            Select Date
+          </label>
 
-        <input
-          v-model="selectedDate"
-          @change="handleDateChange"
-          type="date"
-          class="border border-gray-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+          <input
+            v-model="selectedDate"
+            @change="handleDateChange"
+            type="date"
+            class="border border-gray-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <button
+          type="button"
+          @click="openManualSaleModal"
+          class="h-[46px] px-4 rounded-lg text-white font-black shadow-sm whitespace-nowrap"
+          :style="{ backgroundColor: settingsStore.themeColor }"
+        >
+          + Backdated Sale
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- BACKDATED SALE MODAL -->
+    <!-- ========================= -->
+
+    <div
+      v-if="showManualSaleModal"
+      class="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
+      @click.self="closeManualSaleModal"
+    >
+      <div
+        class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+      >
+        <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 class="text-lg font-black text-gray-800">
+            Backdated Sale
+          </h2>
+          <button
+            type="button"
+            @click="closeManualSaleModal"
+            class="w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-black"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="p-5 space-y-4">
+
+          <div
+            v-if="manualSaleError"
+            class="bg-red-100 text-red-700 border border-red-200 rounded-lg p-2 text-sm font-medium"
+          >
+            {{ manualSaleError }}
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Date</label>
+            <input
+              v-model="manualSale.date"
+              type="date"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Amount (food sales)</label>
+            <div class="relative">
+              <span class="absolute left-3 top-2.5 text-gray-500">₱</span>
+              <input
+                v-model="manualSale.amount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 pl-7 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-1">Payment</label>
+              <select
+                v-model="manualSale.paymentMethod"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-1">Order Type</label>
+              <select
+                v-model="manualSale.orderType"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Dine-In">Dine-In</option>
+                <option value="Take-Out">Take-Out</option>
+                <option value="Delivery">Delivery</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="manualSale.paymentMethod === 'GCash'">
+            <label class="block text-sm font-bold text-gray-700 mb-1">GCash Reference</label>
+            <input
+              v-model="manualSale.referenceNumber"
+              type="text"
+              placeholder="Reference number"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Remarks (optional)</label>
+            <input
+              v-model="manualSale.remarks"
+              type="text"
+              placeholder="Halimbawa: hindi na-record noong araw na iyon"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <p class="text-xs text-gray-400">
+            Mare-record ito bilang Settled + Paid na sale sa piniling petsa.
+            Lalabas sa Sales Records at Reports. Hindi ito humahawak ng stock
+            o cash drawer.
+          </p>
+
+          <div class="flex gap-3 pt-1">
+            <button
+              type="button"
+              @click="closeManualSaleModal"
+              :disabled="savingManualSale"
+              class="flex-1 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              @click="submitManualSale"
+              :disabled="savingManualSale"
+              class="flex-1 py-2.5 rounded-lg text-white font-black shadow-sm disabled:opacity-50"
+              :style="{ backgroundColor: settingsStore.themeColor }"
+            >
+              {{ savingManualSale ? 'Saving...' : 'Record Sale' }}
+            </button>
+          </div>
+
+        </div>
       </div>
     </div>
 
