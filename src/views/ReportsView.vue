@@ -992,6 +992,7 @@ const dailyAverage = computed(() => {
     openDayCount: n,
     sales: avg('sales'),
     totalExpenses: avg('totalExpenses'),
+    balance: avg('balance'),
     profit: avg('profit'),
     ingredients: avg('ingredients'),
     materials: avg('materials'),
@@ -1012,6 +1013,115 @@ const dailyAverage = computed(() => {
 
 // Average ng counts — 1 decimal (hindi currency).
 const fmtAvgCount = n => Number(n || 0).toFixed(1)
+
+const round2 = n =>
+  Math.round(
+    (Number(n || 0) + Number.EPSILON) * 100
+  ) / 100
+
+/*
+|--------------------------------------------------------------------------
+| +/- Balance (cash-audit adjustment) — recompute + save
+|--------------------------------------------------------------------------
+*/
+
+const recomputeBreakdownTotals = () => {
+  const rows =
+    dailyBreakdown.value.rows
+
+  const keys = [
+    'sales',
+    'totalExpenses',
+    'balance',
+    'profit',
+    'ingredients',
+    'materials',
+    'maintenance',
+    'miscellaneous',
+    'labor',
+    'bills',
+    'orderQty',
+    'dineInCount',
+    'takeOutCount',
+    'deliveryCount',
+    'dineInSales',
+    'takeOutSales',
+    'deliverySales',
+    'refundDiscount'
+  ]
+
+  const totals = {}
+
+  keys.forEach(k => {
+    totals[k] = round2(
+      rows.reduce(
+        (sum, r) =>
+          sum + Number(r[k] || 0),
+        0
+      )
+    )
+  })
+
+  dailyBreakdown.value.totals = totals
+}
+
+const savingBalanceDate = ref('')
+
+const saveDailyBalance = async (
+  row,
+  rawValue
+) => {
+  const amount =
+    rawValue === '' ||
+    rawValue === null ||
+    rawValue === undefined
+      ? 0
+      : Number(rawValue)
+
+  const safeAmount =
+    Number.isFinite(amount)
+      ? round2(amount)
+      : 0
+
+  // Optimistic local update: balance + profit + totals
+  row.balance = safeAmount
+
+  row.profit = round2(
+    Number(row.sales || 0) +
+    safeAmount -
+    Number(row.totalExpenses || 0)
+  )
+
+  recomputeBreakdownTotals()
+
+  // Persist
+  savingBalanceDate.value = row.date
+
+  try {
+    await axios.put(
+      `${API}/reports/daily-balance`,
+      {
+        date: row.date,
+        amount: safeAmount
+      },
+      {
+        headers: getAuthHeaders()
+      }
+    )
+  } catch (err) {
+    console.error(
+      'saveDailyBalance error:',
+      err
+    )
+
+    breakdownError.value =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to save balance adjustment.'
+  } finally {
+    savingBalanceDate.value = ''
+  }
+}
 
 const handleDateChange = () => {
   fetchReports()
@@ -1313,6 +1423,7 @@ onMounted(() => {
                   <th class="text-right px-3 py-2 font-bold">Take-out (sales)</th>
                   <th class="text-right px-3 py-2 font-bold">Delivery (sales)</th>
                   <th class="text-right px-3 py-2 font-bold">Refund/Discount</th>
+                  <th class="text-right px-3 py-2 font-bold">+/- Balance</th>
                 </tr>
               </thead>
 
@@ -1348,6 +1459,28 @@ onMounted(() => {
                   <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.takeOutSales) }}</td>
                   <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.deliverySales) }}</td>
                   <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.refundDiscount) }}</td>
+                  <td class="text-right px-3 py-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      :value="row.balance"
+                      @change="
+                        saveDailyBalance(
+                          row,
+                          $event.target.value
+                        )
+                      "
+                      :class="[
+                        'w-24 text-right px-2 py-1 rounded-lg border outline-none focus:ring-2 focus:ring-blue-500',
+                        Number(row.balance) < 0
+                          ? 'border-red-300 text-red-600 font-bold'
+                          : Number(row.balance) > 0
+                            ? 'border-green-300 text-green-700 font-bold'
+                            : 'border-gray-200 text-gray-500'
+                      ]"
+                      placeholder="0.00"
+                    />
+                  </td>
                 </tr>
               </tbody>
 
@@ -1380,6 +1513,12 @@ onMounted(() => {
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.takeOutSales) }}</td>
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.deliverySales) }}</td>
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.refundDiscount) }}</td>
+                  <td
+                    class="text-right px-3 py-2"
+                    :class="(dailyBreakdown.totals.balance || 0) < 0 ? 'text-red-600' : 'text-green-700'"
+                  >
+                    {{ formatAmount(dailyBreakdown.totals.balance) }}
+                  </td>
                 </tr>
 
                 <!-- DAILY AVERAGE (closed days / 0 sales excluded) -->
@@ -1412,6 +1551,7 @@ onMounted(() => {
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.takeOutSales) }}</td>
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.deliverySales) }}</td>
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.refundDiscount) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.balance) }}</td>
                 </tr>
               </tfoot>
 
