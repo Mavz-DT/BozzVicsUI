@@ -958,6 +958,61 @@ const shortDate = dateStr => {
   )
 }
 
+/*
+|--------------------------------------------------------------------------
+| Daily Average (hindi kasama ang closed days)
+|--------------------------------------------------------------------------
+|
+| Kapag 0 ang Sales sa isang araw = closed. HINDI ito isinasama sa
+| pag-compute ng daily average. Denominator = bilang ng mga araw na
+| may benta (open days).
+|
+*/
+
+const openDays = computed(() => {
+  return dailyBreakdown.value.rows.filter(
+    row => Number(row.sales || 0) > 0
+  )
+})
+
+const dailyAverage = computed(() => {
+  const days = openDays.value
+  const n = days.length
+
+  const avg = key =>
+    n
+      ? days.reduce(
+          (sum, row) =>
+            sum + Number(row[key] || 0),
+          0
+        ) / n
+      : 0
+
+  return {
+    openDayCount: n,
+    sales: avg('sales'),
+    totalExpenses: avg('totalExpenses'),
+    profit: avg('profit'),
+    ingredients: avg('ingredients'),
+    materials: avg('materials'),
+    maintenance: avg('maintenance'),
+    miscellaneous: avg('miscellaneous'),
+    labor: avg('labor'),
+    bills: avg('bills'),
+    orderQty: avg('orderQty'),
+    dineInCount: avg('dineInCount'),
+    takeOutCount: avg('takeOutCount'),
+    deliveryCount: avg('deliveryCount'),
+    dineInSales: avg('dineInSales'),
+    takeOutSales: avg('takeOutSales'),
+    deliverySales: avg('deliverySales'),
+    refundDiscount: avg('refundDiscount')
+  }
+})
+
+// Average ng counts — 1 decimal (hindi currency).
+const fmtAvgCount = n => Number(n || 0).toFixed(1)
+
 const handleDateChange = () => {
   fetchReports()
 }
@@ -1325,6 +1380,38 @@ onMounted(() => {
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.takeOutSales) }}</td>
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.deliverySales) }}</td>
                   <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.refundDiscount) }}</td>
+                </tr>
+
+                <!-- DAILY AVERAGE (closed days / 0 sales excluded) -->
+                <tr class="border-t border-gray-200 bg-blue-50/60 text-gray-700 font-bold">
+                  <td class="text-left px-3 py-2 sticky left-0 bg-blue-50 z-10">
+                    DAILY AVG
+                  </td>
+                  <td class="text-left px-3 py-2 text-[10px] text-gray-500 font-semibold whitespace-normal">
+                    {{ dailyAverage.openDayCount }} open day(s)
+                  </td>
+                  <td class="text-right px-3 py-2 text-green-700">{{ formatAmount(dailyAverage.sales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.totalExpenses) }}</td>
+                  <td
+                    class="text-right px-3 py-2"
+                    :class="dailyAverage.profit >= 0 ? 'text-green-600' : 'text-red-600'"
+                  >
+                    {{ formatAmount(dailyAverage.profit) }}
+                  </td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.ingredients) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.materials) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.maintenance) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.miscellaneous) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.labor) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.bills) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(dailyAverage.orderQty) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(dailyAverage.dineInCount) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(dailyAverage.takeOutCount) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(dailyAverage.deliveryCount) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.dineInSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.takeOutSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.deliverySales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyAverage.refundDiscount) }}</td>
                 </tr>
               </tfoot>
 
