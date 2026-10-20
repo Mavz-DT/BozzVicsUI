@@ -33,6 +33,21 @@ const error = ref('')
 
 /*
 |--------------------------------------------------------------------------
+| MTD Daily Breakdown (records table)
+|--------------------------------------------------------------------------
+*/
+
+const dailyBreakdown = ref({
+  month: '',
+  rows: [],
+  totals: null
+})
+
+const breakdownLoading = ref(false)
+const breakdownError = ref('')
+
+/*
+|--------------------------------------------------------------------------
 | Cash Audit Snapshot
 |--------------------------------------------------------------------------
 |
@@ -815,6 +830,8 @@ const fetchReports = async () => {
 
     await fetchCashAudit()
 
+    await fetchDailyBreakdown()
+
   } catch (err) {
     console.error(
       'fetchReports error:',
@@ -853,6 +870,93 @@ const fetchReports = async () => {
 | Date
 |--------------------------------------------------------------------------
 */
+
+/*
+|--------------------------------------------------------------------------
+| Fetch MTD Daily Breakdown
+|--------------------------------------------------------------------------
+*/
+
+const fetchDailyBreakdown = async () => {
+  if (!selectedDate.value || !isAdmin.value) {
+    return
+  }
+
+  breakdownLoading.value = true
+  breakdownError.value = ''
+
+  try {
+    const month =
+      selectedDate.value.slice(0, 7)
+
+    const response =
+      await axios.get(
+        `${API}/reports/daily-breakdown`,
+        {
+          params: { month },
+          headers: getAuthHeaders()
+        }
+      )
+
+    dailyBreakdown.value = {
+      month:
+        response.data?.month || month,
+      rows:
+        Array.isArray(response.data?.rows)
+          ? response.data.rows
+          : [],
+      totals:
+        response.data?.totals || null
+    }
+  } catch (err) {
+    console.error(
+      'fetchDailyBreakdown error:',
+      err
+    )
+
+    dailyBreakdown.value = {
+      month: '',
+      rows: [],
+      totals: null
+    }
+
+    breakdownError.value =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to load daily breakdown.'
+  } finally {
+    breakdownLoading.value = false
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Table helpers (per-day records)
+|--------------------------------------------------------------------------
+*/
+
+const dayName = dateStr => {
+  if (!dateStr) return ''
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    weekday: 'short'
+  }).format(
+    new Date(`${dateStr}T00:00:00+08:00`)
+  )
+}
+
+const shortDate = dateStr => {
+  if (!dateStr) return ''
+
+  return new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric'
+  }).format(
+    new Date(`${dateStr}T00:00:00+08:00`)
+  )
+}
 
 const handleDateChange = () => {
   fetchReports()
@@ -1076,6 +1180,160 @@ onMounted(() => {
         </p>
 
       </div>
+
+      <!-- ================================================= -->
+      <!-- MTD: PER-DAY RECORDS TABLE -->
+      <!-- ================================================= -->
+
+      <template
+        v-else-if="activePeriod === 'MTD'"
+      >
+
+        <div
+          v-if="breakdownError"
+          class="bg-red-100 text-red-700 border border-red-200 rounded-xl p-4 text-sm font-medium"
+        >
+          {{ breakdownError }}
+        </div>
+
+        <div
+          class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden"
+        >
+
+          <div
+            class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3"
+          >
+            <div>
+              <h2 class="font-black text-gray-800">
+                Month-to-Date Records
+              </h2>
+              <p class="text-xs text-gray-500 mt-0.5">
+                Araw-araw na breakdown para sa buwan ng
+                {{ dailyBreakdown.month || (selectedDate || '').slice(0, 7) }}
+              </p>
+            </div>
+            <span class="text-sm font-bold text-gray-500">
+              {{ dailyBreakdown.rows.length }} araw
+            </span>
+          </div>
+
+          <div
+            v-if="breakdownLoading"
+            class="py-12 text-center text-gray-500 font-semibold"
+          >
+            Loading records...
+          </div>
+
+          <div
+            v-else-if="dailyBreakdown.rows.length === 0"
+            class="py-12 text-center text-gray-500 font-medium"
+          >
+            Walang records para sa buwang ito.
+          </div>
+
+          <div
+            v-else
+            class="overflow-x-auto"
+          >
+            <table class="w-full text-xs whitespace-nowrap">
+
+              <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                <tr>
+                  <th class="text-left px-3 py-2 font-bold sticky left-0 bg-gray-50 z-10">Date</th>
+                  <th class="text-left px-3 py-2 font-bold">Day</th>
+                  <th class="text-right px-3 py-2 font-bold">Sales</th>
+                  <th class="text-right px-3 py-2 font-bold">Total Expenses</th>
+                  <th class="text-right px-3 py-2 font-bold">Profit</th>
+                  <th class="text-right px-3 py-2 font-bold">Ingredients</th>
+                  <th class="text-right px-3 py-2 font-bold">Material</th>
+                  <th class="text-right px-3 py-2 font-bold">Maintenance</th>
+                  <th class="text-right px-3 py-2 font-bold">Miscellaneous</th>
+                  <th class="text-right px-3 py-2 font-bold">Labor</th>
+                  <th class="text-right px-3 py-2 font-bold">Bills</th>
+                  <th class="text-right px-3 py-2 font-bold">Order Qty</th>
+                  <th class="text-right px-3 py-2 font-bold">Dine-in (ct)</th>
+                  <th class="text-right px-3 py-2 font-bold">Take-out (ct)</th>
+                  <th class="text-right px-3 py-2 font-bold">Delivery (ct)</th>
+                  <th class="text-right px-3 py-2 font-bold">Dine-in (sales)</th>
+                  <th class="text-right px-3 py-2 font-bold">Take-out (sales)</th>
+                  <th class="text-right px-3 py-2 font-bold">Delivery (sales)</th>
+                  <th class="text-right px-3 py-2 font-bold">Refund/Discount</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr
+                  v-for="row in dailyBreakdown.rows"
+                  :key="row.date"
+                  class="border-b border-gray-100 hover:bg-blue-50/40"
+                >
+                  <td class="text-left px-3 py-2 font-bold text-gray-800 sticky left-0 bg-white z-10">
+                    {{ shortDate(row.date) }}
+                  </td>
+                  <td class="text-left px-3 py-2 text-gray-500">{{ dayName(row.date) }}</td>
+                  <td class="text-right px-3 py-2 font-bold text-green-700">{{ formatAmount(row.sales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-700">{{ formatAmount(row.totalExpenses) }}</td>
+                  <td
+                    class="text-right px-3 py-2 font-black"
+                    :class="row.profit >= 0 ? 'text-green-600' : 'text-red-600'"
+                  >
+                    {{ formatAmount(row.profit) }}
+                  </td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.ingredients) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.materials) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.maintenance) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.miscellaneous) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.labor) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.bills) }}</td>
+                  <td class="text-right px-3 py-2 font-bold text-gray-800">{{ row.orderQty }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ row.dineInCount }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ row.takeOutCount }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ row.deliveryCount }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.dineInSales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.takeOutSales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.deliverySales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.refundDiscount) }}</td>
+                </tr>
+              </tbody>
+
+              <tfoot
+                v-if="dailyBreakdown.totals"
+                class="border-t-2 border-gray-300 bg-gray-50 font-black text-gray-800"
+              >
+                <tr>
+                  <td class="text-left px-3 py-2 sticky left-0 bg-gray-50 z-10">TOTAL</td>
+                  <td class="px-3 py-2"></td>
+                  <td class="text-right px-3 py-2 text-green-700">{{ formatAmount(dailyBreakdown.totals.sales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.totalExpenses) }}</td>
+                  <td
+                    class="text-right px-3 py-2"
+                    :class="dailyBreakdown.totals.profit >= 0 ? 'text-green-600' : 'text-red-600'"
+                  >
+                    {{ formatAmount(dailyBreakdown.totals.profit) }}
+                  </td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.ingredients) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.materials) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.maintenance) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.miscellaneous) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.labor) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.bills) }}</td>
+                  <td class="text-right px-3 py-2">{{ dailyBreakdown.totals.orderQty }}</td>
+                  <td class="text-right px-3 py-2">{{ dailyBreakdown.totals.dineInCount }}</td>
+                  <td class="text-right px-3 py-2">{{ dailyBreakdown.totals.takeOutCount }}</td>
+                  <td class="text-right px-3 py-2">{{ dailyBreakdown.totals.deliveryCount }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.dineInSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.takeOutSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.deliverySales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(dailyBreakdown.totals.refundDiscount) }}</td>
+                </tr>
+              </tfoot>
+
+            </table>
+          </div>
+
+        </div>
+
+      </template>
 
       <template
         v-else-if="activeReport"
