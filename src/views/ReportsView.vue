@@ -46,6 +46,14 @@ const dailyBreakdown = ref({
 const breakdownLoading = ref(false)
 const breakdownError = ref('')
 
+// Fullscreen view ng MTD records table (pseudo-fullscreen overlay).
+const isTableFullscreen = ref(false)
+
+const toggleTableFullscreen = () => {
+  isTableFullscreen.value =
+    !isTableFullscreen.value
+}
+
 /*
 |--------------------------------------------------------------------------
 | Cash Audit Snapshot
@@ -1362,11 +1370,16 @@ onMounted(() => {
         </div>
 
         <div
-          class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden"
+          :class="[
+            'bg-white border border-gray-200 shadow-sm',
+            isTableFullscreen
+              ? 'fixed inset-0 z-[120] rounded-none flex flex-col overflow-hidden'
+              : 'rounded-2xl overflow-hidden'
+          ]"
         >
 
           <div
-            class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3"
+            class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 shrink-0"
           >
             <div>
               <h2 class="font-black text-gray-800">
@@ -1377,9 +1390,22 @@ onMounted(() => {
                 {{ dailyBreakdown.month || (selectedDate || '').slice(0, 7) }}
               </p>
             </div>
-            <span class="text-sm font-bold text-gray-500">
-              {{ dailyBreakdown.rows.length }} araw
-            </span>
+
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-bold text-gray-500 whitespace-nowrap">
+                {{ dailyBreakdown.rows.length }} araw
+              </span>
+
+              <button
+                type="button"
+                @click="toggleTableFullscreen"
+                :title="isTableFullscreen ? 'Normal view' : 'Fullscreen view'"
+                :aria-label="isTableFullscreen ? 'Normal view' : 'Fullscreen view'"
+                class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 transition-all text-lg leading-none"
+              >
+                {{ isTableFullscreen ? '🗗' : '⛶' }}
+              </button>
+            </div>
           </div>
 
           <div
@@ -1398,13 +1424,17 @@ onMounted(() => {
 
           <div
             v-else
-            class="overflow-x-auto"
+            :class="[
+              isTableFullscreen
+                ? 'flex-1 overflow-auto'
+                : 'overflow-x-auto'
+            ]"
           >
             <table class="w-full text-xs whitespace-nowrap">
 
-              <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+              <thead class="bg-gray-50 border-b border-gray-200 text-gray-600 sticky top-0 z-20">
                 <tr>
-                  <th class="text-left px-3 py-2 font-bold sticky left-0 bg-gray-50 z-10">Date</th>
+                  <th class="text-left px-3 py-2 font-bold sticky left-0 bg-gray-50 z-30">Date</th>
                   <th class="text-left px-3 py-2 font-bold">Day</th>
                   <th class="text-right px-3 py-2 font-bold">Sales</th>
                   <th class="text-right px-3 py-2 font-bold">Total Expenses</th>
