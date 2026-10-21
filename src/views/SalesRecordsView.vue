@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
@@ -20,13 +20,52 @@ const showManualSaleModal = ref(false)
 const savingManualSale = ref(false)
 const manualSaleError = ref('')
 
+const manualMenus = ref([])
+const manualOrderNumbers = ref([])
+const manualSelectedMenuId = ref('')
+
 const manualSale = ref({
   date: '',
-  amount: '',
   paymentMethod: 'Cash',
   orderType: 'Dine-In',
   referenceNumber: '',
-  remarks: ''
+  remarks: '',
+  items: []
+})
+
+// Presyo base sa order type (tugma sa server resolveMenuPrice).
+const resolveManualPrice = (menu, orderType) => {
+  const base = Number(menu?.price || 0)
+  const p = menu?.prices
+
+  if (!p) return base
+
+  const key =
+    orderType === 'Dine-In'
+      ? 'dineIn'
+      : orderType === 'Take-Out'
+        ? 'takeOut'
+        : orderType === 'Delivery'
+          ? 'delivery'
+          : null
+
+  if (!key) return base
+
+  const v = p[key]
+
+  return v !== undefined && v !== null && v !== ''
+    ? Number(v)
+    : base
+}
+
+const manualSaleTotal = computed(() => {
+  return manualSale.value.items.reduce(
+    (sum, it) =>
+      sum +
+      Number(it.price || 0) *
+      Number(it.quantity || 0),
+    0
+  )
 })
 
 // =========================
@@ -295,21 +334,67 @@ const handleDateChange = () => {
 // MANUAL SALE ACTIONS
 // =========================
 
-const openManualSaleModal = () => {
+const manualAuthConfig = () => {
+  return {
+    headers: {
+      Authorization: `Bearer ${authStore.getToken()}`
+    }
+  }
+}
+
+const openManualSaleModal = async () => {
   manualSaleError.value = ''
+  manualSelectedMenuId.value = ''
 
   manualSale.value = {
     date:
       selectedDate.value ||
       getTodayPH(),
-    amount: '',
     paymentMethod: 'Cash',
     orderType: 'Dine-In',
     referenceNumber: '',
-    remarks: ''
+    remarks: '',
+    items: []
   }
 
   showManualSaleModal.value = true
+
+  // Kunin ang menus + order numbers
+  try {
+    const [menuRes, numberRes] =
+      await Promise.all([
+        axios.get(
+          `${API}/menus`,
+          manualAuthConfig()
+        ),
+        axios.get(
+          `${API}/order-numbers`,
+          manualAuthConfig()
+        )
+      ])
+
+    manualMenus.value =
+      Array.isArray(menuRes.data)
+        ? menuRes.data
+        : Array.isArray(menuRes.data?.menus)
+          ? menuRes.data.menus
+          : Array.isArray(menuRes.data?.data)
+            ? menuRes.data.data
+            : []
+
+    manualOrderNumbers.value =
+      Array.isArray(numberRes.data)
+        ? numberRes.data
+        : []
+  } catch (error) {
+    console.error(
+      'load manual menus/numbers error:',
+      error
+    )
+
+    manualSaleError.value =
+      'Hindi ma-load ang menu items. Subukan ulit.'
+  }
 }
 
 const closeManualSaleModal = () => {
@@ -320,26 +405,90 @@ const closeManualSaleModal = () => {
   showManualSaleModal.value = false
 }
 
+const addManualItem = () => {
+  const menu =
+    manualMenus.value.find(
+      m => m._id === manualSelectedMenuId.value
+    )
+
+  if (!menu) return
+
+  const price =
+    resolveManualPrice(
+      menu,
+      manualSale.value.orderType
+    )
+
+  const existing =
+    manualSale.value.items.find(
+      it => it.menuId === menu._id
+    )
+
+  if (existing) {
+    existing.quantity += 1
+  } else {
+    manualSale.value.items.push({
+      menuId: menu._id,
+      name: menu.name,
+      price,
+      quantity: 1
+    })
+  }
+
+  manualSelectedMenuId.value = ''
+}
+
+const changeManualQty = (item, delta) => {
+  const next =
+    Number(item.quantity || 0) + delta
+
+  if (next <= 0) {
+    manualSale.value.items =
+      manualSale.value.items.filter(
+        it => it !== item
+      )
+  } else {
+    item.quantity = next
+  }
+}
+
+const removeManualItem = item => {
+  manualSale.value.items =
+    manualSale.value.items.filter(
+      it => it !== item
+    )
+}
+
+// Kapag nagbago ang order type, i-update ang presyo ng cart items.
+watch(
+  () => manualSale.value.orderType,
+  newType => {
+    manualSale.value.items.forEach(it => {
+      const menu =
+        manualMenus.value.find(
+          m => m._id === it.menuId
+        )
+
+      if (menu) {
+        it.price =
+          resolveManualPrice(menu, newType)
+      }
+    })
+  }
+)
+
 const submitManualSale = async () => {
   manualSaleError.value = ''
 
-  const amt =
-    Number(manualSale.value.amount)
-
-  if (
-    !manualSale.value.date
-  ) {
+  if (!manualSale.value.date) {
     manualSaleError.value =
       'Pumili ng petsa.'
     return
   }
 
-  if (
-    !Number.isFinite(amt) ||
-    amt <= 0
-  ) {
+  if (manualSale.value.items.length === 0) {
     manualSaleError.value =
-      'Maglagay ng tamang halaga (mas malaki sa 0).'
+      'Magdagdag ng kahit isang item.'
     return
   }
 
@@ -353,32 +502,126 @@ const submitManualSale = async () => {
     return
   }
 
+  const total = manualSaleTotal.value
+
+  if (total <= 0) {
+    manualSaleError.value =
+      'Dapat mas malaki sa 0 ang kabuuan.'
+    return
+  }
+
+  // Order number: Delivery -> null; kung hindi, unang Available slot.
+  let orderNumber = null
+
+  if (
+    manualSale.value.orderType !== 'Delivery'
+  ) {
+    const available =
+      manualOrderNumbers.value.find(
+        n => n.status === 'Available'
+      )
+
+    orderNumber =
+      available
+        ? available.number
+        : (
+            manualOrderNumbers.value[0]
+              ?.number || 1
+          )
+  }
+
   savingManualSale.value = true
 
   try {
-    const token =
-      authStore.getToken()
+    // 1) Gumawa ng order (itemized)
+    const orderData = {
+      cashier:
+        authStore.user._id,
 
+      items:
+        manualSale.value.items.map(it => ({
+          menuId: it.menuId,
+          name: it.name,
+          quantity: Number(it.quantity),
+          price: Number(it.price),
+          addOns: [],
+          subtotal:
+            Number(it.price) *
+            Number(it.quantity),
+          specialInstructions: ''
+        })),
+
+      orderType:
+        manualSale.value.orderType,
+
+      orderNumber,
+
+      customer: {},
+      deliveryFee: 0,
+      deliveryFeePaidBy: 'Customer',
+      discountAmount: 0,
+      paymentStatus: 'Paid',
+      notes:
+        manualSale.value.remarks ||
+        'Backdated sale'
+    }
+
+    const orderRes =
+      await axios.post(
+        `${API}/orders`,
+        orderData,
+        manualAuthConfig()
+      )
+
+    const createdOrder =
+      orderRes.data?.order ||
+      orderRes.data
+
+    const orderId =
+      createdOrder?._id
+
+    if (!orderId) {
+      throw new Error(
+        'Hindi nakuha ang order ID.'
+      )
+    }
+
+    // 2) I-settle (payment + cash + stock na-deduct na sa create)
     await axios.post(
-      `${API}/orders/manual-sale`,
+      `${API}/payments`,
       {
-        date:
-          manualSale.value.date,
-        amount: amt,
-        paymentMethod:
-          manualSale.value.paymentMethod,
-        orderType:
-          manualSale.value.orderType,
-        referenceNumber:
-          manualSale.value.referenceNumber,
-        remarks:
-          manualSale.value.remarks
+        orderId,
+        receivedBy:
+          authStore.user._id,
+        paymentRequestId:
+          `manual-${orderId}-${Date.now()}`,
+        payments: [
+          {
+            paymentMethod:
+              manualSale.value.paymentMethod,
+            amount: total,
+            amountTendered:
+              manualSale.value.paymentMethod ===
+                'Cash'
+                ? total
+                : 0,
+            change: 0,
+            referenceNumber:
+              manualSale.value.paymentMethod ===
+                'GCash'
+                ? manualSale.value.referenceNumber.trim()
+                : ''
+          }
+        ]
       },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
+      manualAuthConfig()
+    )
+
+    // 3) I-backdate ang order + payments + cash transactions
+    await axios.post(
+      `${API}/orders/${orderId}/backdate`,
+      { date: manualSale.value.date },
+      manualAuthConfig()
     )
 
     showManualSaleModal.value = false
@@ -2534,19 +2777,88 @@ onMounted(() => {
             />
           </div>
 
+          <!-- ITEMS -->
           <div>
-            <label class="block text-sm font-bold text-gray-700 mb-1">Amount (food sales)</label>
-            <div class="relative">
-              <span class="absolute left-3 top-2.5 text-gray-500">₱</span>
-              <input
-                v-model="manualSale.amount"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 pl-7 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <label class="block text-sm font-bold text-gray-700 mb-1">Menu Items</label>
+
+            <div class="flex gap-2">
+              <select
+                v-model="manualSelectedMenuId"
+                class="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Pumili ng item...</option>
+                <option
+                  v-for="menu in manualMenus"
+                  :key="menu._id"
+                  :value="menu._id"
+                >
+                  {{ menu.name }}
+                  — {{ formatCurrency(resolveManualPrice(menu, manualSale.orderType)) }}
+                </option>
+              </select>
+
+              <button
+                type="button"
+                @click="addManualItem"
+                :disabled="!manualSelectedMenuId"
+                class="px-4 rounded-lg bg-gray-800 text-white font-bold disabled:opacity-40"
+              >
+                Add
+              </button>
             </div>
+
+            <!-- Cart -->
+            <div
+              v-if="manualSale.items.length"
+              class="mt-3 border border-gray-200 rounded-xl divide-y divide-gray-100"
+            >
+              <div
+                v-for="item in manualSale.items"
+                :key="item.menuId"
+                class="flex items-center gap-2 px-3 py-2"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="font-bold text-gray-800 text-sm truncate">{{ item.name }}</p>
+                  <p class="text-xs text-gray-500">{{ formatCurrency(item.price) }} each</p>
+                </div>
+
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    @click="changeManualQty(item, -1)"
+                    class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-black text-gray-700"
+                  >−</button>
+                  <span class="w-8 text-center font-bold">{{ item.quantity }}</span>
+                  <button
+                    type="button"
+                    @click="changeManualQty(item, 1)"
+                    class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-black text-gray-700"
+                  >+</button>
+                </div>
+
+                <span class="w-20 text-right font-black text-gray-800 text-sm">
+                  {{ formatCurrency(item.price * item.quantity) }}
+                </span>
+
+                <button
+                  type="button"
+                  @click="removeManualItem(item)"
+                  class="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-black"
+                >×</button>
+              </div>
+
+              <div class="flex items-center justify-between px-3 py-2 bg-gray-50">
+                <span class="font-black text-gray-700">TOTAL</span>
+                <span class="font-black text-green-600">{{ formatCurrency(manualSaleTotal) }}</span>
+              </div>
+            </div>
+
+            <p
+              v-else
+              class="text-xs text-gray-400 mt-2"
+            >
+              Wala pang item. Pumili sa itaas at i-click ang Add.
+            </p>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -2595,9 +2907,10 @@ onMounted(() => {
           </div>
 
           <p class="text-xs text-gray-400">
-            Mare-record ito bilang Settled + Paid na sale sa piniling petsa.
-            Lalabas sa Sales Records at Reports. Hindi ito humahawak ng stock
-            o cash drawer.
+            Mare-record ito bilang Settled + Paid na itemized sale sa
+            piniling petsa. Lalabas sa Sales Records at Reports.
+            Mababawas ang stock, at papasok sa cash drawer ng araw na iyon
+            (para sa Cash payment).
           </p>
 
           <div class="flex gap-3 pt-1">

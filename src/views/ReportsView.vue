@@ -40,11 +40,22 @@ const error = ref('')
 const dailyBreakdown = ref({
   month: '',
   rows: [],
-  totals: null
+  totals: null,
+  menuSales: [],
+  menuSalesByDate: {},
+  expenseItems: []
 })
 
 const breakdownLoading = ref(false)
 const breakdownError = ref('')
+
+// Sort order ng Top/Bottom menu tables: 'sales' (default) o 'qty'.
+const topSort = ref('sales')
+const bottomSort = ref('sales')
+
+// Daily (per-araw) menu table sort.
+const dailyTopSort = ref('sales')
+const dailyBottomSort = ref('sales')
 
 // Fullscreen view ng MTD records table (pseudo-fullscreen overlay).
 const isTableFullscreen = ref(false)
@@ -52,6 +63,38 @@ const isTableFullscreen = ref(false)
 const toggleTableFullscreen = () => {
   isTableFullscreen.value =
     !isTableFullscreen.value
+}
+
+// Generic fullscreen para sa lahat ng tables (bawat table may key).
+const fullscreenTable = ref('')
+
+const toggleFullscreen = key => {
+  fullscreenTable.value =
+    fullscreenTable.value === key ? '' : key
+}
+
+const isFs = key => {
+  return fullscreenTable.value === key
+}
+
+// Hide (default) / Show toggle para sa bawat table — naka-collapse muna
+// para hindi agad nakalatag ang buong table (iwas scroll).
+const expandedTables = ref(new Set())
+
+const toggleCollapse = key => {
+  const s = new Set(expandedTables.value)
+  if (s.has(key)) {
+    s.delete(key)
+    // kapag itinago, alisin din ang fullscreen kung ito ang naka-fullscreen
+    if (fullscreenTable.value === key) fullscreenTable.value = ''
+  } else {
+    s.add(key)
+  }
+  expandedTables.value = s
+}
+
+const isCollapsed = key => {
+  return !expandedTables.value.has(key)
 }
 
 /*
@@ -914,7 +957,20 @@ const fetchDailyBreakdown = async () => {
           ? response.data.rows
           : [],
       totals:
-        response.data?.totals || null
+        response.data?.totals || null,
+      menuSales:
+        Array.isArray(response.data?.menuSales)
+          ? response.data.menuSales
+          : [],
+      menuSalesByDate:
+        response.data?.menuSalesByDate &&
+        typeof response.data.menuSalesByDate === 'object'
+          ? response.data.menuSalesByDate
+          : {},
+      expenseItems:
+        Array.isArray(response.data?.expenseItems)
+          ? response.data.expenseItems
+          : []
     }
   } catch (err) {
     console.error(
@@ -925,7 +981,10 @@ const fetchDailyBreakdown = async () => {
     dailyBreakdown.value = {
       month: '',
       rows: [],
-      totals: null
+      totals: null,
+      menuSales: [],
+      menuSalesByDate: {},
+      expenseItems: []
     }
 
     breakdownError.value =
@@ -980,6 +1039,267 @@ const shortDate = dateStr => {
 const openDays = computed(() => {
   return dailyBreakdown.value.rows.filter(
     row => Number(row.sales || 0) > 0
+  )
+})
+
+// Row ng napiling araw mula sa breakdown — ginagamit sa Daily report
+// para tumugma sa fields ng MTD summary.
+const dailyRow = computed(() => {
+  return (
+    dailyBreakdown.value.rows.find(
+      row => row.date === selectedDate.value
+    ) || null
+  )
+})
+
+/*
+|--------------------------------------------------------------------------
+| Top / Bottom menu sales (buong buwan)
+|--------------------------------------------------------------------------
+*/
+
+const sortMenus = (list, key, dir) => {
+  return [...list].sort((a, b) =>
+    dir === 'desc'
+      ? Number(b[key] || 0) - Number(a[key] || 0)
+      : Number(a[key] || 0) - Number(b[key] || 0)
+  )
+}
+
+const topMenus = computed(() => {
+  // Lahat ng may benta (walang 20 limit).
+  return sortMenus(
+    (dailyBreakdown.value.menuSales || []).filter(
+      m => Number(m.qty || 0) > 0 || Number(m.sales || 0) > 0
+    ),
+    topSort.value,
+    'desc'
+  )
+})
+
+const bottomMenus = computed(() => {
+  return sortMenus(
+    dailyBreakdown.value.menuSales || [],
+    bottomSort.value,
+    'asc'
+  ).slice(0, 20)
+})
+
+// Per-araw na menu list para sa Daily report (kasama ang hindi nabenta).
+const dailyMenuList = computed(() => {
+  const dayEntries =
+    dailyBreakdown.value.menuSalesByDate?.[selectedDate.value] || []
+
+  const dayMap = new Map()
+
+  dayEntries.forEach(e => {
+    const k =
+      e.menuId || `name:${e.name}`
+    dayMap.set(k, e)
+  })
+
+  // Gamitin ang buong menu list (month) para kasama ang 0-sales.
+  return (dailyBreakdown.value.menuSales || []).map(m => {
+    const k =
+      m.menuId || `name:${m.name}`
+    const d = dayMap.get(k)
+
+    return {
+      menuId: m.menuId,
+      name: m.name,
+      qty: d ? Number(d.qty || 0) : 0,
+      sales: d ? Number(d.sales || 0) : 0
+    }
+  })
+})
+
+const dailyTopMenus = computed(() => {
+  // Lahat ng may benta sa araw na ito (walang 20 limit).
+  return sortMenus(
+    dailyMenuList.value.filter(
+      m => Number(m.qty || 0) > 0 || Number(m.sales || 0) > 0
+    ),
+    dailyTopSort.value,
+    'desc'
+  )
+})
+
+const dailyBottomMenus = computed(() => {
+  return sortMenus(
+    dailyMenuList.value,
+    dailyBottomSort.value,
+    'asc'
+  ).slice(0, 20)
+})
+
+/*
+|--------------------------------------------------------------------------
+| Expenses breakdown by category (Daily + MTD)
+|--------------------------------------------------------------------------
+*/
+
+const EXPENSE_CATEGORY_LABELS = {
+  Ingredient: 'Ingredients',
+  Material: 'Material',
+  Maintenance: 'Maintenance',
+  Miscellaneous: 'Miscellaneous',
+  Labor: 'Labor Cost',
+  Bill: 'Bills'
+}
+
+const EXPENSE_CATEGORY_ORDER = [
+  'Ingredient',
+  'Material',
+  'Maintenance',
+  'Miscellaneous',
+  'Labor',
+  'Bill'
+]
+
+const groupExpenses = (items, sortKey = 'cost') => {
+  const byCat = {}
+
+  // Group by category, tapos pagsama-samahin ang parehong item name
+  // (case-insensitive) — i-total ang qty at cost.
+  items.forEach(it => {
+    if (!byCat[it.category]) {
+      byCat[it.category] = {}
+    }
+    const nm = (it.name || '(walang pangalan)').trim()
+    const key = nm.toLowerCase()
+    if (!byCat[it.category][key]) {
+      byCat[it.category][key] = { name: nm, qty: 0, amount: 0 }
+    }
+    byCat[it.category][key].qty += Number(it.qty || 1)
+    byCat[it.category][key].amount += Number(it.amount || 0)
+  })
+
+  return EXPENSE_CATEGORY_ORDER
+    .filter(c => byCat[c] && Object.keys(byCat[c]).length)
+    .map(c => {
+      const grouped = Object.values(byCat[c])
+        .map(x => ({
+          name: x.name,
+          qty: x.qty,
+          amount: Math.round(x.amount * 100) / 100
+        }))
+        .sort((a, b) =>
+          sortKey === 'qty'
+            ? b.qty - a.qty || b.amount - a.amount
+            : b.amount - a.amount || b.qty - a.qty
+        )
+      return {
+        category: c,
+        label: EXPENSE_CATEGORY_LABELS[c] || c,
+        items: grouped,
+        qtyTotal: grouped.reduce((s, i) => s + i.qty, 0),
+        subtotal:
+          Math.round(
+            grouped.reduce((s, i) => s + i.amount, 0) * 100
+          ) / 100
+      }
+    })
+}
+
+// Sort ng mga item sa loob ng bawat category: 'cost' (default) o 'qty'.
+const mtdExpSort = ref('cost')
+const dailyExpSort = ref('cost')
+
+// Expand/collapse ng bawat category sa expenses breakdown (naka-sarado muna —
+// categories lang ang nakikita, may dropdown arrow para buksan ang detalye).
+const expandedExpCats = ref(new Set())
+
+const toggleExpCat = (table, cat) => {
+  const k = `${table}:${cat}`
+  const s = new Set(expandedExpCats.value)
+  if (s.has(k)) s.delete(k)
+  else s.add(k)
+  expandedExpCats.value = s
+}
+
+const isExpCatOpen = (table, cat) => {
+  return expandedExpCats.value.has(`${table}:${cat}`)
+}
+
+// Expand/collapse ng per-item history (per date na binili).
+const expandedExpItems = ref(new Set())
+
+const expItemKey = (table, cat, name) =>
+  `${table}:${cat}:${(name || '').trim().toLowerCase()}`
+
+const toggleExpItem = (table, cat, name) => {
+  const k = expItemKey(table, cat, name)
+  const s = new Set(expandedExpItems.value)
+  if (s.has(k)) s.delete(k)
+  else s.add(k)
+  expandedExpItems.value = s
+}
+
+const isExpItemOpen = (table, cat, name) => {
+  return expandedExpItems.value.has(expItemKey(table, cat, name))
+}
+
+// History ng isang expense item: lahat ng record (per date) na tumutugma
+// sa category + name, naka-sort by date (pinakaluma muna).
+const expenseItemHistory = (category, name) => {
+  const nm = (name || '').trim().toLowerCase()
+  return (dailyBreakdown.value.expenseItems || [])
+    .filter(
+      it =>
+        it.category === category &&
+        (it.name || '').trim().toLowerCase() === nm
+    )
+    .slice()
+    .sort((a, b) =>
+      a.date < b.date ? -1 : a.date > b.date ? 1 : 0
+    )
+}
+
+const mtdExpenseGroups = computed(() => {
+  return groupExpenses(
+    dailyBreakdown.value.expenseItems || [],
+    mtdExpSort.value
+  )
+})
+
+const dailyExpenseGroups = computed(() => {
+  return groupExpenses(
+    (dailyBreakdown.value.expenseItems || []).filter(
+      it => it.date === selectedDate.value
+    ),
+    dailyExpSort.value
+  )
+})
+
+const mtdExpenseGrand = computed(() => {
+  return Math.round(
+    mtdExpenseGroups.value.reduce(
+      (s, g) => s + g.subtotal,
+      0
+    ) * 100
+  ) / 100
+})
+
+const dailyExpenseGrand = computed(() => {
+  return Math.round(
+    dailyExpenseGroups.value.reduce(
+      (s, g) => s + g.subtotal,
+      0
+    ) * 100
+  ) / 100
+})
+
+const mtdExpenseGrandQty = computed(() => {
+  return mtdExpenseGroups.value.reduce(
+    (s, g) => s + g.qtyTotal,
+    0
+  )
+})
+
+const dailyExpenseGrandQty = computed(() => {
+  return dailyExpenseGroups.value.reduce(
+    (s, g) => s + g.qtyTotal,
+    0
   )
 })
 
@@ -1398,6 +1718,13 @@ onMounted(() => {
 
               <button
                 type="button"
+                @click="toggleCollapse('mtd-records')"
+                class="px-3 h-9 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-sm font-bold text-gray-700"
+              >{{ isCollapsed('mtd-records') ? 'Show' : 'Hide' }}</button>
+
+              <button
+                v-if="!isCollapsed('mtd-records')"
+                type="button"
                 @click="toggleTableFullscreen"
                 :title="isTableFullscreen ? 'Normal view' : 'Fullscreen view'"
                 :aria-label="isTableFullscreen ? 'Normal view' : 'Fullscreen view'"
@@ -1408,6 +1735,7 @@ onMounted(() => {
             </div>
           </div>
 
+          <template v-if="!isCollapsed('mtd-records')">
           <div
             v-if="breakdownLoading"
             class="py-12 text-center text-gray-500 font-semibold"
@@ -1587,8 +1915,633 @@ onMounted(() => {
 
             </table>
           </div>
+          </template>
 
         </div>
+
+        <!-- ================================================= -->
+        <!-- TOP 20 BEST SELLING -->
+        <!-- ================================================= -->
+
+        <div
+          :class="[
+            'bg-white border border-gray-200 shadow-sm',
+            isFs('mtd-top') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+          ]"
+        >
+          <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 class="font-black text-gray-800">Best Selling</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Lahat ng may benta para sa buwan</p>
+            </div>
+            <div class="flex items-center gap-1 text-xs">
+              <span class="text-gray-400 font-semibold mr-1">Sort by:</span>
+              <button
+                type="button"
+                @click="topSort = 'sales'"
+                :class="[
+                  'px-3 py-1.5 rounded-lg font-bold',
+                  topSort === 'sales' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
+                ]"
+              >Sales</button>
+              <button
+                type="button"
+                @click="topSort = 'qty'"
+                :class="[
+                  'px-3 py-1.5 rounded-lg font-bold',
+                  topSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
+                ]"
+              >Qty</button>
+              <button
+                type="button"
+                @click="toggleCollapse('mtd-top')"
+                class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700"
+              >{{ isCollapsed('mtd-top') ? 'Show' : 'Hide' }}</button>
+              <button
+                v-if="!isCollapsed('mtd-top')"
+                type="button"
+                @click="toggleFullscreen('mtd-top')"
+                :title="isFs('mtd-top') ? 'Normal view' : 'Fullscreen'"
+                class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base"
+              >{{ isFs('mtd-top') ? '🗗' : '⛶' }}</button>
+            </div>
+          </div>
+
+          <template v-if="!isCollapsed('mtd-top')">
+          <div v-if="topMenus.length === 0" class="py-8 text-center text-gray-500 text-sm">
+            Walang data.
+          </div>
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                <tr>
+                  <th class="text-left px-4 py-2 font-bold w-12">#</th>
+                  <th class="text-left px-4 py-2 font-bold">Item</th>
+                  <th class="text-right px-4 py-2 font-bold">Qty Sold</th>
+                  <th class="text-right px-4 py-2 font-bold">Total Sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(m, i) in topMenus"
+                  :key="`top-${m.menuId || m.name}`"
+                  class="border-b border-gray-100"
+                >
+                  <td class="px-4 py-2 font-bold text-gray-400">{{ i + 1 }}</td>
+                  <td class="px-4 py-2 font-bold text-gray-800">{{ m.name }}</td>
+                  <td class="px-4 py-2 text-right text-gray-700">{{ m.qty }}</td>
+                  <td class="px-4 py-2 text-right font-black text-green-700">{{ formatAmount(m.sales) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          </template>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- BOTTOM 20 LEAST / NOT SELLING -->
+        <!-- ================================================= -->
+
+        <div
+          :class="[
+            'bg-white border border-gray-200 shadow-sm',
+            isFs('mtd-bottom') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+          ]"
+        >
+          <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 class="font-black text-gray-800">Top 20 Least / Not Selling</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Pinakakaunti ang benta (kasama ang hindi nabenta)</p>
+            </div>
+            <div class="flex items-center gap-1 text-xs">
+              <span class="text-gray-400 font-semibold mr-1">Sort by:</span>
+              <button
+                type="button"
+                @click="bottomSort = 'sales'"
+                :class="[
+                  'px-3 py-1.5 rounded-lg font-bold',
+                  bottomSort === 'sales' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
+                ]"
+              >Sales</button>
+              <button
+                type="button"
+                @click="bottomSort = 'qty'"
+                :class="[
+                  'px-3 py-1.5 rounded-lg font-bold',
+                  bottomSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
+                ]"
+              >Qty</button>
+              <button
+                type="button"
+                @click="toggleCollapse('mtd-bottom')"
+                class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700"
+              >{{ isCollapsed('mtd-bottom') ? 'Show' : 'Hide' }}</button>
+              <button
+                v-if="!isCollapsed('mtd-bottom')"
+                type="button"
+                @click="toggleFullscreen('mtd-bottom')"
+                :title="isFs('mtd-bottom') ? 'Normal view' : 'Fullscreen'"
+                class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base"
+              >{{ isFs('mtd-bottom') ? '🗗' : '⛶' }}</button>
+            </div>
+          </div>
+
+          <template v-if="!isCollapsed('mtd-bottom')">
+          <div v-if="bottomMenus.length === 0" class="py-8 text-center text-gray-500 text-sm">
+            Walang data.
+          </div>
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                <tr>
+                  <th class="text-left px-4 py-2 font-bold w-12">#</th>
+                  <th class="text-left px-4 py-2 font-bold">Item</th>
+                  <th class="text-right px-4 py-2 font-bold">Qty Sold</th>
+                  <th class="text-right px-4 py-2 font-bold">Total Sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(m, i) in bottomMenus"
+                  :key="`bottom-${m.menuId || m.name}`"
+                  class="border-b border-gray-100"
+                >
+                  <td class="px-4 py-2 font-bold text-gray-400">{{ i + 1 }}</td>
+                  <td class="px-4 py-2 font-bold text-gray-800">{{ m.name }}</td>
+                  <td class="px-4 py-2 text-right text-gray-700">{{ m.qty }}</td>
+                  <td class="px-4 py-2 text-right font-black text-gray-700">{{ formatAmount(m.sales) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          </template>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- MTD EXPENSES BREAKDOWN BY CATEGORY -->
+        <!-- ================================================= -->
+
+        <div
+          :class="[
+            'bg-white border border-gray-200 shadow-sm',
+            isFs('mtd-exp') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+          ]"
+        >
+          <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 class="font-black text-gray-800">Expenses Breakdown</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Per category para sa buwan (i-click ang category para sa detalye)</p>
+            </div>
+            <div class="flex items-center gap-1 text-xs">
+              <template v-if="!isCollapsed('mtd-exp')">
+                <span class="text-gray-400 font-semibold mr-1">Sort items:</span>
+                <button type="button" @click="mtdExpSort = 'cost'" :class="['px-3 py-1.5 rounded-lg font-bold', mtdExpSort === 'cost' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Cost</button>
+                <button type="button" @click="mtdExpSort = 'qty'" :class="['px-3 py-1.5 rounded-lg font-bold', mtdExpSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+              </template>
+              <button
+                type="button"
+                @click="toggleCollapse('mtd-exp')"
+                class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700"
+              >{{ isCollapsed('mtd-exp') ? 'Show' : 'Hide' }}</button>
+              <button
+                v-if="!isCollapsed('mtd-exp')"
+                type="button"
+                @click="toggleFullscreen('mtd-exp')"
+                :title="isFs('mtd-exp') ? 'Normal view' : 'Fullscreen'"
+                class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base"
+              >{{ isFs('mtd-exp') ? '🗗' : '⛶' }}</button>
+            </div>
+          </div>
+
+          <template v-if="!isCollapsed('mtd-exp')">
+            <div v-if="mtdExpenseGroups.length === 0" class="py-8 text-center text-gray-500 text-sm">
+              Walang expenses para sa buwan.
+            </div>
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                  <tr>
+                    <th class="text-left px-4 py-2 font-bold">Category / Item</th>
+                    <th class="text-right px-4 py-2 font-bold">Qty</th>
+                    <th class="text-right px-4 py-2 font-bold">Cost (Total)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template v-for="g in mtdExpenseGroups" :key="`mexp-${g.category}`">
+                    <tr
+                      class="bg-gray-50 border-t border-gray-200 cursor-pointer hover:bg-gray-100"
+                      @click="toggleExpCat('mtd-exp', g.category)"
+                    >
+                      <td class="px-4 py-2 font-black text-gray-800">
+                        <span class="inline-block w-4 text-gray-500">{{ isExpCatOpen('mtd-exp', g.category) ? '▾' : '▸' }}</span>
+                        {{ g.label }}
+                        <span class="text-xs font-semibold text-gray-400">({{ g.items.length }})</span>
+                      </td>
+                      <td class="px-4 py-2 text-right font-black text-gray-800">{{ g.qtyTotal }}</td>
+                      <td class="px-4 py-2 text-right font-black text-gray-800">{{ formatAmount(g.subtotal) }}</td>
+                    </tr>
+                    <template
+                      v-for="(it, i) in (isExpCatOpen('mtd-exp', g.category) ? g.items : [])"
+                      :key="`mexp-${g.category}-${i}`"
+                    >
+                      <tr
+                        class="border-b border-gray-100 cursor-pointer hover:bg-blue-50/40"
+                        @click="toggleExpItem('mtd-exp', g.category, it.name)"
+                      >
+                        <td class="pl-10 pr-4 py-1.5 text-gray-600">
+                          <span class="inline-block w-3 text-[10px] text-gray-400">{{ isExpItemOpen('mtd-exp', g.category, it.name) ? '▾' : '▸' }}</span>
+                          {{ it.name }}
+                        </td>
+                        <td class="px-4 py-1.5 text-right text-gray-700">{{ it.qty }}</td>
+                        <td class="px-4 py-1.5 text-right text-gray-700">{{ formatAmount(it.amount) }}</td>
+                      </tr>
+                      <tr v-if="isExpItemOpen('mtd-exp', g.category, it.name)" class="bg-blue-50/30 border-b border-gray-100">
+                        <td colspan="3" class="px-4 py-2">
+                          <p class="pl-12 text-[11px] font-black text-gray-500 uppercase tracking-wide mb-1">History — per date na binili</p>
+                          <table class="w-full text-xs">
+                            <thead>
+                              <tr class="text-gray-400">
+                                <th class="text-left pl-12 pr-4 py-1 font-semibold">Date</th>
+                                <th class="text-right px-4 py-1 font-semibold">Qty</th>
+                                <th class="text-right px-4 py-1 font-semibold">Cost</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="(h, hi) in expenseItemHistory(g.category, it.name)"
+                                :key="`mhist-${g.category}-${i}-${hi}`"
+                                class="border-t border-gray-100"
+                              >
+                                <td class="text-left pl-12 pr-4 py-1 text-gray-600">
+                                  {{ shortDate(h.date) }}
+                                  <span class="text-gray-400">({{ dayName(h.date) }})</span>
+                                </td>
+                                <td class="text-right px-4 py-1 text-gray-600">
+                                  {{ h.qty }}<span v-if="h.unit" class="text-gray-400"> {{ h.unit }}</span>
+                                </td>
+                                <td class="text-right px-4 py-1 text-gray-600">{{ formatAmount(h.amount) }}</td>
+                              </tr>
+                            </tbody>
+                            <tfoot>
+                              <tr class="border-t border-gray-200 font-bold text-gray-700">
+                                <td class="text-left pl-12 pr-4 py-1">Total</td>
+                                <td class="text-right px-4 py-1">{{ it.qty }}</td>
+                                <td class="text-right px-4 py-1">{{ formatAmount(it.amount) }}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </td>
+                      </tr>
+                    </template>
+                  </template>
+                </tbody>
+                <tfoot class="border-t-2 border-gray-300 bg-gray-50">
+                  <tr>
+                    <td class="px-4 py-2 font-black text-gray-800">GRAND TOTAL</td>
+                    <td class="px-4 py-2 text-right font-black text-gray-800">{{ mtdExpenseGrandQty }}</td>
+                    <td class="px-4 py-2 text-right font-black text-gray-800">{{ formatAmount(mtdExpenseGrand) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </template>
+        </div>
+
+      </template>
+
+      <!-- ================================================= -->
+      <!-- DAILY: SUMMARY (tugma sa MTD total fields) -->
+      <!-- ================================================= -->
+
+      <template
+        v-else-if="activePeriod === 'Daily'"
+      >
+
+        <div
+          v-if="breakdownError"
+          class="bg-red-100 text-red-700 border border-red-200 rounded-xl p-4 text-sm font-medium"
+        >
+          {{ breakdownError }}
+        </div>
+
+        <div
+          v-if="breakdownLoading"
+          class="bg-white border border-gray-200 rounded-2xl p-12 text-center text-gray-500 font-semibold"
+        >
+          Loading...
+        </div>
+
+        <template v-else>
+
+          <!-- Period info -->
+          <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+            <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">
+              Daily Report
+            </p>
+            <p class="text-lg font-black text-gray-800 mt-1">
+              {{ formatDateOnly(selectedDate) }}
+              <span class="text-sm font-semibold text-gray-500">
+                ({{ dayName(selectedDate) }})
+              </span>
+            </p>
+          </div>
+
+          <!-- Headline: Sales / Expenses / Profit -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Sales</p>
+              <p class="text-2xl font-black text-green-600 mt-2">
+                {{ formatAmount(dailyRow ? dailyRow.sales : 0) }}
+              </p>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Total Expenses</p>
+              <p class="text-2xl font-black text-gray-800 mt-2">
+                {{ formatAmount(dailyRow ? dailyRow.totalExpenses : 0) }}
+              </p>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Profit</p>
+              <p
+                class="text-2xl font-black mt-2"
+                :class="(dailyRow ? dailyRow.profit : 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+              >
+                {{ formatAmount(dailyRow ? dailyRow.profit : 0) }}
+              </p>
+            </div>
+          </div>
+
+          <!-- +/- Balance (editable) -->
+          <div
+            v-if="dailyRow"
+            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4"
+          >
+            <div>
+              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">+/- Balance</p>
+              <p class="text-xs text-gray-400 mt-1">
+                Cash audit adjustment — (−) kulang, (+) sobra. Kasama sa Profit.
+              </p>
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              :value="dailyRow.balance"
+              @change="saveDailyBalance(dailyRow, $event.target.value)"
+              :class="[
+                'w-32 text-right px-3 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-500 font-bold',
+                Number(dailyRow.balance) < 0
+                  ? 'border-red-300 text-red-600'
+                  : Number(dailyRow.balance) > 0
+                    ? 'border-green-300 text-green-700'
+                    : 'border-gray-200 text-gray-600'
+              ]"
+              placeholder="0.00"
+            />
+          </div>
+
+          <!-- Expense breakdown -->
+          <div class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <p class="text-sm font-black text-gray-700 mb-3">Expense Breakdown</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div v-for="e in [
+                { label: 'Ingredients', key: 'ingredients' },
+                { label: 'Material', key: 'materials' },
+                { label: 'Maintenance', key: 'maintenance' },
+                { label: 'Miscellaneous', key: 'miscellaneous' },
+                { label: 'Labor', key: 'labor' },
+                { label: 'Bills', key: 'bills' }
+              ]" :key="e.key" class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ e.label }}</p>
+                <p class="text-lg font-black text-gray-800 mt-1">
+                  {{ formatAmount(dailyRow ? dailyRow[e.key] : 0) }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Orders -->
+          <div class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <p class="text-sm font-black text-gray-700 mb-3">Orders</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Order Qty</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ dailyRow ? dailyRow.orderQty : 0 }}</p>
+              </div>
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Dine-in (ct)</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ dailyRow ? dailyRow.dineInCount : 0 }}</p>
+              </div>
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Take-out (ct)</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ dailyRow ? dailyRow.takeOutCount : 0 }}</p>
+              </div>
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Delivery (ct)</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ dailyRow ? dailyRow.deliveryCount : 0 }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sales by type + Refund/Discount -->
+          <div class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <p class="text-sm font-black text-gray-700 mb-3">Sales by Type</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Dine-in</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ formatAmount(dailyRow ? dailyRow.dineInSales : 0) }}</p>
+              </div>
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Take-out</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ formatAmount(dailyRow ? dailyRow.takeOutSales : 0) }}</p>
+              </div>
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Delivery</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ formatAmount(dailyRow ? dailyRow.deliverySales : 0) }}</p>
+              </div>
+              <div class="rounded-xl bg-gray-50 p-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Refund/Discount</p>
+                <p class="text-lg font-black text-gray-800 mt-1">{{ formatAmount(dailyRow ? dailyRow.refundDiscount : 0) }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- DAILY BEST SELLING -->
+          <div
+            :class="[
+              'bg-white border border-gray-200 shadow-sm',
+              isFs('daily-top') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+            ]"
+          >
+            <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 class="font-black text-gray-800">Best Selling (araw na ito)</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Lahat ng may benta sa {{ formatDateOnly(selectedDate) }}</p>
+              </div>
+              <div class="flex items-center gap-1 text-xs">
+                <span class="text-gray-400 font-semibold mr-1">Sort by:</span>
+                <button type="button" @click="dailyTopSort = 'sales'" :class="['px-3 py-1.5 rounded-lg font-bold', dailyTopSort === 'sales' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Sales</button>
+                <button type="button" @click="dailyTopSort = 'qty'" :class="['px-3 py-1.5 rounded-lg font-bold', dailyTopSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+                <button type="button" @click="toggleCollapse('daily-top')" class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700">{{ isCollapsed('daily-top') ? 'Show' : 'Hide' }}</button>
+                <button v-if="!isCollapsed('daily-top')" type="button" @click="toggleFullscreen('daily-top')" :title="isFs('daily-top') ? 'Normal view' : 'Fullscreen'" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base">{{ isFs('daily-top') ? '🗗' : '⛶' }}</button>
+              </div>
+            </div>
+            <template v-if="!isCollapsed('daily-top')">
+            <div v-if="dailyTopMenus.length === 0" class="py-8 text-center text-gray-500 text-sm">Walang data.</div>
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                  <tr>
+                    <th class="text-left px-4 py-2 font-bold w-12">#</th>
+                    <th class="text-left px-4 py-2 font-bold">Item</th>
+                    <th class="text-right px-4 py-2 font-bold">Qty Sold</th>
+                    <th class="text-right px-4 py-2 font-bold">Total Sales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(m, i) in dailyTopMenus" :key="`dtop-${m.menuId || m.name}`" class="border-b border-gray-100">
+                    <td class="px-4 py-2 font-bold text-gray-400">{{ i + 1 }}</td>
+                    <td class="px-4 py-2 font-bold text-gray-800">{{ m.name }}</td>
+                    <td class="px-4 py-2 text-right text-gray-700">{{ m.qty }}</td>
+                    <td class="px-4 py-2 text-right font-black text-green-700">{{ formatAmount(m.sales) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            </template>
+          </div>
+
+          <!-- DAILY TOP 20 LEAST / NOT SELLING -->
+          <div
+            :class="[
+              'bg-white border border-gray-200 shadow-sm',
+              isFs('daily-bottom') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+            ]"
+          >
+            <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 class="font-black text-gray-800">Top 20 Least / Not Selling (araw na ito)</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Pinakakaunti/walang benta sa {{ formatDateOnly(selectedDate) }}</p>
+              </div>
+              <div class="flex items-center gap-1 text-xs">
+                <span class="text-gray-400 font-semibold mr-1">Sort by:</span>
+                <button type="button" @click="dailyBottomSort = 'sales'" :class="['px-3 py-1.5 rounded-lg font-bold', dailyBottomSort === 'sales' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Sales</button>
+                <button type="button" @click="dailyBottomSort = 'qty'" :class="['px-3 py-1.5 rounded-lg font-bold', dailyBottomSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+                <button type="button" @click="toggleCollapse('daily-bottom')" class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700">{{ isCollapsed('daily-bottom') ? 'Show' : 'Hide' }}</button>
+                <button v-if="!isCollapsed('daily-bottom')" type="button" @click="toggleFullscreen('daily-bottom')" :title="isFs('daily-bottom') ? 'Normal view' : 'Fullscreen'" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base">{{ isFs('daily-bottom') ? '🗗' : '⛶' }}</button>
+              </div>
+            </div>
+            <template v-if="!isCollapsed('daily-bottom')">
+            <div v-if="dailyBottomMenus.length === 0" class="py-8 text-center text-gray-500 text-sm">Walang data.</div>
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                  <tr>
+                    <th class="text-left px-4 py-2 font-bold w-12">#</th>
+                    <th class="text-left px-4 py-2 font-bold">Item</th>
+                    <th class="text-right px-4 py-2 font-bold">Qty Sold</th>
+                    <th class="text-right px-4 py-2 font-bold">Total Sales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(m, i) in dailyBottomMenus" :key="`dbot-${m.menuId || m.name}`" class="border-b border-gray-100">
+                    <td class="px-4 py-2 font-bold text-gray-400">{{ i + 1 }}</td>
+                    <td class="px-4 py-2 font-bold text-gray-800">{{ m.name }}</td>
+                    <td class="px-4 py-2 text-right text-gray-700">{{ m.qty }}</td>
+                    <td class="px-4 py-2 text-right font-black text-gray-700">{{ formatAmount(m.sales) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            </template>
+          </div>
+
+          <!-- ================================================= -->
+          <!-- DAILY EXPENSES BREAKDOWN BY CATEGORY -->
+          <!-- ================================================= -->
+
+          <div
+            :class="[
+              'bg-white border border-gray-200 shadow-sm',
+              isFs('daily-exp') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+            ]"
+          >
+            <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 class="font-black text-gray-800">Expenses Breakdown</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Per category para sa araw na ito (i-click ang category para sa detalye)</p>
+              </div>
+              <div class="flex items-center gap-1 text-xs">
+                <template v-if="!isCollapsed('daily-exp')">
+                  <span class="text-gray-400 font-semibold mr-1">Sort items:</span>
+                  <button type="button" @click="dailyExpSort = 'cost'" :class="['px-3 py-1.5 rounded-lg font-bold', dailyExpSort === 'cost' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Cost</button>
+                  <button type="button" @click="dailyExpSort = 'qty'" :class="['px-3 py-1.5 rounded-lg font-bold', dailyExpSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+                </template>
+                <button
+                  type="button"
+                  @click="toggleCollapse('daily-exp')"
+                  class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700"
+                >{{ isCollapsed('daily-exp') ? 'Show' : 'Hide' }}</button>
+                <button
+                  v-if="!isCollapsed('daily-exp')"
+                  type="button"
+                  @click="toggleFullscreen('daily-exp')"
+                  :title="isFs('daily-exp') ? 'Normal view' : 'Fullscreen'"
+                  class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base"
+                >{{ isFs('daily-exp') ? '🗗' : '⛶' }}</button>
+              </div>
+            </div>
+
+            <template v-if="!isCollapsed('daily-exp')">
+              <div v-if="dailyExpenseGroups.length === 0" class="py-8 text-center text-gray-500 text-sm">
+                Walang expenses sa araw na ito.
+              </div>
+              <div v-else class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                    <tr>
+                      <th class="text-left px-4 py-2 font-bold">Category / Item</th>
+                      <th class="text-right px-4 py-2 font-bold">Qty</th>
+                      <th class="text-right px-4 py-2 font-bold">Cost (Total)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template v-for="g in dailyExpenseGroups" :key="`dexp-${g.category}`">
+                      <tr
+                        class="bg-gray-50 border-t border-gray-200 cursor-pointer hover:bg-gray-100"
+                        @click="toggleExpCat('daily-exp', g.category)"
+                      >
+                        <td class="px-4 py-2 font-black text-gray-800">
+                          <span class="inline-block w-4 text-gray-500">{{ isExpCatOpen('daily-exp', g.category) ? '▾' : '▸' }}</span>
+                          {{ g.label }}
+                          <span class="text-xs font-semibold text-gray-400">({{ g.items.length }})</span>
+                        </td>
+                        <td class="px-4 py-2 text-right font-black text-gray-800">{{ g.qtyTotal }}</td>
+                        <td class="px-4 py-2 text-right font-black text-gray-800">{{ formatAmount(g.subtotal) }}</td>
+                      </tr>
+                      <tr
+                        v-for="(it, i) in (isExpCatOpen('daily-exp', g.category) ? g.items : [])"
+                        :key="`dexp-${g.category}-${i}`"
+                        class="border-b border-gray-100"
+                      >
+                        <td class="pl-10 pr-4 py-1.5 text-gray-600">{{ it.name }}</td>
+                        <td class="px-4 py-1.5 text-right text-gray-700">{{ it.qty }}</td>
+                        <td class="px-4 py-1.5 text-right text-gray-700">{{ formatAmount(it.amount) }}</td>
+                      </tr>
+                    </template>
+                  </tbody>
+                  <tfoot class="border-t-2 border-gray-300 bg-gray-50">
+                    <tr>
+                      <td class="px-4 py-2 font-black text-gray-800">GRAND TOTAL</td>
+                      <td class="px-4 py-2 text-right font-black text-gray-800">{{ dailyExpenseGrandQty }}</td>
+                      <td class="px-4 py-2 text-right font-black text-gray-800">{{ formatAmount(dailyExpenseGrand) }}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </template>
+          </div>
+
+        </template>
 
       </template>
 

@@ -4639,6 +4639,187 @@ const unpaidBillAmount =
   })
 
 // =====================================================
+// MERGE / RENAME EXPENSE ITEMS (admin)
+// Pagsamahin ang magkaparehong item na magkaiba ang spelling
+// (hal. "jowls" at "porkjowls") papunta sa iisang canonical name.
+// =====================================================
+
+const MERGE_CATEGORIES = [
+  { value: 'Ingredient', label: 'Ingredients' },
+  { value: 'Material', label: 'Material' },
+  { value: 'Maintenance', label: 'Maintenance' },
+  { value: 'Miscellaneous', label: 'Miscellaneous' },
+  { value: 'Labor', label: 'Labor Cost' },
+  { value: 'Bill', label: 'Bills' }
+]
+
+const isMergeModalOpen = ref(false)
+const mergeCategory = ref('Ingredient')
+const mergeNames = ref([])
+const mergeLoading = ref(false)
+const mergeSelected = ref([])
+const mergeTarget = ref('')
+const mergeSaving = ref(false)
+const mergeMessage = ref('')
+const mergeError = ref('')
+const mergeSearch = ref('')
+
+// Naka-filter na listahan base sa search (substring, case-insensitive).
+const filteredMergeNames = computed(() => {
+  const q = mergeSearch.value.trim().toLowerCase()
+
+  if (!q) return mergeNames.value
+
+  return mergeNames.value.filter(n =>
+    (n.name || '').toLowerCase().includes(q)
+  )
+})
+
+const openMergeModal = async () => {
+  isMergeModalOpen.value = true
+  mergeSelected.value = []
+  mergeTarget.value = ''
+  mergeMessage.value = ''
+  mergeError.value = ''
+  mergeSearch.value = ''
+  await fetchMergeNames()
+}
+
+const closeMergeModal = () => {
+  isMergeModalOpen.value = false
+}
+
+const fetchMergeNames = async () => {
+  mergeLoading.value = true
+  mergeError.value = ''
+
+  try {
+    const params = new URLSearchParams()
+
+    if (mergeCategory.value) {
+      params.set('category', mergeCategory.value)
+    }
+
+    const res = await fetch(
+      `${API}/expenses/item-names?${params.toString()}`,
+      { headers: { ...getAuthHeaders() } }
+    )
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      throw new Error(
+        data?.message || 'Failed to load item names.'
+      )
+    }
+
+    mergeNames.value = Array.isArray(data?.items)
+      ? data.items
+      : []
+  } catch (err) {
+    mergeNames.value = []
+    mergeError.value =
+      err.message || 'Failed to load item names.'
+  } finally {
+    mergeLoading.value = false
+  }
+}
+
+const onMergeCategoryChange = async () => {
+  mergeSelected.value = []
+  mergeTarget.value = ''
+  mergeMessage.value = ''
+  mergeSearch.value = ''
+  await fetchMergeNames()
+}
+
+const isMergeSelected = name =>
+  mergeSelected.value.includes(name)
+
+const toggleMergeSelect = name => {
+  const i = mergeSelected.value.indexOf(name)
+
+  if (i >= 0) {
+    mergeSelected.value.splice(i, 1)
+  } else {
+    mergeSelected.value.push(name)
+  }
+
+  // Auto-suggest ang unang napili bilang target kung wala pa.
+  if (
+    !mergeTarget.value &&
+    mergeSelected.value.length
+  ) {
+    mergeTarget.value = mergeSelected.value[0]
+  }
+}
+
+const useAsTarget = name => {
+  mergeTarget.value = name
+}
+
+const submitMerge = async () => {
+  mergeError.value = ''
+  mergeMessage.value = ''
+
+  const toName = (mergeTarget.value || '').trim()
+
+  if (!toName) {
+    mergeError.value =
+      'Pumili o mag-type ng target na item name.'
+    return
+  }
+
+  const sources = mergeSelected.value.filter(
+    n => n !== toName
+  )
+
+  if (sources.length === 0) {
+    mergeError.value =
+      'Pumili ng kahit isang item na isasama (iba sa target).'
+    return
+  }
+
+  mergeSaving.value = true
+
+  try {
+    const res = await fetch(
+      `${API}/expenses/merge-items`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({
+          category: mergeCategory.value,
+          toName,
+          fromNames: sources
+        })
+      }
+    )
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      throw new Error(data?.message || 'Merge failed.')
+    }
+
+    mergeMessage.value =
+      `${data.message} (${data.recordsUpdated} record/s ang na-update)`
+    mergeSelected.value = []
+    mergeTarget.value = ''
+
+    await fetchMergeNames()
+    await fetchExpenses()
+  } catch (err) {
+    mergeError.value = err.message || 'Merge failed.'
+  } finally {
+    mergeSaving.value = false
+  }
+}
+
+// =====================================================
 // FORMAT
 // =====================================================
 
@@ -5278,18 +5459,29 @@ onMounted(async () => {
     <!-- PAGE TITLE -->
     <!-- ================================================= -->
 
-    <div>
-      <h1
-        class="text-2xl font-bold text-blue-800 flex items-center gap-2"
-      >
-        💰 Expenses
-      </h1>
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1
+          class="text-2xl font-bold text-blue-800 flex items-center gap-2"
+        >
+          💰 Expenses
+        </h1>
 
-      <p
-        class="text-sm text-gray-500 mt-1"
+        <p
+          class="text-sm text-gray-500 mt-1"
+        >
+          Record and monitor business expenses.
+        </p>
+      </div>
+
+      <button
+        v-if="isAdmin"
+        type="button"
+        @click="openMergeModal"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
       >
-        Record and monitor business expenses.
-      </p>
+        🔀 Merge / Rename Items
+      </button>
     </div>
 
     <!-- ================================================= -->
@@ -7527,6 +7719,149 @@ onMounted(async () => {
 
       </div>
 
+    </div>
+
+    <!-- ================================================= -->
+    <!-- MERGE / RENAME ITEMS MODAL (admin) -->
+    <!-- ================================================= -->
+
+    <div
+      v-if="isMergeModalOpen"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      @click.self="closeMergeModal"
+    >
+      <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+        <div class="bg-amber-600 text-white px-5 py-4 shrink-0">
+          <div class="text-lg font-bold">🔀 Merge / Rename Items</div>
+          <div class="text-sm text-amber-100 mt-1">
+            Pagsamahin ang magkaparehong item na magkaiba ang spelling papunta sa iisang pangalan.
+          </div>
+        </div>
+
+        <div class="p-5 space-y-4 overflow-y-auto">
+
+          <!-- Category picker -->
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Category</label>
+            <select
+              v-model="mergeCategory"
+              @change="onMergeCategoryChange"
+              class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            >
+              <option v-for="c in MERGE_CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+            </select>
+          </div>
+
+          <!-- Distinct names list -->
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+              Piliin ang mga item na pagsasamahin
+            </label>
+
+            <!-- Search -->
+            <div class="relative mb-2">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+              <input
+                v-model="mergeSearch"
+                type="text"
+                placeholder="Hanapin... (hal. jowls)"
+                class="w-full border border-gray-300 rounded-xl pl-9 pr-8 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <button
+                v-if="mergeSearch"
+                type="button"
+                @click="mergeSearch = ''"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+              >✕</button>
+            </div>
+
+            <div v-if="mergeLoading" class="py-6 text-center text-gray-400 text-sm">Loading...</div>
+
+            <div v-else-if="mergeNames.length === 0" class="py-6 text-center text-gray-400 text-sm">
+              Walang item sa category na ito.
+            </div>
+
+            <div v-else-if="filteredMergeNames.length === 0" class="py-6 text-center text-gray-400 text-sm">
+              Walang tugma sa "{{ mergeSearch }}".
+            </div>
+
+            <div v-else class="border border-gray-200 rounded-xl divide-y divide-gray-100 max-h-56 overflow-y-auto">
+              <label
+                v-for="n in filteredMergeNames"
+                :key="n.name"
+                class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-amber-50/60"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isMergeSelected(n.name)"
+                  @change="toggleMergeSelect(n.name)"
+                  class="w-4 h-4 accent-amber-600"
+                />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold text-gray-800 truncate">{{ n.name }}</p>
+                  <p class="text-[11px] text-gray-400">{{ n.count }} record/s · qty {{ n.totalQty }} · {{ fmtAmount(n.totalCost) }}</p>
+                </div>
+                <button
+                  type="button"
+                  @click.prevent="useAsTarget(n.name)"
+                  :class="[
+                    'text-[11px] font-bold px-2 py-1 rounded-lg border',
+                    mergeTarget === n.name
+                      ? 'bg-amber-600 text-white border-amber-600'
+                      : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'
+                  ]"
+                >
+                  {{ mergeTarget === n.name ? '✓ Target' : 'Gawing target' }}
+                </button>
+              </label>
+            </div>
+          </div>
+
+          <!-- Target name -->
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+              Canonical name (target)
+            </label>
+            <input
+              v-model="mergeTarget"
+              type="text"
+              placeholder="Hal. Pork Jowls"
+              class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+            <p class="text-[11px] text-gray-400 mt-1">
+              Lahat ng napiling item na iba sa target ay ipapangalan sa target na ito.
+            </p>
+          </div>
+
+          <div v-if="mergeError" class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 py-2 text-sm">
+            {{ mergeError }}
+          </div>
+          <div v-if="mergeMessage" class="bg-green-50 border border-green-200 text-green-700 rounded-xl px-3 py-2 text-sm">
+            {{ mergeMessage }}
+          </div>
+        </div>
+
+        <div class="flex gap-2 p-5 pt-0 shrink-0">
+          <button
+            type="button"
+            @click="closeMergeModal"
+            :disabled="mergeSaving"
+            class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-colors disabled:opacity-50"
+          >
+            Isara
+          </button>
+          <button
+            type="button"
+            @click="submitMerge"
+            :disabled="mergeSaving"
+            class="flex-1 px-4 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold transition-colors disabled:opacity-50"
+          >
+            {{ mergeSaving ? 'Merging...' : 'Merge Items' }}
+          </button>
+        </div>
+
+      </div>
     </div>
 
   </div>
