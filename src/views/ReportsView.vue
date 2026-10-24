@@ -46,8 +46,20 @@ const dailyBreakdown = ref({
   expenseItems: []
 })
 
+// YTD — per-buwan na breakdown (Jan hanggang current month).
+const yearBreakdown = ref({
+  year: '',
+  rows: [],
+  totals: null,
+  menuSales: [],
+  menuSalesByMonth: {},
+  expenseItems: []
+})
+
 const breakdownLoading = ref(false)
 const breakdownError = ref('')
+const yearBreakdownLoading = ref(false)
+const yearBreakdownError = ref('')
 
 // Sort order ng Top/Bottom menu tables: 'sales' (default) o 'qty'.
 const topSort = ref('sales')
@@ -56,6 +68,10 @@ const bottomSort = ref('sales')
 // Daily (per-araw) menu table sort.
 const dailyTopSort = ref('sales')
 const dailyBottomSort = ref('sales')
+
+// YTD overall sales sort + expenses sort.
+const yearOverallSort = ref('sales')
+const yearExpSort = ref('cost')
 
 // Fullscreen view ng MTD records table (pseudo-fullscreen overlay).
 const isTableFullscreen = ref(false)
@@ -806,6 +822,75 @@ const fetchCashAudit = async () => {
 
 /*
 |--------------------------------------------------------------------------
+| Import Historical (Excel upload)
+|--------------------------------------------------------------------------
+*/
+
+const isImportModalOpen = ref(false)
+const importFile = ref(null)
+const importFileName = ref('')
+const importing = ref(false)
+const importResult = ref(null)
+const importError = ref('')
+
+const openImportModal = () => {
+  isImportModalOpen.value = true
+  importFile.value = null
+  importFileName.value = ''
+  importResult.value = null
+  importError.value = ''
+}
+
+const closeImportModal = () => {
+  isImportModalOpen.value = false
+}
+
+const onImportFileChange = e => {
+  const f = e.target.files && e.target.files[0]
+  importFile.value = f || null
+  importFileName.value = f ? f.name : ''
+  importResult.value = null
+  importError.value = ''
+}
+
+const submitImport = async () => {
+  if (!importFile.value) {
+    importError.value = 'Pumili muna ng Excel file.'
+    return
+  }
+
+  importing.value = true
+  importError.value = ''
+  importResult.value = null
+
+  try {
+    const form = new FormData()
+    form.append('file', importFile.value)
+
+    const res = await axios.post(
+      `${API}/reports/import-historical`,
+      form,
+      { headers: getAuthHeaders() }
+    )
+
+    importResult.value = res.data
+    importFile.value = null
+    importFileName.value = ''
+
+    // I-refresh ang reports para lumabas agad ang na-import.
+    await fetchReports()
+  } catch (err) {
+    importError.value =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to import.'
+  } finally {
+    importing.value = false
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
 | Fetch Reports
 |--------------------------------------------------------------------------
 */
@@ -882,6 +967,8 @@ const fetchReports = async () => {
     await fetchCashAudit()
 
     await fetchDailyBreakdown()
+
+    await fetchYearBreakdown()
 
   } catch (err) {
     console.error(
@@ -996,6 +1083,74 @@ const fetchDailyBreakdown = async () => {
   }
 }
 
+const fetchYearBreakdown = async () => {
+  if (!selectedDate.value || !isAdmin.value) {
+    return
+  }
+
+  yearBreakdownLoading.value = true
+  yearBreakdownError.value = ''
+
+  try {
+    const year =
+      selectedDate.value.slice(0, 4)
+
+    const response =
+      await axios.get(
+        `${API}/reports/year-breakdown`,
+        {
+          params: { year },
+          headers: getAuthHeaders()
+        }
+      )
+
+    yearBreakdown.value = {
+      year:
+        response.data?.year || year,
+      rows:
+        Array.isArray(response.data?.rows)
+          ? response.data.rows
+          : [],
+      totals:
+        response.data?.totals || null,
+      menuSales:
+        Array.isArray(response.data?.menuSales)
+          ? response.data.menuSales
+          : [],
+      menuSalesByMonth:
+        response.data?.menuSalesByMonth &&
+        typeof response.data.menuSalesByMonth === 'object'
+          ? response.data.menuSalesByMonth
+          : {},
+      expenseItems:
+        Array.isArray(response.data?.expenseItems)
+          ? response.data.expenseItems
+          : []
+    }
+  } catch (err) {
+    console.error(
+      'fetchYearBreakdown error:',
+      err
+    )
+
+    yearBreakdown.value = {
+      year: '',
+      rows: [],
+      totals: null,
+      menuSales: [],
+      menuSalesByMonth: {},
+      expenseItems: []
+    }
+
+    yearBreakdownError.value =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to load year breakdown.'
+  } finally {
+    yearBreakdownLoading.value = false
+  }
+}
+
 /*
 |--------------------------------------------------------------------------
 | Table helpers (per-day records)
@@ -1022,6 +1177,55 @@ const shortDate = dateStr => {
     day: 'numeric'
   }).format(
     new Date(`${dateStr}T00:00:00+08:00`)
+  )
+}
+
+// 'YYYY-MM' → 'Jan 2026' (para sa YTD per-buwan na rows).
+const monthLabel = monthStr => {
+  if (!monthStr) return ''
+
+  const [y, m] = String(monthStr).split('-')
+
+  if (!y || !m) return monthStr
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    year: 'numeric'
+  }).format(
+    new Date(`${y}-${m}-01T00:00:00+08:00`)
+  )
+}
+
+// 'YYYY-MM' → 'Jan' (maikling buwan para sa chart axis).
+const monthShort = monthStr => {
+  if (!monthStr) return ''
+
+  const [y, m] = String(monthStr).split('-')
+
+  if (!y || !m) return monthStr
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'short'
+  }).format(
+    new Date(`${y}-${m}-01T00:00:00+08:00`)
+  )
+}
+
+// 'YYYY-MM' → 'January' (pangalan lang ng buwan).
+const monthName = monthStr => {
+  if (!monthStr) return ''
+
+  const [y, m] = String(monthStr).split('-')
+
+  if (!y || !m) return monthStr
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'long'
+  }).format(
+    new Date(`${y}-${m}-01T00:00:00+08:00`)
   )
 }
 
@@ -1339,6 +1543,206 @@ const dailyAverage = computed(() => {
   }
 })
 
+// =====================================================
+// YTD — per-buwan na computeds (mirror ng MTD)
+// =====================================================
+
+const openMonths = computed(() => {
+  return yearBreakdown.value.rows.filter(
+    row => Number(row.sales || 0) > 0
+  )
+})
+
+const monthlyAverage = computed(() => {
+  const months = openMonths.value
+  const n = months.length
+
+  const avg = key =>
+    n
+      ? months.reduce(
+          (sum, row) => sum + Number(row[key] || 0),
+          0
+        ) / n
+      : 0
+
+  return {
+    openMonthCount: n,
+    sales: avg('sales'),
+    totalExpenses: avg('totalExpenses'),
+    balance: avg('balance'),
+    profit: avg('profit'),
+    ingredients: avg('ingredients'),
+    materials: avg('materials'),
+    maintenance: avg('maintenance'),
+    miscellaneous: avg('miscellaneous'),
+    labor: avg('labor'),
+    bills: avg('bills'),
+    orderQty: avg('orderQty'),
+    dineInCount: avg('dineInCount'),
+    takeOutCount: avg('takeOutCount'),
+    deliveryCount: avg('deliveryCount'),
+    dineInSales: avg('dineInSales'),
+    takeOutSales: avg('takeOutSales'),
+    deliverySales: avg('deliverySales'),
+    refundDiscount: avg('refundDiscount')
+  }
+})
+
+// Overall sales record — LAHAT ng items (kasama ang 0 sales), sortable.
+const overallMenus = computed(() => {
+  return sortMenus(
+    yearBreakdown.value.menuSales || [],
+    yearOverallSort.value,
+    'desc'
+  )
+})
+
+// Expand/collapse per item para sa per-month sales performance.
+const expandedYearMenus = ref(new Set())
+
+const yearMenuKey = m =>
+  m.menuId || `name:${m.name}`
+
+const toggleYearMenu = m => {
+  const k = yearMenuKey(m)
+  const s = new Set(expandedYearMenus.value)
+  if (s.has(k)) s.delete(k)
+  else s.add(k)
+  expandedYearMenus.value = s
+}
+
+const isYearMenuOpen = m =>
+  expandedYearMenus.value.has(yearMenuKey(m))
+
+// Per-month na qty + sales ng isang item (Jan..current month ng taon).
+const itemMonthlySeries = m => {
+  const key = yearMenuKey(m)
+
+  return (yearBreakdown.value.rows || []).map(r => {
+    const mk = r.date
+    const arr =
+      yearBreakdown.value.menuSalesByMonth?.[mk] || []
+    const found = arr.find(
+      e => (e.menuId || `name:${e.name}`) === key
+    )
+
+    return {
+      month: mk,
+      qty: found ? Number(found.qty || 0) : 0,
+      sales: found ? Number(found.sales || 0) : 0
+    }
+  })
+}
+
+// Pinakamataas na halaga sa series para sa isang metric key (scaling).
+const seriesMax = (series, key) => {
+  return series.reduce(
+    (mx, p) => Math.max(mx, Number(p[key] || 0)),
+    0
+  )
+}
+
+// Length % ng bar (minimum 2% kapag may halaga para kitang-kita).
+const barPct = (value, max) => {
+  const v = Number(value || 0)
+  if (!max || v <= 0) return 0
+  return Math.max(2, Math.round((v / max) * 100))
+}
+
+// Pinakamababang halaga na > 0 (para sa color scaling).
+const seriesMinPos = (series, key) => {
+  const vals = series
+    .map(p => Number(p[key] || 0))
+    .filter(v => v > 0)
+  return vals.length ? Math.min(...vals) : 0
+}
+
+// Kulay ng bar: GREEN ang pinakamataas, RED ang pinakamababa, at
+// gradient (red -> dilaw -> green) ang mga nasa gitna.
+const barColor = (value, series, key) => {
+  const v = Number(value || 0)
+  if (v <= 0) return 'transparent'
+
+  const max = seriesMax(series, key)
+  const min = seriesMinPos(series, key)
+
+  // Kung iisa lang o pare-pareho ang halaga -> green.
+  if (max <= min) return 'hsl(140 65% 42%)'
+
+  const t = (v - min) / (max - min) // 0 (lowest) .. 1 (highest)
+  const hue = Math.round(t * 130)   // 0 = red, 130 ≈ green
+  return `hsl(${hue} 70% 45%)`
+}
+
+// Metric toggle para sa YTD drill-down charts.
+const ytdSalesMetric = ref('sales')   // Overall Sales Record: 'sales' | 'qty'
+const ytdExpMetric = ref('cost')      // Expenses Breakdown: 'cost' | 'qty'
+
+// Per-month na qty + amount ng isang expense item (Jan..current month).
+const expenseItemMonthlySeries = (category, name) => {
+  const nm = (name || '').trim().toLowerCase()
+  const byMonth = {}
+
+  ;(yearBreakdown.value.expenseItems || []).forEach(it => {
+    if (
+      it.category === category &&
+      (it.name || '').trim().toLowerCase() === nm
+    ) {
+      const mk = String(it.date).slice(0, 7)
+      if (!byMonth[mk]) byMonth[mk] = { qty: 0, amount: 0 }
+      byMonth[mk].qty += Number(it.qty || 1)
+      byMonth[mk].amount += Number(it.amount || 0)
+    }
+  })
+
+  return (yearBreakdown.value.rows || []).map(r => {
+    const e = byMonth[r.date] || { qty: 0, amount: 0 }
+    return {
+      month: r.date,
+      qty: round2(e.qty),
+      amount: round2(e.amount)
+    }
+  })
+}
+
+const yearExpenseGroups = computed(() => {
+  return groupExpenses(
+    yearBreakdown.value.expenseItems || [],
+    yearExpSort.value
+  )
+})
+
+const yearExpenseGrand = computed(() => {
+  return Math.round(
+    yearExpenseGroups.value.reduce(
+      (s, g) => s + g.subtotal,
+      0
+    ) * 100
+  ) / 100
+})
+
+const yearExpenseGrandQty = computed(() => {
+  return yearExpenseGroups.value.reduce(
+    (s, g) => s + g.qtyTotal,
+    0
+  )
+})
+
+// History ng isang YTD expense item (per date na binili sa buong taon).
+const yearExpenseItemHistory = (category, name) => {
+  const nm = (name || '').trim().toLowerCase()
+  return (yearBreakdown.value.expenseItems || [])
+    .filter(
+      it =>
+        it.category === category &&
+        (it.name || '').trim().toLowerCase() === nm
+    )
+    .slice()
+    .sort((a, b) =>
+      a.date < b.date ? -1 : a.date > b.date ? 1 : 0
+    )
+}
+
 // Average ng counts — 1 decimal (hindi currency).
 const fmtAvgCount = n => Number(n || 0).toFixed(1)
 
@@ -1455,6 +1859,22 @@ const handleDateChange = () => {
   fetchReports()
 }
 
+// MTD: month-year picker -> itakda ang selectedDate sa unang araw ng buwan.
+const onMonthChange = e => {
+  const v = e.target.value // 'YYYY-MM'
+  if (!/^\d{4}-\d{2}$/.test(v)) return
+  selectedDate.value = `${v}-01`
+  fetchReports()
+}
+
+// YTD: year picker -> itakda ang selectedDate sa Jan 1 ng taon.
+const onYearChange = e => {
+  const v = String(e.target.value || '').trim()
+  if (!/^\d{4}$/.test(v)) return
+  selectedDate.value = `${v}-01-01`
+  fetchReports()
+}
+
 /*
 |--------------------------------------------------------------------------
 | Period
@@ -1538,6 +1958,14 @@ onMounted(() => {
             Sales, expenses, cash position, and estimated profit.
           </p>
 
+          <button
+            type="button"
+            @click="openImportModal"
+            class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+          >
+            📥 Import Historical (Excel)
+          </button>
+
         </div>
 
         <div
@@ -1547,14 +1975,37 @@ onMounted(() => {
           <label
             class="block text-xs font-bold text-gray-500 mb-1"
           >
-            Report Date
+            {{ activePeriod === 'MTD' ? 'Report Month' : activePeriod === 'YTD' ? 'Report Year' : 'Report Date' }}
           </label>
 
+          <!-- Daily: buong petsa -->
           <input
+            v-if="activePeriod === 'Daily'"
             v-model="selectedDate"
             @change="handleDateChange"
             type="date"
             class="border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-purple-200"
+          />
+
+          <!-- MTD: month-year lang -->
+          <input
+            v-else-if="activePeriod === 'MTD'"
+            :value="(selectedDate || '').slice(0, 7)"
+            @change="onMonthChange"
+            type="month"
+            class="border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-purple-200"
+          />
+
+          <!-- YTD: year lang -->
+          <input
+            v-else
+            :value="(selectedDate || '').slice(0, 4)"
+            @change="onYearChange"
+            type="number"
+            min="2020"
+            max="2100"
+            step="1"
+            class="w-28 border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-purple-200"
           />
 
         </div>
@@ -2546,1852 +2997,465 @@ onMounted(() => {
       </template>
 
       <template
-        v-else-if="activeReport"
+        v-else-if="activePeriod === 'YTD'"
       >
 
-        <!-- PERIOD INFO -->
-
         <div
-          class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm"
+          v-if="yearBreakdownError"
+          class="bg-red-100 text-red-700 border border-red-200 rounded-xl p-4 text-sm font-medium"
         >
-
-          <div
-            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-          >
-
-            <div>
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Reporting Period
-              </p>
-
-              <p
-                class="text-lg font-black text-gray-800 mt-1"
-              >
-                {{ activePeriod }}
-              </p>
-
-            </div>
-
-            <div
-              class="text-sm text-gray-500 sm:text-right"
-            >
-
-              <p>
-                {{
-                  formatDateOnly(
-                    activeReport.start
-                  )
-                }}
-                —
-                {{
-                  formatReportEndDate(
-                    activeReport.end
-                  )
-                }}
-              </p>
-
-            </div>
-
-          </div>
-
+          {{ yearBreakdownError }}
         </div>
 
-        <!-- TOP SUMMARY -->
+        <!-- ================================================= -->
+        <!-- YTD: PER-MONTH RECORDS TABLE -->
+        <!-- ================================================= -->
 
         <div
-          class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+          :class="[
+            'bg-white border border-gray-200 shadow-sm',
+            isFs('ytd-records') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+          ]"
         >
+          <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+            <div>
+              <h2 class="font-black text-gray-800">Year-to-Date Records</h2>
+              <p class="text-xs text-gray-500 mt-0.5">
+                Buwan-buwan na breakdown para sa taong
+                {{ yearBreakdown.year || (selectedDate || '').slice(0, 4) }}
+              </p>
+            </div>
 
-          <!-- NET SALES -->
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-bold text-gray-500 whitespace-nowrap">
+                {{ yearBreakdown.rows.length }} buwan
+              </span>
 
-          <div
-            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-          >
+              <button
+                type="button"
+                @click="toggleCollapse('ytd-records')"
+                class="px-3 h-9 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-sm font-bold text-gray-700"
+              >{{ isCollapsed('ytd-records') ? 'Show' : 'Hide' }}</button>
 
-            <p
-              class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-            >
-              Net Sales
-            </p>
-
-            <p
-              class="text-3xl font-black text-green-600 mt-2"
-            >
-              {{ formatAmount(totalSales) }}
-            </p>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              {{ orderCount }} completed orders
-            </p>
-
+              <button
+                v-if="!isCollapsed('ytd-records')"
+                type="button"
+                @click="toggleFullscreen('ytd-records')"
+                :title="isFs('ytd-records') ? 'Normal view' : 'Fullscreen view'"
+                class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 transition-all text-lg leading-none"
+              >{{ isFs('ytd-records') ? '🗗' : '⛶' }}</button>
+            </div>
           </div>
 
-          <!-- EXPENSES -->
-
+          <template v-if="!isCollapsed('ytd-records')">
           <div
-            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+            v-if="yearBreakdownLoading"
+            class="py-12 text-center text-gray-500 font-semibold"
           >
-
-            <p
-              class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-            >
-              Total Expenses
-            </p>
-
-            <p
-              class="text-3xl font-black text-red-600 mt-2"
-            >
-              {{ formatAmount(totalExpenses) }}
-            </p>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Recorded operating costs
-            </p>
-
+            Loading records...
           </div>
 
-          <!-- PROFIT -->
-
           <div
-            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+            v-else-if="yearBreakdown.rows.length === 0"
+            class="py-12 text-center text-gray-500 font-medium"
           >
-
-            <p
-              class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-            >
-              Estimated Profit
-            </p>
-
-            <p
-              class="text-3xl font-black mt-2"
-              :class="
-                estimatedProfit >= 0
-                  ? 'text-blue-600'
-                  : 'text-red-600'
-              "
-            >
-              {{
-                formatAmount(
-                  estimatedProfit
-                )
-              }}
-            </p>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Net sales less expenses
-            </p>
-
+            Walang records para sa taong ito.
           </div>
 
-          <!-- ORDERS -->
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-xs whitespace-nowrap">
 
-          <div
-            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-          >
+              <thead class="bg-gray-50 border-b border-gray-200 text-gray-600 sticky top-0 z-20">
+                <tr>
+                  <th class="text-left px-3 py-2 font-bold sticky left-0 bg-gray-50 z-30">Month</th>
+                  <th class="text-right px-3 py-2 font-bold">Sales</th>
+                  <th class="text-right px-3 py-2 font-bold">Total Expenses</th>
+                  <th class="text-right px-3 py-2 font-bold">Profit</th>
+                  <th class="text-right px-3 py-2 font-bold">Ingredients</th>
+                  <th class="text-right px-3 py-2 font-bold">Material</th>
+                  <th class="text-right px-3 py-2 font-bold">Maintenance</th>
+                  <th class="text-right px-3 py-2 font-bold">Miscellaneous</th>
+                  <th class="text-right px-3 py-2 font-bold">Labor</th>
+                  <th class="text-right px-3 py-2 font-bold">Bills</th>
+                  <th class="text-right px-3 py-2 font-bold">Order Qty</th>
+                  <th class="text-right px-3 py-2 font-bold">Dine-in (ct)</th>
+                  <th class="text-right px-3 py-2 font-bold">Take-out (ct)</th>
+                  <th class="text-right px-3 py-2 font-bold">Delivery (ct)</th>
+                  <th class="text-right px-3 py-2 font-bold">Dine-in (sales)</th>
+                  <th class="text-right px-3 py-2 font-bold">Take-out (sales)</th>
+                  <th class="text-right px-3 py-2 font-bold">Delivery (sales)</th>
+                  <th class="text-right px-3 py-2 font-bold">Refund/Discount</th>
+                  <th class="text-right px-3 py-2 font-bold">+/- Balance</th>
+                </tr>
+              </thead>
 
-            <p
-              class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-            >
-              Order Count
-            </p>
+              <tbody>
+                <tr
+                  v-for="row in yearBreakdown.rows"
+                  :key="row.date"
+                  class="border-b border-gray-100 hover:bg-blue-50/40"
+                >
+                  <td class="text-left px-3 py-2 font-bold text-gray-800 sticky left-0 bg-white z-10">
+                    {{ monthLabel(row.date) }}
+                  </td>
+                  <td class="text-right px-3 py-2 font-bold text-green-700">{{ formatAmount(row.sales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-700">{{ formatAmount(row.totalExpenses) }}</td>
+                  <td
+                    class="text-right px-3 py-2 font-black"
+                    :class="row.profit >= 0 ? 'text-green-600' : 'text-red-600'"
+                  >
+                    {{ formatAmount(row.profit) }}
+                  </td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.ingredients) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.materials) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.maintenance) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.miscellaneous) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.labor) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.bills) }}</td>
+                  <td class="text-right px-3 py-2 font-bold text-gray-800">{{ row.orderQty }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ row.dineInCount }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ row.takeOutCount }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ row.deliveryCount }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.dineInSales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.takeOutSales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.deliverySales) }}</td>
+                  <td class="text-right px-3 py-2 text-gray-600">{{ formatAmount(row.refundDiscount) }}</td>
+                  <td
+                    class="text-right px-3 py-2 font-bold"
+                    :class="Number(row.balance) < 0 ? 'text-red-600' : Number(row.balance) > 0 ? 'text-green-700' : 'text-gray-400'"
+                  >
+                    {{ formatAmount(row.balance) }}
+                  </td>
+                </tr>
+              </tbody>
 
-            <p
-              class="text-3xl font-black text-gray-800 mt-2"
-            >
-              {{ orderCount }}
-            </p>
+              <tfoot
+                v-if="yearBreakdown.totals"
+                class="border-t-2 border-gray-300 bg-gray-50 font-black text-gray-800"
+              >
+                <tr>
+                  <td class="text-left px-3 py-2 sticky left-0 bg-gray-50 z-10">TOTAL</td>
+                  <td class="text-right px-3 py-2 text-green-700">{{ formatAmount(yearBreakdown.totals.sales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.totalExpenses) }}</td>
+                  <td
+                    class="text-right px-3 py-2"
+                    :class="yearBreakdown.totals.profit >= 0 ? 'text-green-600' : 'text-red-600'"
+                  >
+                    {{ formatAmount(yearBreakdown.totals.profit) }}
+                  </td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.ingredients) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.materials) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.maintenance) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.miscellaneous) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.labor) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.bills) }}</td>
+                  <td class="text-right px-3 py-2">{{ yearBreakdown.totals.orderQty }}</td>
+                  <td class="text-right px-3 py-2">{{ yearBreakdown.totals.dineInCount }}</td>
+                  <td class="text-right px-3 py-2">{{ yearBreakdown.totals.takeOutCount }}</td>
+                  <td class="text-right px-3 py-2">{{ yearBreakdown.totals.deliveryCount }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.dineInSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.takeOutSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.deliverySales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(yearBreakdown.totals.refundDiscount) }}</td>
+                  <td
+                    class="text-right px-3 py-2"
+                    :class="(yearBreakdown.totals.balance || 0) < 0 ? 'text-red-600' : 'text-green-700'"
+                  >
+                    {{ formatAmount(yearBreakdown.totals.balance) }}
+                  </td>
+                </tr>
 
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Settled and paid orders
-            </p>
+                <!-- MONTHLY AVERAGE (closed months / 0 sales excluded) -->
+                <tr class="border-t border-gray-200 bg-blue-50/60 text-gray-700 font-bold">
+                  <td class="text-left px-3 py-2 sticky left-0 bg-blue-50 z-10">
+                    MONTHLY AVG
+                    <span class="text-[10px] text-gray-500 font-semibold">({{ monthlyAverage.openMonthCount }} open)</span>
+                  </td>
+                  <td class="text-right px-3 py-2 text-green-700">{{ formatAmount(monthlyAverage.sales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.totalExpenses) }}</td>
+                  <td
+                    class="text-right px-3 py-2"
+                    :class="monthlyAverage.profit >= 0 ? 'text-green-600' : 'text-red-600'"
+                  >
+                    {{ formatAmount(monthlyAverage.profit) }}
+                  </td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.ingredients) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.materials) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.maintenance) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.miscellaneous) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.labor) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.bills) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(monthlyAverage.orderQty) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(monthlyAverage.dineInCount) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(monthlyAverage.takeOutCount) }}</td>
+                  <td class="text-right px-3 py-2">{{ fmtAvgCount(monthlyAverage.deliveryCount) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.dineInSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.takeOutSales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.deliverySales) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.refundDiscount) }}</td>
+                  <td class="text-right px-3 py-2">{{ formatAmount(monthlyAverage.balance) }}</td>
+                </tr>
+              </tfoot>
 
+            </table>
           </div>
 
+          <p v-if="!isCollapsed('ytd-records')" class="px-4 md:px-5 py-2 text-[11px] text-gray-400 border-t border-gray-100">
+            Ang +/- Balance ay kabuuan ng per-araw na cash audit sa loob ng buwan (read-only dito; i-edit sa MTD/Daily).
+          </p>
+          </template>
         </div>
 
-        <!-- ======================================================== -->
-        <!-- CASH AUDIT SNAPSHOT -->
-        <!-- ======================================================== -->
+        <!-- ================================================= -->
+        <!-- YTD OVERALL SALES RECORD (lahat ng items) -->
+        <!-- ================================================= -->
 
-        <section class="space-y-4">
-
-          <div
-            class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2"
-          >
-
+        <div
+          :class="[
+            'bg-white border border-gray-200 shadow-sm',
+            isFs('ytd-overall') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+          ]"
+        >
+          <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
             <div>
-
-              <h2
-                class="text-xl font-black text-gray-800"
-              >
-                Cash Audit Snapshot
-              </h2>
-
-              <p
-                class="text-sm text-gray-500 mt-1"
-              >
-                Physical cash and GCash position for the selected date.
-              </p>
-
+              <h2 class="font-black text-gray-800">Overall Sales Record</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Lahat ng items para sa {{ yearBreakdown.year }} — i-click ang item para sa buwanang sales performance</p>
             </div>
-
-            <div
-              class="text-sm text-gray-500"
-            >
-              Selected Date:
-              <span
-                class="font-black text-gray-700"
-              >
-                {{
-                  cashAudit.date ||
-                  selectedDate
-                }}
-              </span>
+            <div class="flex items-center gap-1 text-xs">
+              <template v-if="!isCollapsed('ytd-overall')">
+                <span class="text-gray-400 font-semibold mr-1">Sort by:</span>
+                <button type="button" @click="yearOverallSort = 'sales'" :class="['px-3 py-1.5 rounded-lg font-bold', yearOverallSort === 'sales' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Sales</button>
+                <button type="button" @click="yearOverallSort = 'qty'" :class="['px-3 py-1.5 rounded-lg font-bold', yearOverallSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+              </template>
+              <button type="button" @click="toggleCollapse('ytd-overall')" class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700">{{ isCollapsed('ytd-overall') ? 'Show' : 'Hide' }}</button>
+              <button v-if="!isCollapsed('ytd-overall')" type="button" @click="toggleFullscreen('ytd-overall')" :title="isFs('ytd-overall') ? 'Normal view' : 'Fullscreen'" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base">{{ isFs('ytd-overall') ? '🗗' : '⛶' }}</button>
             </div>
-
           </div>
 
-          <!-- CASH AUDIT ERROR -->
+          <template v-if="!isCollapsed('ytd-overall')">
+          <div v-if="overallMenus.length === 0" class="py-8 text-center text-gray-500 text-sm">Walang menu items.</div>
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                <tr>
+                  <th class="text-left px-4 py-2 font-bold w-12">#</th>
+                  <th class="text-left px-4 py-2 font-bold">Item</th>
+                  <th class="text-right px-4 py-2 font-bold">Qty Sold</th>
+                  <th class="text-right px-4 py-2 font-bold">Total Sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template v-for="(m, i) in overallMenus" :key="`yov-${m.menuId || m.name}`">
+                  <tr
+                    class="border-b border-gray-100 cursor-pointer hover:bg-blue-50/40"
+                    @click="toggleYearMenu(m)"
+                  >
+                    <td class="px-4 py-2 font-bold text-gray-400">{{ i + 1 }}</td>
+                    <td class="px-4 py-2 font-bold text-gray-800">
+                      <span class="inline-block w-3 text-[10px] text-gray-400">{{ isYearMenuOpen(m) ? '▾' : '▸' }}</span>
+                      {{ m.name }}
+                    </td>
+                    <td class="px-4 py-2 text-right text-gray-700">{{ m.qty }}</td>
+                    <td class="px-4 py-2 text-right font-black text-green-700">{{ formatAmount(m.sales) }}</td>
+                  </tr>
 
-          <div
-            v-if="cashAuditError"
-            class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-medium"
-          >
-            {{ cashAuditError }}
+                  <tr v-if="isYearMenuOpen(m)" class="bg-blue-50/30 border-b border-gray-100">
+                    <td colspan="4" class="px-4 py-4">
+                      <template v-for="series in [itemMonthlySeries(m)]" :key="'ser'">
+
+                        <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                          <p class="text-[11px] font-black text-gray-500 uppercase tracking-wide">
+                            Buwanang Sales Performance — {{ m.name }}
+                          </p>
+                          <div class="flex items-center gap-1 text-xs">
+                            <span class="text-gray-400 font-semibold mr-1">View:</span>
+                            <button type="button" @click.stop="ytdSalesMetric = 'sales'" :class="['px-3 py-1 rounded-lg font-bold', ytdSalesMetric === 'sales' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Sales</button>
+                            <button type="button" @click.stop="ytdSalesMetric = 'qty'" :class="['px-3 py-1 rounded-lg font-bold', ytdSalesMetric === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+                          </div>
+                        </div>
+
+                        <!-- HORIZONTAL BAR CHART -->
+                        <template v-for="mx in [seriesMax(series, ytdSalesMetric === 'qty' ? 'qty' : 'sales')]" :key="'mx'">
+                          <div v-if="mx > 0" class="mb-4 space-y-1">
+                            <div
+                              v-for="(pt, pi) in series"
+                              :key="`bar-${pi}`"
+                              class="flex items-center gap-2"
+                            >
+                              <span class="w-16 text-[10px] text-gray-500 text-right shrink-0">{{ monthShort(pt.month) }}</span>
+                              <div class="flex-1 bg-gray-100 rounded h-4 overflow-hidden">
+                                <div
+                                  class="h-full rounded transition-all"
+                                  :style="{
+                                    width: barPct(ytdSalesMetric === 'qty' ? pt.qty : pt.sales, mx) + '%',
+                                    backgroundColor: barColor(ytdSalesMetric === 'qty' ? pt.qty : pt.sales, series, ytdSalesMetric === 'qty' ? 'qty' : 'sales')
+                                  }"
+                                  :title="`${monthLabel(pt.month)}: ${formatAmount(pt.sales)} (${pt.qty} pcs)`"
+                                ></div>
+                              </div>
+                              <span class="w-28 text-[10px] text-right shrink-0 leading-tight">
+                                <span class="text-gray-700 font-semibold">{{ ytdSalesMetric === 'qty' ? pt.qty + ' pcs' : formatAmount(pt.sales) }}</span>
+                                <span class="text-gray-400"> · {{ ytdSalesMetric === 'qty' ? formatAmount(pt.sales) : pt.qty + ' pcs' }}</span>
+                              </span>
+                            </div>
+                            <div class="flex items-center gap-2 pt-1 mt-1 border-t border-gray-200 font-bold text-gray-700">
+                              <span class="w-16 text-[10px] text-right shrink-0">TOTAL</span>
+                              <span class="flex-1"></span>
+                              <span class="w-28 text-[10px] text-right shrink-0 leading-tight">
+                                <span>{{ ytdSalesMetric === 'qty' ? m.qty + ' pcs' : formatAmount(m.sales) }}</span>
+                                <span class="text-gray-400 font-normal"> · {{ ytdSalesMetric === 'qty' ? formatAmount(m.sales) : m.qty + ' pcs' }}</span>
+                              </span>
+                            </div>
+                          </div>
+                          <p v-else class="text-xs text-gray-400 mb-1">Walang sales sa taong ito.</p>
+                        </template>
+
+                      </template>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
-
-          <!-- CASH AUDIT LOADING -->
-
-          <div
-            v-if="cashAuditLoading"
-            class="bg-white border border-gray-200 rounded-2xl p-8 text-center text-sm text-gray-500 shadow-sm"
-          >
-            Loading cash audit snapshot...
-          </div>
-
-          <div
-            v-else
-            class="space-y-4"
-          >
-
-            <!-- SUMMARY CARDS -->
-
-            <div
-              class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
-            >
-
-              <!-- OPENING -->
-
-              <div
-                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-              >
-
-                <p
-                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-                >
-                  Opening Cash
-                </p>
-
-                <p
-                  class="text-2xl md:text-3xl font-black text-gray-800 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      cashAudit.openingCash
-                    )
-                  }}
-                </p>
-
-                <p
-                  class="text-xs text-gray-400 mt-1"
-                >
-                  Initial cash in the drawer.
-                </p>
-
-              </div>
-
-              <!-- CASH SALES -->
-
-              <div
-                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-              >
-
-                <p
-                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-                >
-                  Cash Sales
-                </p>
-
-                <p
-                  class="text-2xl md:text-3xl font-black text-emerald-600 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      cashAudit.cashSales
-                    )
-                  }}
-                </p>
-
-                <p
-                  class="text-xs text-gray-400 mt-1"
-                >
-                  Actual cash received from sales.
-                </p>
-
-              </div>
-
-              <!-- STORE EXPENSES -->
-
-              <div
-                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-              >
-
-                <p
-                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-                >
-                  Store-paid Expenses
-                </p>
-
-                <p
-                  class="text-2xl md:text-3xl font-black text-red-600 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      cashAudit.storeExpenses
-                    )
-                  }}
-                </p>
-
-                <p
-                  class="text-xs text-gray-400 mt-1"
-                >
-                  Deducted from physical cash.
-                </p>
-
-              </div>
-
-              <!-- OTHER CASH OUT -->
-
-              <div
-                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-              >
-
-                <p
-                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-                >
-                  Other Cash Out
-                </p>
-
-                <p
-                  class="text-2xl md:text-3xl font-black text-red-600 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      cashAudit.otherCashOut
-                    )
-                  }}
-                </p>
-
-                <p
-                  class="text-xs text-gray-400 mt-1"
-                >
-                  Other physical cash released.
-                </p>
-
-              </div>
-
-              <!-- EXPECTED CASH -->
-
-              <div
-                class="rounded-2xl p-5 shadow-sm border-2"
-                :style="{
-                  borderColor:
-                    settingsStore.themeColor
-                }"
-              >
-
-                <p
-                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-                >
-                  Expected Cash in Drawer
-                </p>
-
-                <p
-                  class="text-2xl md:text-3xl font-black text-gray-900 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      cashAudit.expectedCash
-                    )
-                  }}
-                </p>
-
-                <p
-                  class="text-xs text-gray-500 mt-1"
-                >
-                  Expected physical cash after movements.
-                </p>
-
-              </div>
-
-              <!-- GCASH -->
-
-              <div
-                class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-              >
-
-                <p
-                  class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-                >
-                  GCash Received
-                </p>
-
-                <p
-                  class="text-2xl md:text-3xl font-black mt-2"
-                  :style="{
-                    color:
-                      settingsStore.themeColor
-                  }"
-                >
-                  {{
-                    formatAmount(
-                      cashAudit.gcashReceived
-                    )
-                  }}
-                </p>
-
-                <p
-                  class="text-xs text-gray-400 mt-1"
-                >
-                  Separate from physical cash drawer.
-                </p>
-
-              </div>
-
-            </div>
-
-            <!-- CASH FORMULA -->
-
-            <div
-              class="bg-gray-50 border border-gray-200 rounded-2xl p-5"
-            >
-
-              <p
-                class="text-xs font-black uppercase tracking-wide text-gray-500"
-              >
-                Expected Cash Calculation
-              </p>
-
-              <div
-                class="mt-3 grid grid-cols-1 sm:grid-cols-5 gap-3"
-              >
-
-                <div
-                  class="rounded-xl bg-white border border-gray-200 p-4"
-                >
-
-                  <p
-                    class="text-xs text-gray-400"
-                  >
-                    Opening
-                  </p>
-
-                  <p
-                    class="font-black text-gray-800 mt-1"
-                  >
-                    {{
-                      formatAmount(
-                        cashAudit.openingCash
-                      )
-                    }}
-                  </p>
-
-                </div>
-
-                <div
-                  class="rounded-xl bg-white border border-gray-200 p-4"
-                >
-
-                  <p
-                    class="text-xs text-gray-400"
-                  >
-                    + Cash In
-                  </p>
-
-                  <p
-                    class="font-black text-emerald-600 mt-1"
-                  >
-                    {{
-                      formatAmount(
-                        cashAudit.cashSales +
-                        cashAudit.otherCashIn
-                      )
-                    }}
-                  </p>
-
-                </div>
-
-                <div
-                  class="rounded-xl bg-white border border-gray-200 p-4"
-                >
-
-                  <p
-                    class="text-xs text-gray-400"
-                  >
-                    - Store Expenses
-                  </p>
-
-                  <p
-                    class="font-black text-red-600 mt-1"
-                  >
-                    {{
-                      formatAmount(
-                        cashAudit.storeExpenses
-                      )
-                    }}
-                  </p>
-
-                </div>
-
-                <div
-                  class="rounded-xl bg-white border border-gray-200 p-4"
-                >
-
-                  <p
-                    class="text-xs text-gray-400"
-                  >
-                    - Other Cash Out
-                  </p>
-
-                  <p
-                    class="font-black text-red-600 mt-1"
-                  >
-                    {{
-                      formatAmount(
-                        cashAudit.otherCashOut
-                      )
-                    }}
-                  </p>
-
-                </div>
-
-                <div
-                  class="rounded-xl border-2 p-4"
-                  :style="{
-                    borderColor:
-                      settingsStore.themeColor
-                  }"
-                >
-
-                  <p
-                    class="text-xs text-gray-500"
-                  >
-                    = Expected
-                  </p>
-
-                  <p
-                    class="font-black text-gray-900 mt-1"
-                  >
-                    {{
-                      formatAmount(
-                        cashAudit.expectedCash
-                      )
-                    }}
-                  </p>
-
-                </div>
-
-              </div>
-
-            </div>
-
-            <!-- SNAPSHOT NOTE -->
-
-            <div
-              class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3"
-            >
-
-              <p
-                class="text-xs text-blue-700 leading-relaxed"
-              >
-                Cash Audit Snapshot ay para lamang sa selected date. Kahit MTD o YTD ang report period, hindi ito cumulative cash balance. Para sa actual daily cash audit, gamitin ang Cash Ledger bilang detailed source.
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- SALES SUMMARY -->
-
-        <section class="space-y-4">
-
-          <div>
-
-            <h2
-              class="text-xl font-black text-gray-800"
-            >
-              Sales Summary
-            </h2>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Breakdown of sales for the selected period.
-            </p>
-
-          </div>
-
-          <div
-            class="grid grid-cols-1 lg:grid-cols-2 gap-4"
-          >
-
-            <!-- GENERAL SALES -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4"
-            >
-
-              <h3
-                class="font-black text-gray-800"
-              >
-                Sales Breakdown
-              </h3>
-
-              <div
-                class="flex justify-between items-center"
-              >
-
-                <span
-                  class="text-gray-600"
-                >
-                  Gross Sales
-                </span>
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  {{
-                    formatAmount(
-                      grossSales
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="flex justify-between items-center"
-              >
-
-                <span
-                  class="text-gray-600"
-                >
-                  Discounts
-                </span>
-
-                <span
-                  class="font-black text-red-600"
-                >
-                  -{{
-                    formatAmount(
-                      discounts
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="flex justify-between items-center"
-              >
-
-                <span
-                  class="text-gray-600"
-                >
-                  Delivery Fees
-                </span>
-
-                <span
-                  class="font-black text-blue-600"
-                >
-                  +{{
-                    formatAmount(
-                      deliveryFees
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="pt-3 border-t border-gray-200 flex justify-between items-center"
-              >
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  Net Sales
-                </span>
-
-                <span
-                  class="font-black text-green-600"
-                >
-                  {{
-                    formatAmount(
-                      totalSales
-                    )
-                  }}
-                </span>
-
-              </div>
-
-            </div>
-
-            <!-- PAYMENT -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4"
-            >
-
-              <h3
-                class="font-black text-gray-800"
-              >
-                Payment Breakdown
-              </h3>
-
-              <div
-                class="flex justify-between items-center"
-              >
-
-                <span
-                  class="text-gray-600"
-                >
-                  Cash
-                </span>
-
-                <span
-                  class="font-black text-green-600"
-                >
-                  {{
-                    formatAmount(
-                      cashSales
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="flex justify-between items-center"
-              >
-
-                <span
-                  class="text-gray-600"
-                >
-                  GCash
-                </span>
-
-                <span
-                  class="font-black text-blue-600"
-                >
-                  {{
-                    formatAmount(
-                      gcashSales
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="flex justify-between items-center"
-              >
-
-                <span
-                  class="text-gray-600"
-                >
-                  Refunds
-                </span>
-
-                <span
-                  class="font-black text-red-600"
-                >
-                  -{{
-                    formatAmount(
-                      refunds
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="flex justify-between items-center"
-              >
-
-                <span
-                  class="text-gray-600"
-                >
-                  Adjustments
-                </span>
-
-                <span
-                  class="font-black text-blue-600"
-                >
-                  {{
-                    formatAmount(
-                      adjustments
-                    )
-                  }}
-                </span>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- ORDER TYPE SALES -->
-
-        <section class="space-y-4">
-
-          <div>
-
-            <h2
-              class="text-xl font-black text-gray-800"
-            >
-              Sales by Order Type
-            </h2>
-
-          </div>
-
-          <div
-            class="grid grid-cols-1 sm:grid-cols-3 gap-4"
-          >
-
-            <!-- DINE IN -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <div
-                class="flex items-center justify-between"
-              >
-
-                <p
-                  class="font-black text-gray-800"
-                >
-                  Dine-In
-                </p>
-
-                <span
-                  class="px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-black"
-                >
-                  {{
-                    sales.dineInCount ||
-                    0
-                  }}
-                </span>
-
-              </div>
-
-              <p
-                class="text-2xl font-black text-purple-600 mt-3"
-              >
-                {{
-                  formatAmount(
-                    dineInSales
-                  )
-                }}
-              </p>
-
-            </div>
-
-            <!-- TAKE OUT -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <div
-                class="flex items-center justify-between"
-              >
-
-                <p
-                  class="font-black text-gray-800"
-                >
-                  Take-Out
-                </p>
-
-                <span
-                  class="px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-black"
-                >
-                  {{
-                    sales.takeOutCount ||
-                    0
-                  }}
-                </span>
-
-              </div>
-
-              <p
-                class="text-2xl font-black text-orange-600 mt-3"
-              >
-                {{
-                  formatAmount(
-                    takeOutSales
-                  )
-                }}
-              </p>
-
-            </div>
-
-            <!-- DELIVERY -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <div
-                class="flex items-center justify-between"
-              >
-
-                <p
-                  class="font-black text-gray-800"
-                >
-                  Delivery
-                </p>
-
-                <span
-                  class="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-black"
-                >
-                  {{
-                    sales.deliveryCount ||
-                    0
-                  }}
-                </span>
-
-              </div>
-
-              <p
-                class="text-2xl font-black text-blue-600 mt-3"
-              >
-                {{
-                  formatAmount(
-                    deliverySales
-                  )
-                }}
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- EXPENSE BREAKDOWN -->
-
-        <section class="space-y-4">
-
-          <div>
-
-            <h2
-              class="text-xl font-black text-gray-800"
-            >
-              Expense Breakdown
-            </h2>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Recorded expenses by category.
-            </p>
-
-          </div>
-
-          <div
-            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-5"
-          >
-
-            <!-- INGREDIENTS -->
-
+          </template>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- YTD EXPENSES BREAKDOWN BY CATEGORY -->
+        <!-- ================================================= -->
+
+        <div
+          :class="[
+            'bg-white border border-gray-200 shadow-sm',
+            isFs('ytd-exp') ? 'fixed inset-0 z-[120] rounded-none overflow-auto' : 'rounded-2xl overflow-hidden'
+          ]"
+        >
+          <div class="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
             <div>
-
-              <div
-                class="flex justify-between items-center gap-3 mb-2"
-              >
-
-                <span
-                  class="font-semibold text-gray-700"
-                >
-                  Ingredients
-                </span>
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  {{
-                    formatAmount(
-                      ingredientsExpense
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
-              >
-
-                <div
-                  class="h-full bg-green-500 rounded-full"
-                  :style="{
-                    width:
-                      `${expensePercentage(ingredientsExpense)}%`
-                  }"
-                ></div>
-
-              </div>
-
+              <h2 class="font-black text-gray-800">Expenses Breakdown</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Per category para sa buong taon (i-click ang category para sa detalye)</p>
             </div>
-
-            <!-- MATERIALS -->
-
-            <div>
-
-              <div
-                class="flex justify-between items-center gap-3 mb-2"
-              >
-
-                <span
-                  class="font-semibold text-gray-700"
-                >
-                  Materials
-                </span>
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  {{
-                    formatAmount(
-                      materialsExpense
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
-              >
-
-                <div
-                  class="h-full bg-yellow-500 rounded-full"
-                  :style="{
-                    width:
-                      `${expensePercentage(materialsExpense)}%`
-                  }"
-                ></div>
-
-              </div>
-
+            <div class="flex items-center gap-1 text-xs">
+              <template v-if="!isCollapsed('ytd-exp')">
+                <span class="text-gray-400 font-semibold mr-1">Sort items:</span>
+                <button type="button" @click="yearExpSort = 'cost'" :class="['px-3 py-1.5 rounded-lg font-bold', yearExpSort === 'cost' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Cost</button>
+                <button type="button" @click="yearExpSort = 'qty'" :class="['px-3 py-1.5 rounded-lg font-bold', yearExpSort === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+              </template>
+              <button type="button" @click="toggleCollapse('ytd-exp')" class="ml-1 px-2.5 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 font-bold text-gray-700">{{ isCollapsed('ytd-exp') ? 'Show' : 'Hide' }}</button>
+              <button v-if="!isCollapsed('ytd-exp')" type="button" @click="toggleFullscreen('ytd-exp')" :title="isFs('ytd-exp') ? 'Normal view' : 'Fullscreen'" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-base">{{ isFs('ytd-exp') ? '🗗' : '⛶' }}</button>
             </div>
-
-            <!-- MAINTENANCE -->
-
-            <div>
-
-              <div
-                class="flex justify-between items-center gap-3 mb-2"
-              >
-
-                <span
-                  class="font-semibold text-gray-700"
-                >
-                  Maintenance
-                </span>
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  {{
-                    formatAmount(
-                      maintenanceExpense
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
-              >
-
-                <div
-                  class="h-full bg-orange-500 rounded-full"
-                  :style="{
-                    width:
-                      `${expensePercentage(maintenanceExpense)}%`
-                  }"
-                ></div>
-
-              </div>
-
-            </div>
-
-            <!-- BILLS -->
-
-            <div>
-
-              <div
-                class="flex justify-between items-center gap-3 mb-2"
-              >
-
-                <span
-                  class="font-semibold text-gray-700"
-                >
-                  Bills
-                </span>
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  {{
-                    formatAmount(
-                      billsExpense
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
-              >
-
-                <div
-                  class="h-full bg-red-500 rounded-full"
-                  :style="{
-                    width:
-                      `${expensePercentage(billsExpense)}%`
-                  }"
-                ></div>
-
-              </div>
-
-            </div>
-
-            <!-- MISCELLANEOUS -->
-
-            <div>
-
-              <div
-                class="flex justify-between items-center gap-3 mb-2"
-              >
-
-                <span
-                  class="font-semibold text-gray-700"
-                >
-                  Miscellaneous
-                </span>
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  {{
-                    formatAmount(
-                      miscellaneousExpense
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
-              >
-
-                <div
-                  class="h-full bg-gray-500 rounded-full"
-                  :style="{
-                    width:
-                      `${expensePercentage(miscellaneousExpense)}%`
-                  }"
-                ></div>
-
-              </div>
-
-            </div>
-
-            <!-- LABOR -->
-
-            <div>
-
-              <div
-                class="flex justify-between items-center gap-3 mb-2"
-              >
-
-                <span
-                  class="font-semibold text-gray-700"
-                >
-                  Labor
-                </span>
-
-                <span
-                  class="font-black text-gray-800"
-                >
-                  {{
-                    formatAmount(
-                      laborExpense
-                    )
-                  }}
-                </span>
-
-              </div>
-
-              <div
-                class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"
-              >
-
-                <div
-                  class="h-full bg-purple-500 rounded-full"
-                  :style="{
-                    width:
-                      `${expensePercentage(laborExpense)}%`
-                  }"
-                ></div>
-
-              </div>
-
-            </div>
-
-            <!-- TOTAL -->
-
-            <div
-              class="pt-4 border-t border-gray-200 flex justify-between items-center"
-            >
-
-              <span
-                class="font-black text-gray-800"
-              >
-                Total Expenses
-              </span>
-
-              <span
-                class="text-xl font-black text-red-600"
-              >
-                {{
-                  formatAmount(
-                    totalExpenses
-                  )
-                }}
-              </span>
-
-            </div>
-
           </div>
 
-        </section>
-
-        <!-- BILL BREAKDOWN -->
-
-        <section class="space-y-4">
-
-          <div>
-
-            <h2
-              class="text-xl font-black text-gray-800"
-            >
-              Bill Breakdown
-            </h2>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Shows how Bills were included in the selected period.
-            </p>
-
-          </div>
-
-          <div
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
-
-            <!-- DIRECT -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Direct Bills
-              </p>
-
-              <p
-                class="text-2xl font-black text-gray-800 mt-2"
-              >
-                {{
-                  formatAmount(
-                    directBillExpense
-                  )
-                }}
-              </p>
-
-              <p
-                class="text-sm text-gray-500 mt-1"
-              >
-                One-time or non-recurring bill records.
-              </p>
-
+          <template v-if="!isCollapsed('ytd-exp')">
+            <div v-if="yearExpenseGroups.length === 0" class="py-8 text-center text-gray-500 text-sm">
+              Walang expenses para sa taong ito.
             </div>
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                  <tr>
+                    <th class="text-left px-4 py-2 font-bold">Category / Item</th>
+                    <th class="text-right px-4 py-2 font-bold">Qty</th>
+                    <th class="text-right px-4 py-2 font-bold">Cost (Total)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template v-for="g in yearExpenseGroups" :key="`yexp-${g.category}`">
+                    <tr
+                      class="bg-gray-50 border-t border-gray-200 cursor-pointer hover:bg-gray-100"
+                      @click="toggleExpCat('ytd-exp', g.category)"
+                    >
+                      <td class="px-4 py-2 font-black text-gray-800">
+                        <span class="inline-block w-4 text-gray-500">{{ isExpCatOpen('ytd-exp', g.category) ? '▾' : '▸' }}</span>
+                        {{ g.label }}
+                        <span class="text-xs font-semibold text-gray-400">({{ g.items.length }})</span>
+                      </td>
+                      <td class="px-4 py-2 text-right font-black text-gray-800">{{ g.qtyTotal }}</td>
+                      <td class="px-4 py-2 text-right font-black text-gray-800">{{ formatAmount(g.subtotal) }}</td>
+                    </tr>
+                    <template
+                      v-for="(it, i) in (isExpCatOpen('ytd-exp', g.category) ? g.items : [])"
+                      :key="`yexp-${g.category}-${i}`"
+                    >
+                      <tr
+                        class="border-b border-gray-100 cursor-pointer hover:bg-blue-50/40"
+                        @click="toggleExpItem('ytd-exp', g.category, it.name)"
+                      >
+                        <td class="pl-10 pr-4 py-1.5 text-gray-600">
+                          <span class="inline-block w-3 text-[10px] text-gray-400">{{ isExpItemOpen('ytd-exp', g.category, it.name) ? '▾' : '▸' }}</span>
+                          {{ it.name }}
+                        </td>
+                        <td class="px-4 py-1.5 text-right text-gray-700">{{ it.qty }}</td>
+                        <td class="px-4 py-1.5 text-right text-gray-700">{{ formatAmount(it.amount) }}</td>
+                      </tr>
+                      <tr v-if="isExpItemOpen('ytd-exp', g.category, it.name)" class="bg-blue-50/30 border-b border-gray-100">
+                        <td colspan="3" class="px-4 py-3">
+                          <template v-for="series in [expenseItemMonthlySeries(g.category, it.name)]" :key="'eser'">
 
-            <!-- RECURRING -->
+                            <div class="flex items-center justify-between gap-2 mb-3 flex-wrap pl-10">
+                              <p class="text-[11px] font-black text-gray-500 uppercase tracking-wide">
+                                Buwanang Gastos — {{ it.name }}
+                              </p>
+                              <div class="flex items-center gap-1 text-xs">
+                                <span class="text-gray-400 font-semibold mr-1">View:</span>
+                                <button type="button" @click.stop="ytdExpMetric = 'cost'" :class="['px-3 py-1 rounded-lg font-bold', ytdExpMetric === 'cost' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Cost</button>
+                                <button type="button" @click.stop="ytdExpMetric = 'qty'" :class="['px-3 py-1 rounded-lg font-bold', ytdExpMetric === 'qty' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600']">Qty</button>
+                              </div>
+                            </div>
 
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
+                            <!-- HORIZONTAL BAR CHART (monthly gastos) -->
+                            <template v-for="mx in [seriesMax(series, ytdExpMetric === 'qty' ? 'qty' : 'amount')]" :key="'emx'">
+                              <div v-if="mx > 0" class="mb-4 space-y-1 pl-10 pr-2">
+                                <div
+                                  v-for="(pt, pi) in series"
+                                  :key="`ebar-${pi}`"
+                                  class="flex items-center gap-2"
+                                >
+                                  <span class="w-16 text-[10px] text-gray-500 text-right shrink-0">{{ monthShort(pt.month) }}</span>
+                                  <div class="flex-1 bg-gray-100 rounded h-4 overflow-hidden">
+                                    <div
+                                      class="h-full rounded transition-all"
+                                      :style="{
+                                        width: barPct(ytdExpMetric === 'qty' ? pt.qty : pt.amount, mx) + '%',
+                                        backgroundColor: barColor(ytdExpMetric === 'qty' ? pt.qty : pt.amount, series, ytdExpMetric === 'qty' ? 'qty' : 'amount')
+                                      }"
+                                      :title="`${monthLabel(pt.month)}: ${formatAmount(pt.amount)} (qty ${pt.qty})`"
+                                    ></div>
+                                  </div>
+                                  <span class="w-28 text-[10px] text-right shrink-0 leading-tight">
+                                    <span class="text-gray-700 font-semibold">{{ ytdExpMetric === 'qty' ? pt.qty : formatAmount(pt.amount) }}</span>
+                                    <span class="text-gray-400"> · {{ ytdExpMetric === 'qty' ? formatAmount(pt.amount) : 'qty ' + pt.qty }}</span>
+                                  </span>
+                                </div>
+                                <div class="flex items-center gap-2 pt-1 mt-1 border-t border-gray-200 font-bold text-gray-700">
+                                  <span class="w-16 text-[10px] text-right shrink-0">TOTAL</span>
+                                  <span class="flex-1"></span>
+                                  <span class="w-28 text-[10px] text-right shrink-0 leading-tight">
+                                    <span>{{ ytdExpMetric === 'qty' ? it.qty : formatAmount(it.amount) }}</span>
+                                    <span class="text-gray-400 font-normal"> · {{ ytdExpMetric === 'qty' ? formatAmount(it.amount) : 'qty ' + it.qty }}</span>
+                                  </span>
+                                </div>
+                              </div>
+                              <p v-else class="text-xs text-gray-400 mb-1 pl-10">Walang gastos sa taong ito.</p>
+                            </template>
 
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Recurring Bills
-              </p>
-
-              <p
-                class="text-2xl font-black text-blue-600 mt-2"
-              >
-                {{
-                  formatAmount(
-                    recurringBillExpense
-                  )
-                }}
-              </p>
-
-              <p
-                class="text-sm text-gray-500 mt-1"
-              >
-                Daily allocation from Daily / Weekly / Monthly bills.
-              </p>
-
+                          </template>
+                        </td>
+                      </tr>
+                    </template>
+                  </template>
+                </tbody>
+                <tfoot class="border-t-2 border-gray-300 bg-gray-50">
+                  <tr>
+                    <td class="px-4 py-2 font-black text-gray-800">GRAND TOTAL</td>
+                    <td class="px-4 py-2 text-right font-black text-gray-800">{{ yearExpenseGrandQty }}</td>
+                    <td class="px-4 py-2 text-right font-black text-gray-800">{{ formatAmount(yearExpenseGrand) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-
-            <!-- SELECTED DATE -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Selected Date Allocation
-              </p>
-
-              <p
-                class="text-2xl font-black text-red-600 mt-2"
-              >
-                {{
-                  formatAmount(
-                    selectedDateBillAllocation
-                  )
-                }}
-              </p>
-
-              <p
-                class="text-sm text-gray-500 mt-1"
-              >
-                Recurring bill allocation for {{ selectedDate }}.
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- LABOR BREAKDOWN -->
-
-        <section class="space-y-4">
-
-          <div>
-
-            <h2
-              class="text-xl font-black text-gray-800"
-            >
-              Labor Breakdown
-            </h2>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Regular labor, 13th Month, and Labor Benefits.
-            </p>
-
-          </div>
-
-          <div
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-          >
-
-            <!-- REGULAR -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Regular Labor
-              </p>
-
-              <p
-                class="text-2xl font-black text-purple-600 mt-2"
-              >
-                {{
-                  formatAmount(
-                    regularLaborExpense
-                  )
-                }}
-              </p>
-
-              <p
-                class="text-sm text-gray-500 mt-1"
-              >
-                Payroll-period allocation.
-              </p>
-
-            </div>
-
-            <!-- 13TH MONTH -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                13th Month
-              </p>
-
-              <p
-                class="text-2xl font-black text-blue-600 mt-2"
-              >
-                {{
-                  formatAmount(
-                    thirteenthMonthExpense
-                  )
-                }}
-              </p>
-
-              <p
-                class="text-sm text-gray-500 mt-1"
-              >
-                Full-month daily allocation.
-              </p>
-
-            </div>
-
-            <!-- LABOR BENEFITS -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Labor Benefits
-              </p>
-
-              <p
-                class="text-2xl font-black text-green-600 mt-2"
-              >
-                {{
-                  formatAmount(
-                    laborBenefitsExpense
-                  )
-                }}
-              </p>
-
-              <p
-                class="text-sm text-gray-500 mt-1"
-              >
-                Dynamic Daily / Weekly / Monthly items.
-              </p>
-
-            </div>
-
-            <!-- ESTIMATE -->
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Estimated Daily Regular
-              </p>
-
-              <p
-                class="text-2xl font-black text-gray-800 mt-2"
-              >
-                {{
-                  formatAmount(
-                    estimatedDailyRegularLabor
-                  )
-                }}
-              </p>
-
-              <p
-                class="text-xs text-gray-500 mt-1"
-              >
-                Source:
-                {{ regularEstimateSource }}
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- SELECTED DATE LABOR ALLOCATION -->
-
-        <section class="space-y-4">
-
-          <div>
-
-            <h2
-              class="text-xl font-black text-gray-800"
-            >
-              Selected Date Labor Allocation
-            </h2>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Daily labor values used for {{ selectedDate }}.
-            </p>
-
-          </div>
-
-          <div
-            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-          >
-
-            <div
-              class="grid grid-cols-1 sm:grid-cols-3 gap-4"
-            >
-
-              <!-- REGULAR -->
-
-              <div
-                class="rounded-xl bg-purple-50 border border-purple-100 p-4"
-              >
-
-                <p
-                  class="text-xs font-bold text-purple-600 uppercase tracking-wide"
-                >
-                  Regular Labor
-                </p>
-
-                <p
-                  class="text-xl font-black text-purple-700 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      selectedDateRegularLabor
-                    )
-                  }}
-                </p>
-
-              </div>
-
-              <!-- 13TH MONTH -->
-
-              <div
-                class="rounded-xl bg-blue-50 border border-blue-100 p-4"
-              >
-
-                <p
-                  class="text-xs font-bold text-blue-600 uppercase tracking-wide"
-                >
-                  13th Month
-                </p>
-
-                <p
-                  class="text-xl font-black text-blue-700 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      selectedDate13thMonth
-                    )
-                  }}
-                </p>
-
-              </div>
-
-              <!-- BENEFITS -->
-
-              <div
-                class="rounded-xl bg-green-50 border border-green-100 p-4"
-              >
-
-                <p
-                  class="text-xs font-bold text-green-600 uppercase tracking-wide"
-                >
-                  Labor Benefits
-                </p>
-
-                <p
-                  class="text-xl font-black text-green-700 mt-2"
-                >
-                  {{
-                    formatAmount(
-                      selectedDateLaborBenefits
-                    )
-                  }}
-                </p>
-
-              </div>
-
-            </div>
-
-            <div
-              class="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center"
-            >
-
-              <span
-                class="font-black text-gray-800"
-              >
-                Selected Date Total Labor
-              </span>
-
-              <span
-                class="text-xl font-black text-purple-700"
-              >
-                {{
-                  formatAmount(
-                    selectedDateRegularLabor +
-                    selectedDate13thMonth +
-                    selectedDateLaborBenefits
-                  )
-                }}
-              </span>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- AVERAGES -->
-
-        <section class="space-y-4">
-
-          <div>
-
-            <h2
-              class="text-xl font-black text-gray-800"
-            >
-              Daily Averages
-            </h2>
-
-            <p
-              class="text-sm text-gray-500 mt-1"
-            >
-              Useful for MTD and YTD monitoring.
-            </p>
-
-          </div>
-
-          <div
-            class="grid grid-cols-1 sm:grid-cols-3 gap-4"
-          >
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Average Sales
-              </p>
-
-              <p
-                class="text-2xl font-black text-green-600 mt-2"
-              >
-                {{
-                  formatAmount(
-                    averageSales
-                  )
-                }}
-              </p>
-
-            </div>
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Average Expenses
-              </p>
-
-              <p
-                class="text-2xl font-black text-red-600 mt-2"
-              >
-                {{
-                  formatAmount(
-                    averageExpenses
-                  )
-                }}
-              </p>
-
-            </div>
-
-            <div
-              class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-            >
-
-              <p
-                class="text-xs font-bold text-gray-500 uppercase tracking-wide"
-              >
-                Average Profit
-              </p>
-
-              <p
-                class="text-2xl font-black mt-2"
-                :class="
-                  averageProfit >= 0
-                    ? 'text-blue-600'
-                    : 'text-red-600'
-                "
-              >
-                {{
-                  formatAmount(
-                    averageProfit
-                  )
-                }}
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- PROFIT SUMMARY -->
-
-        <section>
-
-          <div
-            class="rounded-2xl p-6 border"
-            :class="
-              estimatedProfit >= 0
-                ? 'bg-blue-50 border-blue-200'
-                : 'bg-red-50 border-red-200'
-            "
-          >
-
-            <div
-              class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-            >
-
-              <div>
-
-                <p
-                  class="text-xs font-bold uppercase tracking-wide"
-                  :class="
-                    estimatedProfit >= 0
-                      ? 'text-blue-600'
-                      : 'text-red-600'
-                  "
-                >
-                  Estimated Profit
-                </p>
-
-                <p
-                  class="text-3xl font-black mt-1"
-                  :class="
-                    estimatedProfit >= 0
-                      ? 'text-blue-700'
-                      : 'text-red-700'
-                  "
-                >
-                  {{
-                    formatAmount(
-                      estimatedProfit
-                    )
-                  }}
-                </p>
-
-                <p
-                  class="text-sm mt-1"
-                  :class="
-                    estimatedProfit >= 0
-                      ? 'text-blue-600'
-                      : 'text-red-600'
-                  "
-                >
-                  Net sales less recorded operating expenses.
-                </p>
-
-              </div>
-
-              <div
-                class="text-right"
-              >
-
-                <p
-                  class="text-xs text-gray-500"
-                >
-                  Selected Period
-                </p>
-
-                <p
-                  class="font-black text-gray-800"
-                >
-                  {{ activePeriod }}
-                </p>
-
-                <p
-                  class="text-sm text-gray-500"
-                >
-                  {{ selectedDate }}
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
+          </template>
+        </div>
 
       </template>
 
@@ -4420,6 +3484,78 @@ onMounted(() => {
           Walang report data para sa napiling petsa.
         </p>
 
+      </div>
+
+      <!-- ================================================= -->
+      <!-- IMPORT HISTORICAL MODAL -->
+      <!-- ================================================= -->
+
+      <div
+        v-if="isImportModalOpen"
+        class="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-4"
+        @click.self="closeImportModal"
+      >
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+          <div class="bg-indigo-600 text-white px-5 py-4 shrink-0">
+            <div class="text-lg font-bold">📥 Import Historical Data</div>
+            <div class="text-sm text-indigo-100 mt-1">
+              Mag-upload ng lumang monthly Excel (RDR template). Babasahin ang Summary + daily sheets.
+            </div>
+          </div>
+
+          <div class="p-5 space-y-4 overflow-y-auto">
+
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Excel file (.xlsx)</label>
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                @change="onImportFileChange"
+                class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <p v-if="importFileName" class="text-xs text-gray-500 mt-1">{{ importFileName }}</p>
+            </div>
+
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Per-araw na per-item sales at expenses ang ii-import. Ang mga petsang may live POS data na ay awtomatikong ili-laktaw (iwas-doble). Puwedeng i-upload ulit ang parehong buwan — papalitan lang nito ang dati.
+            </p>
+
+            <div v-if="importError" class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 py-2 text-sm">
+              {{ importError }}
+            </div>
+
+            <div v-if="importResult" class="bg-green-50 border border-green-200 text-green-700 rounded-xl px-3 py-3 text-sm space-y-1">
+              <p class="font-bold">{{ importResult.message }}</p>
+              <p class="text-xs">Buwan: {{ (importResult.months || []).join(', ') }}</p>
+              <p class="text-xs">Saklaw: {{ importResult.dateRange?.from }} → {{ importResult.dateRange?.to }}</p>
+              <p class="text-xs">Item-sales rows: {{ importResult.itemSalesRows }} · Expense rows: {{ importResult.expenseRows }}</p>
+              <p v-if="importResult.skippedCount" class="text-xs text-amber-700">
+                Na-skip ({{ importResult.skippedCount }}): {{ (importResult.skipped || []).join(', ') }}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex gap-2 p-5 pt-0 shrink-0">
+            <button
+              type="button"
+              @click="closeImportModal"
+              :disabled="importing"
+              class="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-colors disabled:opacity-50"
+            >
+              Isara
+            </button>
+            <button
+              type="button"
+              @click="submitImport"
+              :disabled="importing || !importFile"
+              class="flex-1 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition-colors disabled:opacity-50"
+            >
+              {{ importing ? 'Importing...' : 'Import' }}
+            </button>
+          </div>
+
+        </div>
       </div>
 
     </template>
